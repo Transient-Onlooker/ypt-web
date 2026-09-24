@@ -50,7 +50,8 @@ async function api(path, method = "GET", body) {
     status: response.status,
     success: data?.s === true,
   });
-  if (!response.ok || data?.s !== true) throw new Error("API_REJECTED");
+  if (!response.ok || data?.s !== true)
+    throw new Error(path === "/user/sign-in-jwt" ? "LOGIN_REJECTED" : "API_REJECTED");
   return data;
 }
 const reloadBody = {
@@ -73,6 +74,7 @@ try {
   let password = await ask("");
   muted = false;
   process.stdout.write("\n");
+  report.stage = "login";
   const login = await api("/user/sign-in-jwt", "POST", {
     email,
     password,
@@ -175,7 +177,9 @@ try {
   report.error = error instanceof Error ? error.message : "LOCAL_ERROR";
   await save();
   console.error(
-    `Test stopped at ${report.stage}: ${report.error}. Check the app and stop any running timer. No action is retried.`,
+    report.stage === "login"
+      ? `Login was rejected (${report.error}). No timer was started. Check the account details and retry when ready.`
+      : `Test stopped at ${report.stage}: ${report.error}. Check the app and stop any running timer. No action is retried.`,
   );
   process.exitCode = 1;
 } finally {
