@@ -404,7 +404,7 @@ function App() {
         void loadMembers(selectedGroup);
     };
     document.addEventListener("visibilitychange", refresh);
-    const interval = setInterval(refresh, 30_000);
+    const interval = setInterval(refresh, 15_000);
     return () => {
       document.removeEventListener("visibilitychange", refresh);
       clearInterval(interval);
@@ -746,7 +746,7 @@ function App() {
                         disabled={busy || remoteUnverified}
                         onClick={() => void change("stop")}
                       >
-                        종료
+                        공부 끝내기
                       </button>
                     </>
                   )}
@@ -764,7 +764,7 @@ function App() {
                         disabled={busy}
                         onClick={() => void change("stop")}
                       >
-                        종료
+                        공부 끝내기
                       </button>
                     </>
                   )}
@@ -783,6 +783,12 @@ function App() {
                       </button>
                     )}
                 </div>
+                {(timer?.state === "running" || timer?.state === "paused") && (
+                  <p className="card-note">
+                    일시정지는 과목을 기억해 재개할 수 있습니다. 공부 끝내기는
+                    구간을 마무리하고 다음 시작 때 과목을 다시 고릅니다.
+                  </p>
+                )}
                 {((timer?.state === "idle" && !appOnly) ||
                   timer?.state === "paused") && (
                   <p className="card-note">
@@ -1034,7 +1040,10 @@ function App() {
                 </div>
                 {members && (
                   <p className="member-summary">
-                    조회된 멤버 {members.length}명 · 공부 상태 미확인
+                    공부 중 {members.filter((member) => member.studying === true).length}명
+                    {" · "}조회된 멤버 {members.length}명
+                    {members.some((member) => member.studying === null) &&
+                      ` · 상태 미확인 ${members.filter((member) => member.studying === null).length}명`}
                     {memberQuery.trim() &&
                       ` · 검색 결과 ${visibleMembers?.length ?? 0}명`}
                   </p>
@@ -1075,6 +1084,7 @@ function App() {
                   <p className="checked-time">
                     마지막 확인{" "}
                     {new Date(groupCheckedAt).toLocaleTimeString("ko-KR")}
+                    {" · "}화면이 보일 때 15초마다 자동 확인
                   </p>
                 )}
                 {visibleMembers?.length ? (
@@ -1088,10 +1098,23 @@ function App() {
                         <span className="member-name">
                           {member.nickname}
                           <small>
-                            공부 상태 미확인 · 오늘 기록
+                            {member.studying === true
+                              ? "공부 중"
+                              : member.studying === false
+                                ? "쉬는 중"
+                                : "공부 상태 미확인"}
                           </small>
                         </span>
-                        <strong>{duration(member.studyMs)}</strong>
+                        <span className="member-time">
+                          <strong>{duration(member.studyMs)}</strong>
+                          <small>오늘 기록</small>
+                          {member.studying === true && member.startedAt !== null && (
+                            <>
+                              <strong>{duration(Math.max(0, now + clockOffset - member.startedAt))}</strong>
+                              <small>진행 중</small>
+                            </>
+                          )}
+                        </span>
                       </div>
                     ))}
                   </div>

@@ -138,7 +138,7 @@ function upstream() {
         throw new Error("wrong group member request");
       return reply({
         ms: [
-          { ud: 1, n: "멤버1", im: true, dl: { sm: 1000 } },
+          { ud: 1, n: "멤버1", im: true, dl: { is: false, sm: 1000 } },
           { ud: 2, n: "멤버2", im: true, dl: { sm: 2000 } },
           { ud: 3, n: "멤버3", im: true, dl: { sm: 3000 } },
           { ud: 4, n: "멤버4", im: true, dl: { sm: 4000 } },
@@ -345,7 +345,8 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     assert.equal(groupMembers.status, 200);
     assert.equal(groupMembers.data.members.length, 4);
-    assert.equal(groupMembers.data.members[0].studying, null);
+    assert.equal(groupMembers.data.members[0].studying, false);
+    assert.equal(groupMembers.data.members[0].startedAt, null);
     assert.equal(groupMembers.data.members[0].studyMs, 1000);
     assert.deepEqual(
       (await call(env, "/groups", "GET", undefined, b.cookie)).data.groups,

@@ -26,6 +26,7 @@ export type Member = {
   nickname: string;
   studying: boolean | null;
   studyMs: number | null;
+  startedAt: number | null;
 };
 export type Capabilities = {
   crossControl: boolean;

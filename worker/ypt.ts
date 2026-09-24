@@ -209,14 +209,23 @@ export function groupsFrom(reply: Record<string, unknown>): Group[] {
 export function membersFrom(reply: Record<string, unknown>): Member[] {
   if (!Array.isArray(reply.ms)) throw new YptError("INVALID_DATA");
   return array(reply.ms)
-    .map((m) => ({
-      id: number(m.ud),
-      nickname: typeof m.n === "string" ? m.n : "",
-      // im remained true for idle members in a live comparison. Its meaning
-      // is not verified as current study status, so never present it as such.
-      studying: null as Member["studying"],
-      studyMs: number(object(m.dl)?.sm),
-    }))
+    .map((m) => {
+      const log = object(m.dl);
+      const studying = typeof log?.is === "boolean" ? log.is : null;
+      const stamp = log?.st;
+      const startedAt = studying === true && typeof stamp === "string" &&
+        /(?:Z|[+-]\d{2}:?\d{2})$/.test(stamp) ? Date.parse(stamp) : NaN;
+      return {
+        id: number(m.ud),
+        nickname: typeof m.n === "string" ? m.n : "",
+        // im stayed true for idle members; dl.is matched the observed idle state.
+        studying,
+        studyMs: number(log?.sm),
+        startedAt: Number.isSafeInteger(startedAt) &&
+          startedAt >= Date.now() - 24 * 60 * 60_000 &&
+          startedAt <= Date.now() + 30_000 ? startedAt : null,
+      };
+    })
     .filter(
       (m): m is Member =>
         m.id !== null && Number.isSafeInteger(m.id) && !!m.nickname,

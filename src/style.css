@@ -494,6 +494,8 @@ input[type="search"] {
   flex: 1;
   display: grid;
   gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 600;
 }
 .member-name small {
@@ -505,6 +507,17 @@ input[type="search"] {
   font-family: "Pretendard Variable", sans-serif;
   font-size: 14px;
   font-weight: 500;
+}
+.member-time {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.member-time small {
+  color: #66816d;
+  font-size: 12px;
 }
 .checked-time {
   font-size: 13px;

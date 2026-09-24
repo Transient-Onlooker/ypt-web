@@ -102,10 +102,22 @@ test("group arrays deduplicate and members keep unverified status distinct", () 
       ],
     }),
     [
-      { id: 1, nickname: "멤버", studying: null, studyMs: 1000 },
-      { id: 2, nickname: "다른 멤버", studying: null, studyMs: null },
+      { id: 1, nickname: "멤버", studying: null, studyMs: 1000, startedAt: null },
+      { id: 2, nickname: "다른 멤버", studying: null, studyMs: null, startedAt: null },
     ],
   );
+});
+
+test("member study status comes from the day log, not im", () => {
+  const startedAt = Date.now() - 5_000;
+  const members = membersFrom({ ms: [
+    { ud: 1, n: "A", im: true, dl: { is: false, sm: 0 } },
+    { ud: 2, n: "B", im: true, dl: { is: true, st: new Date(startedAt).toISOString(), sm: 2000 } },
+  ] });
+  assert.deepEqual(members, [
+    { id: 1, nickname: "A", studying: false, studyMs: 0, startedAt: null },
+    { id: 2, nickname: "B", studying: true, studyMs: 2000, startedAt },
+  ]);
 });
 
 test("upstream success requires s:true and never exposes upstream response in errors", async () => {
