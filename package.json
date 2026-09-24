@@ -1,0 +1,26 @@
+{
+  "name": "ypt-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "dev": "vite --host localhost",
+    "dev:worker": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "db:local": "wrangler d1 migrations apply DB --local",
+    "check:worker": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "probe": "node scripts/probe.mjs"
+  },
+  "dependencies": { "react": "19.3.0", "react-dom": "19.3.0" },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "latest",
+    "typescript": "~5.9.3",
+    "vite": "8.3.1",
+    "wrangler": "latest"
+  }
+}

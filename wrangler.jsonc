@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ypt-web",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-24",
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": true },
+  "d1_databases": [{ "binding": "DB", "database_name": "ypt-web", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "worker/migrations" }],
+  "vars": { "APP_ORIGIN": "http://localhost:5173" },
+  "observability": { "enabled": false }
+}
