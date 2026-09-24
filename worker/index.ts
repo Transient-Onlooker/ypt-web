@@ -1,4 +1,5 @@
 import type { Day, Snapshot, Timer, TimerState } from "../shared/types.ts";
+import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import {
   YptError,
   dayFrom,
@@ -357,6 +358,33 @@ async function changeTimer(
       return fail("STATE", 409, "복구할 상태가 없습니다.");
     if (input.confirmedStopped !== true)
       return fail("CONFIRM", 400, "앱에서 정지한 뒤 확인해 주세요.");
+    if (
+      row.state !== "uncertain" &&
+      Date.now() - row.updated_at < PENDING_RECOVERY_MS
+    )
+      return fail(
+        "IN_PROGRESS",
+        409,
+        "요청을 처리 중입니다. 잠시 뒤 상태를 다시 확인해 주세요.",
+      );
+    try {
+      const jwt = await credential(env, s.account_id);
+      const remote = remoteFrom(await reload(jwt));
+      if (remote.status === "running")
+        return fail(
+          "APP_ACTIVE",
+          409,
+          "앱에서 타이머가 실행 중입니다. 정지한 뒤 다시 확인해 주세요.",
+        );
+      if (remote.status !== "idle")
+        return fail(
+          "REMOTE_UNVERIFIED",
+          503,
+          "앱 타이머 상태를 확인할 수 없습니다. 잠시 뒤 다시 확인해 주세요.",
+        );
+    } catch (e) {
+      return resultError(e);
+    }
     const updated = await env.DB.prepare(
       "UPDATE timers SET state='idle',subject=NULL,started_at=NULL,origin=NULL,pending_id=NULL,revision=revision+1,updated_at=? WHERE account_id=? AND revision=? AND state IN ('uncertain','starting','stopping')",
     )

@@ -561,6 +561,14 @@ input[type="search"] {
   color: #5b7261;
   margin: 10px 0 30px;
 }
+.login-notice {
+  background: #edf6ed;
+  color: #285339;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
 .login-card form {
   display: grid;
   gap: 10px;

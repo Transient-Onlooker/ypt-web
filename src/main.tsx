@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
+import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
@@ -10,17 +11,29 @@ type ApiError = Error & { code?: string; status?: number };
 let csrf = "";
 
 async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    method,
-    credentials: "same-origin",
-    headers: {
-      ...(method !== "GET"
-        ? { "Content-Type": "application/json", "X-CSRF-Token": csrf }
-        : {}),
-    },
-    ...(data ? { body: JSON.stringify(data) } : {}),
-  });
-  const result = (await response.json().catch(() => ({}))) as {
+  let response: Response;
+  try {
+    response = await fetch(`/api${path}`, {
+      method,
+      credentials: "same-origin",
+      headers: {
+        ...(method !== "GET"
+          ? { "Content-Type": "application/json", "X-CSRF-Token": csrf }
+          : {}),
+      },
+      ...(data ? { body: JSON.stringify(data) } : {}),
+    });
+  } catch {
+    throw new Error("서버에 연결하지 못했습니다. 네트워크를 확인해 주세요.");
+  }
+  const parsed: unknown = await response.json().catch(() => null);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new Error(
+      response.ok
+        ? "서버 응답을 확인할 수 없습니다. 잠시 뒤 다시 시도해 주세요."
+        : "요청을 처리하지 못했습니다.",
+    );
+  const result = parsed as {
     error?: string;
     code?: string;
     [key: string]: unknown;
@@ -45,7 +58,13 @@ function shiftDate(date: string, days: number) {
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
-function Login({ onLogin }: { onLogin: () => Promise<void> }) {
+function Login({
+  onLogin,
+  notice,
+}: {
+  onLogin: () => Promise<void>;
+  notice: string;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -80,6 +99,7 @@ function Login({ onLogin }: { onLogin: () => Promise<void> }) {
         <div className="eyebrow">YPT WEB</div>
         <h1>공부를 이어가세요</h1>
         <p className="intro">열품타 이메일 계정으로 로그인합니다.</p>
+        {notice && <p className="login-notice" role="status">{notice}</p>}
         <form onSubmit={submit}>
           <label htmlFor="email">이메일</label>
           <input
@@ -118,6 +138,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionLoadError, setSessionLoadError] = useState(false);
   const [sessionAttempt, setSessionAttempt] = useState(0);
+  const [loginNotice, setLoginNotice] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [snapshotCheckedAt, setSnapshotCheckedAt] = useState<number | null>(null);
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
@@ -197,6 +218,9 @@ function App() {
         setMemberQuery("");
         setMemberSort("studying");
         setTab("study");
+        setLoginNotice(
+          cause instanceof Error ? cause.message : "다시 로그인해 주세요.",
+        );
         setSession({ authenticated: false });
         csrf = "";
       } else
@@ -451,6 +475,7 @@ function App() {
       setSelectedSubject("");
       setDate("");
       setTab("study");
+      setLoginNotice("");
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "로그아웃하지 못했습니다.",
@@ -483,10 +508,12 @@ function App() {
   if (!session.authenticated)
     return (
       <Login
+        notice={loginNotice}
         onLogin={async () => {
           authEpoch.current++;
           setSession({ authenticated: true, csrf });
           setError("");
+          setLoginNotice("");
           await loadSnapshot();
         }}
       />
@@ -513,9 +540,15 @@ function App() {
     else if (timer.state === "running") status = "공부 중";
     else if (timer.state === "paused") status = "일시정지";
     else if (timer.state === "idle") status = "대기 중";
+    else if (timer.state === "starting" || timer.state === "stopping")
+      status = "요청 처리 중";
     else status = "상태 확인 필요";
   }
   const displayedDay = date === snapshot?.today.date ? snapshot.today : day;
+  const pendingRecoveryWait =
+    timer !== undefined &&
+    (timer.state === "starting" || timer.state === "stopping") &&
+    now - timer.updatedAt < PENDING_RECOVERY_MS;
   const statusStale =
     snapshotCheckedAt !== null && now - snapshotCheckedAt > 45_000;
   const visibleMembers = members
@@ -732,10 +765,12 @@ function App() {
                     ) && (
                       <button
                         className="secondary"
-                        disabled={busy}
+                        disabled={busy || pendingRecoveryWait}
                         onClick={() => void change("resolve")}
                       >
-                        앱에서 정지 확인 후 복구
+                        {pendingRecoveryWait
+                          ? "요청 처리 중…"
+                          : "앱에서 정지 확인 후 복구"}
                       </button>
                     )}
                 </div>
@@ -745,13 +780,18 @@ function App() {
                     시작·재개 전에 서버가 앱 타이머 상태를 다시 확인합니다.
                   </p>
                 )}
-                {timer &&
+                {pendingRecoveryWait ? (
+                  <p className="caution">
+                    요청을 처리 중입니다. 같은 요청은 다시 보내지 않습니다. 처리
+                    결과를 기다린 뒤 상태를 확인해 주세요.
+                  </p>
+                ) : timer &&
                   ["starting", "stopping", "uncertain"].includes(
                     timer.state,
                   ) && (
                     <p className="caution">
                       요청 결과가 불확실합니다. 열품타 앱에서 타이머를 정지한 뒤
-                      복구하세요. 같은 요청은 자동 재시도하지 않습니다.
+                      복구하세요. 복구할 때 서버도 앱 상태를 다시 확인합니다.
                     </p>
                   )}
                 {remoteUnverified && (

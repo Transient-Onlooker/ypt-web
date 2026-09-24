@@ -1,0 +1,1 @@
+export const PENDING_RECOVERY_MS = 60_000;

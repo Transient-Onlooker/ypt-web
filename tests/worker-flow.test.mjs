@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { randomBytes, randomUUID } from "node:crypto";
 import worker from "../worker/index.ts";
+import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 
 const origin = "https://study.example";
 function database() {
@@ -486,6 +487,16 @@ test("login, account isolation, timer transitions, app adoption, and response lo
         .state,
       "uncertain",
     );
+    const activeRecovery = await call(
+      env,
+      "/timer/resolve",
+      "POST",
+      { confirmedStopped: true },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(activeRecovery.status, 409);
+    assert.equal(activeRecovery.data.code, "APP_ACTIVE");
     assert.equal(
       (
         await call(
@@ -621,6 +632,65 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     env.DB.sqlite.close();
   } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("pending recovery waits and verifies the app state", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const db = database();
+  const env = {
+    DB: db,
+    APP_ORIGIN: origin,
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    const login = await call(env, "/login", "POST", {
+      email: "recovery@example.test",
+      password: "correct",
+    });
+    assert.equal(login.status, 200);
+    const account = db.sqlite.prepare("SELECT id FROM accounts").get().id;
+    const update = db.sqlite.prepare(
+      "UPDATE timers SET state='starting', updated_at=? WHERE account_id=?",
+    );
+    update.run(Date.now(), account);
+    const recent = await call(
+      env, "/timer/resolve", "POST", { confirmedStopped: true },
+      login.cookie, login.data.csrf,
+    );
+    assert.equal(recent.status, 409);
+    assert.equal(recent.data.code, "IN_PROGRESS");
+    update.run(Date.now() - PENDING_RECOVERY_MS - 1_000, account);
+    const app = stub.users.get("jwt-recovery@example.test");
+    app.active = true;
+    app.subject = "수학";
+    app.startedAt = Date.now() - 1_000;
+    const active = await call(
+      env, "/timer/resolve", "POST", { confirmedStopped: true },
+      login.cookie, login.data.csrf,
+    );
+    assert.equal(active.status, 409);
+    assert.equal(active.data.code, "APP_ACTIVE");
+    stub.hideNextStartTime();
+    const unverified = await call(
+      env, "/timer/resolve", "POST", { confirmedStopped: true },
+      login.cookie, login.data.csrf,
+    );
+    assert.equal(unverified.status, 503);
+    assert.equal(unverified.data.code, "REMOTE_UNVERIFIED");
+    app.active = false;
+    const recovered = await call(
+      env, "/timer/resolve", "POST", { confirmedStopped: true },
+      login.cookie, login.data.csrf,
+    );
+    assert.equal(recovered.status, 200);
+    assert.equal(recovered.data.timer.state, "idle");
+  } finally {
+    db.sqlite.close();
     globalThis.fetch = realFetch;
   }
 });
