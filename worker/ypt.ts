@@ -24,11 +24,12 @@ export async function ypt(
   jwt?: string,
   fetcher: typeof fetch = fetch,
 ): Promise<Record<string, unknown>> {
+  const route = path.split("?")[0];
   let response: Response;
   try {
     response = await fetcher(`${BASE}${path}`, {
       method,
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(15_000),
       headers: {
         "Content-Type": "application/json",
@@ -37,22 +38,42 @@ export async function ypt(
       },
       ...(method === "POST" ? { body: JSON.stringify(body ?? {}) } : {}),
     });
-  } catch {
+  } catch (error) {
+    console.warn("YPT fetch failed", route, error instanceof Error ? error.name : "unknown");
+    throw new YptError("UNCERTAIN");
+  }
+  // Do not forward login credentials or JWTs to a redirect target.
+  if (response.status >= 300 && response.status < 400) {
+    console.warn("YPT redirect rejected", route, response.status);
     throw new YptError("UNCERTAIN");
   }
   let data: unknown;
   try {
     data = await response.json();
   } catch {
+    console.warn(
+      "YPT non-JSON response",
+      route,
+      response.status,
+      response.headers.get("content-type"),
+    );
     throw new YptError("UNCERTAIN");
   }
-  if (!data || typeof data !== "object" || Array.isArray(data))
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    console.warn("YPT invalid response shape", route, response.status);
     throw new YptError("INVALID_DATA");
+  }
   const reply = data as Record<string, unknown>;
   if ([401, 403].includes(response.status) || String(reply.c) === "112")
     throw new YptError("AUTH_EXPIRED");
-  if (!response.ok) throw new YptError("UNCERTAIN");
-  if (reply.s !== true) throw new YptError("REJECTED");
+  if (!response.ok) {
+    console.warn("YPT HTTP error", route, response.status);
+    throw new YptError("UNCERTAIN");
+  }
+  if (reply.s !== true) {
+    console.warn("YPT rejected", route, response.status);
+    throw new YptError("REJECTED");
+  }
   return reply;
 }
 
@@ -199,8 +220,10 @@ export async function login(email: string, password: string) {
     getx: true,
     language: "en",
   });
-  if (typeof reply.jwt !== "string" || !reply.jwt)
+  if (typeof reply.jwt !== "string" || !reply.jwt) {
+    console.warn("YPT login missing JWT field");
     throw new YptError("INVALID_DATA");
+  }
   return reply.jwt;
 }
 export async function reload(jwt: string) {

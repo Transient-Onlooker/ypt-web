@@ -118,6 +118,21 @@ test("upstream success requires s:true and never exposes upstream response in er
   );
 });
 
+test("upstream redirects are returned manually and rejected without following", async () => {
+  let redirectMode;
+  await assert.rejects(
+    ypt("/user/sign-in-jwt", "POST", { password: "secret" }, undefined, async (_url, init) => {
+      redirectMode = init.redirect;
+      return new Response(null, {
+        status: 302,
+        headers: { Location: "https://other.example/" },
+      });
+    }),
+    (error) => error instanceof YptError && error.code === "UNCERTAIN",
+  );
+  assert.equal(redirectMode, "manual");
+});
+
 test("session endpoint is anonymous without a cookie; mutation rejects untrusted origin", async () => {
   const env = {
     APP_ORIGIN: "https://study.example",
