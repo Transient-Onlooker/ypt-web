@@ -389,32 +389,18 @@ async function changeTimer(
       409,
       "이미 처리한 요청입니다. 상태를 다시 확인해 주세요.",
     );
+  const stopPaused = action === "stop" && row.state === "paused";
   if (
     (action === "start" && row.state !== "idle") ||
     (action === "resume" && row.state !== "paused") ||
-    (["pause", "stop"].includes(action) && row.state !== "running")
-  ) {
-    if (action === "stop" && row.state === "paused") {
-      const done = await env.DB.prepare(
-        "UPDATE timers SET state='idle',subject=NULL,started_at=NULL,origin=NULL,revision=revision+1,updated_at=? WHERE account_id=? AND revision=? AND state='paused'",
-      )
-        .bind(Date.now(), s.account_id, row.revision)
-        .run();
-      return done.meta.changes
-        ? json({ timer: publicTimer(await timer(env, s.account_id)) })
-        : fail("CONFLICT", 409, "상태가 변경됐습니다.");
-    }
+    (["pause", "stop"].includes(action) &&
+      row.state !== "running" &&
+      !stopPaused)
+  )
     return fail("STATE", 409, "현재 상태에서는 실행할 수 없습니다.");
-  }
   const subject = action === "start" ? input.subject : row.subject;
   if (typeof subject !== "string" || !subject.trim())
     return fail("SUBJECT", 400, "과목을 선택해 주세요.");
-  if (["start", "resume"].includes(action) && input.confirmedAppIdle !== true)
-    return fail(
-      "APP_CHECK",
-      400,
-      "앱에서 기존 타이머가 꺼져 있는지 확인해 주세요.",
-    );
   let jwt: string;
   try {
     jwt = await credential(env, s.account_id);
@@ -424,6 +410,28 @@ async function changeTimer(
   try {
     const info = await reload(jwt);
     const remote = remoteFrom(info);
+    if (stopPaused) {
+      if (remote.status !== "idle")
+        return fail(
+          "REMOTE_MISMATCH",
+          409,
+          "앱 타이머 상태가 다릅니다. 상태를 새로고침해 주세요.",
+        );
+      const done = await env.DB.prepare(
+        "UPDATE timers SET state='idle',subject=NULL,started_at=NULL,origin=NULL,revision=revision+1,updated_at=? WHERE account_id=? AND revision=? AND state='paused'",
+      )
+        .bind(Date.now(), s.account_id, row.revision)
+        .run();
+      return done.meta.changes
+        ? json({ timer: publicTimer(await timer(env, s.account_id)) })
+        : fail("CONFLICT", 409, "상태가 변경됐습니다.");
+    }
+    if (["start", "resume"].includes(action) && remote.status === "unverified")
+      return fail(
+        "REMOTE_UNVERIFIED",
+        503,
+        "앱 타이머 상태를 확인할 수 없습니다. 잠시 뒤 다시 확인해 주세요.",
+      );
     if (["start", "resume"].includes(action) && remote.status !== "idle")
       return fail(
         "APP_ACTIVE",

@@ -249,7 +249,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
             revision: 0,
             operationId: randomUUID(),
             subject: "수학",
-            confirmedAppIdle: true,
           },
           a.cookie,
           a.csrf,
@@ -264,7 +263,7 @@ test("login, account isolation, timer transitions, app adoption, and response lo
       env,
       "/timer/start",
       "POST",
-      { revision: 0, operationId: id, subject: "수학", confirmedAppIdle: true },
+      { revision: 0, operationId: id, subject: "수학" },
       a.cookie,
       a.csrf,
     );
@@ -284,7 +283,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
             revision: 0,
             operationId: id,
             subject: "수학",
-            confirmedAppIdle: true,
           },
           a.cookie,
           a.csrf,
@@ -302,7 +300,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
             revision: 0,
             operationId: randomUUID(),
             subject: "수학",
-            confirmedAppIdle: true,
           },
           aSecondTab.cookie,
           aSecondTab.csrf,
@@ -368,6 +365,21 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     assert.equal(pause.status, 200);
     assert.equal(pause.data.timer.state, "paused");
+    const app = stub.users.get("jwt-a@example.test");
+    app.active = true;
+    app.subject = "수학";
+    app.startedAt = Date.now() - 2_000;
+    const conflictingPausedStop = await call(
+      env,
+      "/timer/stop",
+      "POST",
+      { revision: pause.data.timer.revision, operationId: randomUUID() },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(conflictingPausedStop.status, 409);
+    assert.equal(conflictingPausedStop.data.code, "REMOTE_MISMATCH");
+    app.active = false;
     const resume = await call(
       env,
       "/timer/resume",
@@ -375,7 +387,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
       {
         revision: pause.data.timer.revision,
         operationId: randomUUID(),
-        confirmedAppIdle: true,
       },
       a.cookie,
       a.csrf,
@@ -392,10 +403,55 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     assert.equal(stop.status, 200);
     assert.equal(stop.data.timer.state, "idle");
-    const app = stub.users.get("jwt-a@example.test");
+    const quickStart = await call(
+      env,
+      "/timer/start",
+      "POST",
+      {
+        revision: stop.data.timer.revision,
+        operationId: randomUUID(),
+        subject: "수학",
+      },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(quickStart.status, 200);
+    const quickPause = await call(
+      env,
+      "/timer/pause",
+      "POST",
+      { revision: quickStart.data.timer.revision, operationId: randomUUID() },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(quickPause.status, 200);
+    const endPaused = await call(
+      env,
+      "/timer/stop",
+      "POST",
+      { revision: quickPause.data.timer.revision, operationId: randomUUID() },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(endPaused.status, 200);
+    assert.equal(endPaused.data.timer.state, "idle");
     app.active = true;
     app.subject = "수학";
     app.startedAt = Date.now() - 5000;
+    const blockedStart = await call(
+      env,
+      "/timer/start",
+      "POST",
+      {
+        revision: endPaused.data.timer.revision,
+        operationId: randomUUID(),
+        subject: "수학",
+      },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(blockedStart.status, 409);
+    assert.equal(blockedStart.data.code, "APP_ACTIVE");
     const adopted = await call(env, "/snapshot", "GET", undefined, a.cookie);
     assert.equal(adopted.data.timer.origin, "app");
     assert.equal(adopted.data.timer.startedAt, app.startedAt);
@@ -418,7 +474,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
         revision: crossStop.data.timer.revision,
         operationId: randomUUID(),
         subject: "수학",
-        confirmedAppIdle: true,
       },
       a.cookie,
       a.csrf,
@@ -441,7 +496,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
             revision: crossStop.data.timer.revision,
             operationId: randomUUID(),
             subject: "수학",
-            confirmedAppIdle: true,
           },
           a.cookie,
           a.csrf,
@@ -469,7 +523,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
         revision: resolved.data.timer.revision,
         operationId: randomUUID(),
         subject: "수학",
-        confirmedAppIdle: true,
       },
       a.cookie,
       a.csrf,
@@ -495,7 +548,6 @@ test("login, account isolation, timer transitions, app adoption, and response lo
         revision: resolvedUnverified.data.timer.revision,
         operationId: randomUUID(),
         subject: "수학",
-        confirmedAppIdle: true,
       },
       a.cookie,
       a.csrf,

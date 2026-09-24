@@ -4,6 +4,7 @@ import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
+type MemberSort = "studying" | "time" | "name";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 let csrf = "";
@@ -125,7 +126,6 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState("");
-  const [appIdle, setAppIdle] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [clockOffset, setClockOffset] = useState(0);
   const [date, setDate] = useState("");
@@ -141,6 +141,8 @@ function App() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [groupError, setGroupError] = useState("");
   const [memberError, setMemberError] = useState("");
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberSort, setMemberSort] = useState<MemberSort>("studying");
   const inFlight = useRef(false);
   const authEpoch = useRef(0);
   const snapshotRequest = useRef(0);
@@ -188,11 +190,12 @@ function App() {
         setDay(null);
         setDate("");
         setSelectedSubject("");
-        setAppIdle(false);
         setError("");
         setHistoryError("");
         setGroupError("");
         setMemberError("");
+        setMemberQuery("");
+        setMemberSort("studying");
         setTab("study");
         setSession({ authenticated: false });
         csrf = "";
@@ -228,6 +231,21 @@ function App() {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+  useEffect(() => {
+    if (!session?.authenticated) {
+      document.title = "YPT Web · 로그인";
+      return;
+    }
+    const startedAt =
+      snapshot?.timer.state === "running"
+        ? snapshot.timer.startedAt
+        : snapshot?.remoteStatus === "running"
+          ? snapshot.remoteStartedAt
+          : null;
+    document.title = startedAt
+      ? `${duration(now + clockOffset - startedAt)} · YPT Web`
+      : "YPT Web · 공부";
+  }, [session?.authenticated, snapshot, now, clockOffset]);
   useEffect(() => {
     if (!session?.authenticated) return;
     const onVisible = () => {
@@ -353,6 +371,7 @@ function App() {
     setMembers(null);
     setGroupCheckedAt(null);
     setMemberError("");
+    setMemberQuery("");
     void loadMembers(selectedGroup);
     const refresh = () => {
       if (document.visibilityState === "visible")
@@ -383,11 +402,9 @@ function App() {
               revision: snapshot.timer.revision,
               operationId: crypto.randomUUID(),
               subject: selectedSubject,
-              confirmedAppIdle: appIdle,
             },
       );
       if (epoch !== authEpoch.current) return;
-      setAppIdle(false);
       await loadSnapshot();
     } catch (cause) {
       if (epoch !== authEpoch.current) return;
@@ -427,10 +444,11 @@ function App() {
       setError("");
       setGroupError("");
       setMemberError("");
+      setMemberQuery("");
+      setMemberSort("studying");
       setHistoryError("");
       setDay(null);
       setSelectedSubject("");
-      setAppIdle(false);
       setDate("");
       setTab("study");
     } catch (cause) {
@@ -500,10 +518,23 @@ function App() {
   const displayedDay = date === snapshot?.today.date ? snapshot.today : day;
   const statusStale =
     snapshotCheckedAt !== null && now - snapshotCheckedAt > 45_000;
-  const sortedMembers = members?.slice().sort((a, b) =>
-    Number(b.studying === true) - Number(a.studying === true) ||
-    (b.studyMs ?? -1) - (a.studyMs ?? -1),
-  );
+  const visibleMembers = members
+    ?.filter((member) =>
+      member.nickname
+        .toLocaleLowerCase("ko-KR")
+        .includes(memberQuery.trim().toLocaleLowerCase("ko-KR")),
+    )
+    .sort((a, b) => {
+      const nameOrder = a.nickname.localeCompare(b.nickname, "ko-KR");
+      if (memberSort === "name") return nameOrder;
+      const timeOrder = (b.studyMs ?? -1) - (a.studyMs ?? -1);
+      if (memberSort === "time") return timeOrder || nameOrder;
+      return (
+        Number(b.studying === true) - Number(a.studying === true) ||
+        timeOrder ||
+        nameOrder
+      );
+    });
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -514,18 +545,21 @@ function App() {
         <nav aria-label="메뉴">
           <button
             className={tab === "study" ? "active" : ""}
+            aria-current={tab === "study" ? "page" : undefined}
             onClick={() => setTab("study")}
           >
             공부
           </button>
           <button
             className={tab === "history" ? "active" : ""}
+            aria-current={tab === "history" ? "page" : undefined}
             onClick={() => setTab("history")}
           >
             기록
           </button>
           <button
             className={tab === "groups" ? "active" : ""}
+            aria-current={tab === "groups" ? "page" : undefined}
             onClick={() => setTab("groups")}
           >
             그룹
@@ -646,24 +680,11 @@ function App() {
                     </select>
                   </div>
                 )}
-                {((timer?.state === "idle" && !appOnly && !remoteUnverified) ||
-                  timer?.state === "paused") && (
-                  <label className="check-row">
-                    <input
-                      type="checkbox"
-                      checked={appIdle}
-                      onChange={(event) => setAppIdle(event.target.checked)}
-                    />
-                    열품타 앱에서 실행 중인 타이머가 없는지 확인했습니다.
-                  </label>
-                )}
                 <div className="timer-actions">
                   {timer?.state === "idle" && !appOnly && (
                     <button
                       className="primary"
-                      disabled={
-                        busy || !appIdle || !selectedSubject || remoteUnverified
-                      }
+                      disabled={busy || !selectedSubject || remoteUnverified}
                       onClick={() => void change("start")}
                     >
                       공부 시작
@@ -691,7 +712,7 @@ function App() {
                     <>
                       <button
                         className="primary"
-                        disabled={busy || !appIdle || remoteUnverified}
+                        disabled={busy || remoteUnverified}
                         onClick={() => void change("resume")}
                       >
                         재개
@@ -718,6 +739,12 @@ function App() {
                       </button>
                     )}
                 </div>
+                {((timer?.state === "idle" && !appOnly) ||
+                  timer?.state === "paused") && (
+                  <p className="card-note">
+                    시작·재개 전에 서버가 앱 타이머 상태를 다시 확인합니다.
+                  </p>
+                )}
                 {timer &&
                   ["starting", "stopping", "uncertain"].includes(
                     timer.state,
@@ -894,6 +921,7 @@ function App() {
                       <button
                         key={group.id}
                         className={selectedGroup === group.id ? "selected" : ""}
+                        aria-pressed={selectedGroup === group.id}
                         onClick={() => {
                           if (selectedGroup === group.id) {
                             void loadMembers(group.id);
@@ -937,8 +965,39 @@ function App() {
                 </div>
                 {members && (
                   <p className="member-summary">
-                    공부 중 {members.filter((member) => member.studying === true).length}명 · 전체 {members.length}명
+                    공부 중 {members.filter((member) => member.studying === true).length}명
+                    {" · "}전체 {members.length}명
+                    {memberQuery.trim() &&
+                      ` · 검색 결과 ${visibleMembers?.length ?? 0}명`}
                   </p>
+                )}
+                {members && members.length > 0 && (
+                  <div className="member-controls">
+                    <div>
+                      <label htmlFor="member-search">멤버 검색</label>
+                      <input
+                        id="member-search"
+                        type="search"
+                        placeholder="닉네임으로 찾기"
+                        value={memberQuery}
+                        onChange={(event) => setMemberQuery(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="member-sort">정렬</label>
+                      <select
+                        id="member-sort"
+                        value={memberSort}
+                        onChange={(event) =>
+                          setMemberSort(event.target.value as MemberSort)
+                        }
+                      >
+                        <option value="studying">공부 중 우선</option>
+                        <option value="time">시간 많은 순</option>
+                        <option value="name">이름순</option>
+                      </select>
+                    </div>
+                  </div>
                 )}
                 {memberError && (
                   <p className="error" role="alert">
@@ -951,9 +1010,9 @@ function App() {
                     {new Date(groupCheckedAt).toLocaleTimeString("ko-KR")}
                   </p>
                 )}
-                {sortedMembers?.length ? (
+                {visibleMembers?.length ? (
                   <div className="member-list">
-                    {sortedMembers.map((member) => (
+                    {visibleMembers.map((member) => (
                       <div className="member-row" key={member.id}>
                         <span
                           aria-hidden="true"
@@ -977,6 +1036,8 @@ function App() {
                   <p className="empty">
                     {selectedGroup === null
                       ? "그룹을 선택해 주세요."
+                      : members?.length && memberQuery.trim()
+                        ? "검색 결과가 없습니다."
                       : members
                         ? "표시할 멤버가 없습니다."
                         : loadingMembers

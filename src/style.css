@@ -261,7 +261,8 @@ h1 {
 select,
 input[type="date"],
 input[type="email"],
-input[type="password"] {
+input[type="password"],
+input[type="search"] {
   width: 100%;
   border: 1px solid #ceddce;
   border-radius: 11px;
@@ -269,22 +270,6 @@ input[type="password"] {
   color: #183427;
   background: #fff;
   font-size: 16px;
-}
-.check-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  line-height: 1.5;
-  color: #395443;
-  font-size: 14px;
-  margin: 16px 0 20px;
-}
-.check-row input {
-  accent-color: #27884d;
-  width: 19px;
-  height: 19px;
-  margin: 2px 0 0;
-  flex: none;
 }
 .timer-actions {
   display: flex;
@@ -462,6 +447,22 @@ input[type="password"] {
   margin: 18px 0 0;
   color: #315840;
   font-size: 14px;
+  font-weight: 700;
+}
+.member-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.65fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+.member-controls > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.member-controls label {
+  color: #405749;
+  font-size: 13px;
   font-weight: 700;
 }
 .member-row {
@@ -655,6 +656,9 @@ input[type="password"] {
   .study-grid,
   .group-grid {
     gap: 16px;
+  }
+  .member-controls {
+    grid-template-columns: 1fr;
   }
   .bottom-nav {
     display: grid;
