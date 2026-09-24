@@ -38,7 +38,7 @@ type TimerRow = {
 const encoder = new TextEncoder();
 const TTL = 30 * 24 * 60 * 60 * 1000;
 const COOKIE = "ypt_session";
-const HISTORY_VALIDATED = false;
+const HISTORY_VALIDATED = true;
 function json(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
     status,

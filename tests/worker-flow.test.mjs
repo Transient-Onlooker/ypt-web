@@ -116,6 +116,8 @@ function upstream() {
     }
     if (path === "/group/groups/v2")
       return reply({ gs: [], ms: [], cs: [], ps: [] });
+    if (path === "/logs/day")
+      return reply({ dl: { dt: new URL(input).searchParams.get("date"), sm: 69_946, ls: [{ sb: "수학", sm: 69_946 }] } });
     throw new Error(`unexpected ${path}`);
   };
   return {
@@ -282,8 +284,12 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     assert.equal(
       (await call(env, "/history?date=2026-02-30", "GET", undefined, a.cookie))
         .status,
-      501,
+      400,
     );
+    const historical = await call(env, "/history?date=2026-09-24", "GET", undefined, a.cookie);
+    assert.equal(historical.status, 200);
+    assert.equal(historical.data.totalMs, 69_946);
+    assert.deepEqual(historical.data.subjects, [{ title: "수학", studyMs: 69_946 }]);
     assert.equal(
       (await call(env, "/groups/123/members", "GET", undefined, a.cookie))
         .status,
