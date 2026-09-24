@@ -38,6 +38,8 @@ function upstream() {
   const users = new Map();
   let dropStartResponse = false;
   let dropStopResponse = false;
+  let nextStartOffsetMs = 0;
+  let hideActiveStartTimeOnce = false;
   const reply = (data) =>
     new Response(JSON.stringify({ s: true, ...data }), {
       status: 200,
@@ -68,16 +70,20 @@ function upstream() {
       return new Response(JSON.stringify({ s: false, c: 112 }), {
         status: 401,
       });
-    if (path === "/user/v2/reload/info")
+    if (path === "/user/v2/reload/info") {
+      const hideStartTime = hideActiveStartTimeOnce && state.active;
+      if (hideStartTime) hideActiveStartTimeOnce = false;
       return reply({
         p: {
           is: state.active,
-          st: state.startedAt ? new Date(state.startedAt).toISOString() : "",
+          st: state.startedAt && !hideStartTime ? new Date(state.startedAt).toISOString() : "",
           sb: state.subject || "",
         },
         ss: [{ tt: "수학", dl: false, sm: 0 }],
+        coid: 82,
         dl: { dt: "2026-09-24", sm: state.total, ls: state.segments },
       });
+    }
     if (path === "/study/start") {
       if (state.active)
         return new Response(JSON.stringify({ s: false, c: 104 }), {
@@ -85,7 +91,8 @@ function upstream() {
         });
       state.active = true;
       state.subject = inputBody.subject;
-      state.startedAt = Date.now();
+      state.startedAt = Date.now() + nextStartOffsetMs;
+      nextStartOffsetMs = 0;
       if (dropStartResponse) {
         dropStartResponse = false;
         throw new Error("lost response");
@@ -115,7 +122,28 @@ function upstream() {
       });
     }
     if (path === "/group/groups/v2")
-      return reply({ gs: [], ms: [], cs: [], ps: [] });
+      return token === "jwt-a@example.test"
+        ? reply({
+            gs: [{ id: 7, t: "공부방", mc: 4 }],
+            ms: [], cs: [], ps: [],
+          })
+        : reply({ gs: [], ms: [], cs: [], ps: [] });
+    if (path === "/logs/group/members/v2") {
+      const url = new URL(input);
+      if (
+        url.searchParams.get("groupID") !== "7" ||
+        url.searchParams.get("countryID") !== "82"
+      )
+        throw new Error("wrong group member request");
+      return reply({
+        ms: [
+          { ud: 1, n: "멤버1", im: true, dl: { sm: 1000 } },
+          { ud: 2, n: "멤버2", im: true, dl: { sm: 2000 } },
+          { ud: 3, n: "멤버3", im: true, dl: { sm: 3000 } },
+          { ud: 4, n: "멤버4", im: true, dl: { sm: 4000 } },
+        ],
+      });
+    }
     if (path === "/logs/day")
       return reply({ dl: { dt: new URL(input).searchParams.get("date"), sm: 69_946, ls: [{ sb: "수학", sm: 69_946 }] } });
     throw new Error(`unexpected ${path}`);
@@ -128,6 +156,12 @@ function upstream() {
     },
     loseNextStop() {
       dropStopResponse = true;
+    },
+    offsetNextStart(ms) {
+      nextStartOffsetMs = ms;
+    },
+    hideNextStartTime() {
+      hideActiveStartTimeOnce = true;
     },
   };
 }
@@ -224,6 +258,7 @@ test("login, account isolation, timer transitions, app adoption, and response lo
       ).status,
       403,
     );
+    stub.offsetNextStart(-5_000);
     const id = randomUUID();
     const start = await call(
       env,
@@ -235,6 +270,10 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     assert.equal(start.status, 200);
     assert.equal(start.data.timer.state, "running");
+    assert.equal(
+      start.data.timer.startedAt,
+      stub.users.get("jwt-a@example.test").startedAt,
+    );
     assert.equal(
       (
         await call(
@@ -286,12 +325,36 @@ test("login, account isolation, timer transitions, app adoption, and response lo
         .status,
       400,
     );
-    const historical = await call(env, "/history?date=2026-09-24", "GET", undefined, a.cookie);
+    const historical = await call(
+      env, "/history?date=2026-09-24", "GET", undefined, a.cookie,
+    );
     assert.equal(historical.status, 200);
     assert.equal(historical.data.totalMs, 69_946);
-    assert.deepEqual(historical.data.subjects, [{ title: "수학", studyMs: 69_946 }]);
+    assert.deepEqual(historical.data.subjects, [
+      { title: "수학", studyMs: 69_946 },
+    ]);
     assert.equal(
       (await call(env, "/groups/123/members", "GET", undefined, a.cookie))
+        .status,
+      404,
+    );
+    const joinedGroups = await call(env, "/groups", "GET", undefined, a.cookie);
+    assert.deepEqual(joinedGroups.data.groups, [
+      { id: 7, title: "공부방", memberCount: 4 },
+    ]);
+    const groupMembers = await call(
+      env, "/groups/7/members", "GET", undefined, a.cookie,
+    );
+    assert.equal(groupMembers.status, 200);
+    assert.equal(groupMembers.data.members.length, 4);
+    assert.equal(groupMembers.data.members[0].studying, true);
+    assert.equal(groupMembers.data.members[0].studyMs, 1000);
+    assert.deepEqual(
+      (await call(env, "/groups", "GET", undefined, b.cookie)).data.groups,
+      [],
+    );
+    assert.equal(
+      (await call(env, "/groups/7/members", "GET", undefined, b.cookie))
         .status,
       404,
     );
@@ -397,12 +460,39 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     assert.equal(resolved.status, 200);
     assert.equal(resolved.data.timer.state, "idle");
-    const startForLostStop = await call(
+    stub.hideNextStartTime();
+    const unverifiedStart = await call(
       env,
       "/timer/start",
       "POST",
       {
         revision: resolved.data.timer.revision,
+        operationId: randomUUID(),
+        subject: "수학",
+        confirmedAppIdle: true,
+      },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(unverifiedStart.status, 503);
+    assert.equal(unverifiedStart.data.code, "UNCERTAIN");
+    assert.equal(app.active, true);
+    app.active = false;
+    const resolvedUnverified = await call(
+      env,
+      "/timer/resolve",
+      "POST",
+      { confirmedStopped: true },
+      a.cookie,
+      a.csrf,
+    );
+    assert.equal(resolvedUnverified.status, 200);
+    const startForLostStop = await call(
+      env,
+      "/timer/start",
+      "POST",
+      {
+        revision: resolvedUnverified.data.timer.revision,
         operationId: randomUUID(),
         subject: "수학",
         confirmedAppIdle: true,

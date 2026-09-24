@@ -1,11 +1,4 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap");
-@media (max-width: 650px) {
-  .topbar .desktop-logout {
-    display: block;
-    font-size: 12px;
-    padding: 4px;
-  }
-}
 :root {
   font-family: "DM Sans", "Noto Sans KR", sans-serif;
   color: #182820;
@@ -120,11 +113,14 @@ select:focus-visible {
   gap: 8px;
   font-size: 14px;
   color: #4a6053;
+  min-width: 0;
 }
 .top-status strong {
   font-family: "DM Mono", monospace;
   color: #182820;
   margin-left: 10px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .status-dot,
 .member-indicator {
@@ -154,6 +150,40 @@ select:focus-visible {
 }
 .page-title {
   margin-bottom: 28px;
+}
+.active-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 17px;
+  margin-bottom: 23px;
+  border: 1px solid #a9d4af;
+  border-radius: 15px;
+  background: #e9f8e9;
+}
+.active-strip > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.active-strip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #356143;
+  font-size: 13px;
+}
+.active-strip strong {
+  font-family: "DM Mono", monospace;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.active-strip button {
+  min-height: 39px;
+  padding: 7px 12px;
+  white-space: nowrap;
+  font-size: 13px;
 }
 .eyebrow {
   font-family: "DM Mono", monospace;
@@ -199,6 +229,9 @@ h1 {
   font-size: 14px;
   font-weight: 700;
   padding: 3px;
+}
+.text-button:hover:not(:disabled) {
+  text-decoration: underline;
 }
 .timer-display {
   font-family: "DM Mono", monospace;
@@ -315,6 +348,25 @@ input[type="password"] {
   font-size: 14px;
   margin: 0 0 32px;
 }
+.live-session {
+  display: grid;
+  gap: 5px;
+  padding: 15px 17px;
+  margin: -12px 0 22px;
+  border: 1px solid #b5d7b2;
+  border-radius: 13px;
+  background: #f7fcf5;
+  color: #335b3b;
+  font-size: 14px;
+}
+.live-session strong {
+  font-family: "DM Mono", monospace;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.live-session small {
+  color: #647b67;
+}
 .subject-list {
   border-top: 1px solid #d2e2d1;
 }
@@ -337,7 +389,26 @@ input[type="password"] {
 .history-picker {
   display: grid;
   gap: 9px;
-  max-width: 270px;
+  max-width: 360px;
+}
+.date-actions {
+  display: flex;
+  gap: 7px;
+}
+.date-actions button {
+  min-height: 38px;
+  flex: 1;
+  padding: 7px 8px;
+  font-size: 13px;
+}
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 23px;
+  color: #647b68;
+  font-size: 13px;
 }
 .history-total {
   display: grid;
@@ -386,6 +457,12 @@ input[type="password"] {
 }
 .member-list {
   margin-top: 14px;
+}
+.member-summary {
+  margin: 18px 0 0;
+  color: #315840;
+  font-size: 14px;
+  font-weight: 700;
 }
 .member-row {
   display: flex;
@@ -450,6 +527,9 @@ input[type="password"] {
   display: grid;
   place-items: center;
   color: #4f6655;
+}
+.connection-error {
+  text-align: center;
 }
 .login-page {
   min-height: 100vh;
@@ -538,7 +618,19 @@ input[type="password"] {
     display: none;
   }
   .desktop-logout {
-    display: none;
+    display: block;
+    font-size: 12px;
+    padding: 6px 2px;
+    white-space: nowrap;
+    flex: none;
+  }
+  .top-status strong {
+    margin-left: 2px;
+  }
+  .top-status {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .content main {
     padding: 26px 16px 105px;

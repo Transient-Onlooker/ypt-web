@@ -483,8 +483,18 @@ async function changeTimer(
     .bind(s.account_id, op, action, Date.now())
     .run();
   try {
-    if (pending === "starting") await start(jwt, subject);
-    else await stop(jwt, startedAt!);
+    let confirmedStartedAt = startedAt;
+    if (pending === "starting") {
+      await start(jwt, subject);
+      const confirmed = remoteFrom(await reload(jwt));
+      if (
+        confirmed.status !== "running" ||
+        confirmed.subject !== subject ||
+        confirmed.startedAt === null
+      )
+        throw new YptError("UNCERTAIN");
+      confirmedStartedAt = confirmed.startedAt;
+    } else await stop(jwt, startedAt!);
     const finalState: TimerState =
       pending === "starting"
         ? "running"
@@ -497,7 +507,7 @@ async function changeTimer(
       .bind(
         finalState,
         finalState === "idle" ? null : subject,
-        finalState === "running" ? startedAt : null,
+        finalState === "running" ? confirmedStartedAt : null,
         finalState === "idle"
           ? null
           : pending === "starting"

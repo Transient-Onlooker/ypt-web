@@ -5,6 +5,7 @@ import {
   groupsFrom,
   membersFrom,
   remoteFrom,
+  subjectsFrom,
   ypt,
   YptError,
 } from "../worker/ypt.ts";
@@ -69,6 +70,8 @@ test("day totals use completed segment logs and preserve missing per-subject val
 });
 
 test("group arrays deduplicate and members keep unverified status distinct", () => {
+  assert.throws(() => groupsFrom({}), YptError);
+  assert.throws(() => subjectsFrom({}), YptError);
   assert.deepEqual(
     groupsFrom({
       gs: [{ id: 3, t: "A", mc: 2 }],

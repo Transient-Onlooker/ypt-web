@@ -89,6 +89,7 @@ function title(value: Record<string, unknown>): string | null {
   return null;
 }
 export function subjectsFrom(info: Record<string, unknown>): Subject[] {
+  if (!Array.isArray(info.ss)) throw new YptError("INVALID_DATA");
   return array(info.ss)
     .filter((v) => v.dl !== true)
     .map((v) => ({ title: title(v), studyMs: number(v.sm) }))
@@ -129,6 +130,8 @@ export function dayFrom(value: unknown, subjects: Subject[] = []): Day {
   };
 }
 export function groupsFrom(reply: Record<string, unknown>): Group[] {
+  if (!["gs", "ms", "cs", "ps"].some((key) => Array.isArray(reply[key])))
+    throw new YptError("INVALID_DATA");
   const seen = new Set<number>();
   return ["gs", "ms", "cs", "ps"]
     .flatMap((key) => array(reply[key]))
