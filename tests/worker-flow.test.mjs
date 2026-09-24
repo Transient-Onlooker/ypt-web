@@ -338,14 +338,14 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     const joinedGroups = await call(env, "/groups", "GET", undefined, a.cookie);
     assert.deepEqual(joinedGroups.data.groups, [
-      { id: 7, title: "공부방", memberCount: 4 },
+      { id: 7, title: "공부방", capacity: 4 },
     ]);
     const groupMembers = await call(
       env, "/groups/7/members", "GET", undefined, a.cookie,
     );
     assert.equal(groupMembers.status, 200);
     assert.equal(groupMembers.data.members.length, 4);
-    assert.equal(groupMembers.data.members[0].studying, true);
+    assert.equal(groupMembers.data.members[0].studying, null);
     assert.equal(groupMembers.data.members[0].studyMs, 1000);
     assert.deepEqual(
       (await call(env, "/groups", "GET", undefined, b.cookie)).data.groups,

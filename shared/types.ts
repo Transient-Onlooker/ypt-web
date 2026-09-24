@@ -13,14 +13,14 @@ export type Timer = {
   updatedAt: number;
   origin: "web" | "app" | null;
 };
-export type Subject = { title: string; studyMs: number | null };
+export type Subject = { title: string; studyMs: number | null; color?: string };
 export type Day = {
   date: string;
   totalMs: number;
   subjects: Subject[];
   subjectTimesAvailable: boolean;
 };
-export type Group = { id: number; title: string; memberCount: number | null };
+export type Group = { id: number; title: string; capacity: number | null };
 export type Member = {
   id: number;
   nickname: string;
@@ -38,6 +38,7 @@ export type Snapshot = {
   subjects: Subject[];
   capabilities: Capabilities;
   serverNow: number;
+  upstreamClockOffsetMs: number | null;
   remoteStatus: "idle" | "running" | "unverified";
   remoteStartedAt: number | null;
   remoteSubject: string | null;

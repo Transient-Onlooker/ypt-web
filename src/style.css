@@ -1,6 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
 :root {
-  font-family: "DM Sans", "Noto Sans KR", sans-serif;
+  font-family: "Pretendard Variable", sans-serif;
   color: #182820;
   background: #f3f6f1;
   font-synthesis: none;
@@ -116,7 +116,7 @@ select:focus-visible {
   min-width: 0;
 }
 .top-status strong {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   color: #182820;
   margin-left: 10px;
   white-space: nowrap;
@@ -175,7 +175,7 @@ select:focus-visible {
   font-size: 13px;
 }
 .active-strip strong {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   font-size: 22px;
   font-variant-numeric: tabular-nums;
 }
@@ -186,7 +186,7 @@ select:focus-visible {
   font-size: 13px;
 }
 .eyebrow {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   font-size: 12px;
   letter-spacing: 0.2em;
   color: #528461;
@@ -234,7 +234,7 @@ h1 {
   text-decoration: underline;
 }
 .timer-display {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   font-size: clamp(40px, 5vw, 66px);
   letter-spacing: -0.06em;
   margin-top: 58px;
@@ -257,6 +257,24 @@ h1 {
   color: #405749;
   font-size: 14px;
   font-weight: 700;
+}
+.subject-select,
+.subject-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.subject-select select {
+  flex: 1;
+  min-width: 0;
+}
+.subject-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #aebbb0;
+  flex: none;
 }
 select,
 input[type="date"],
@@ -322,7 +340,7 @@ input[type="search"] {
   margin-top: 47px;
 }
 .summary-time {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   color: #1a422a;
   font-size: clamp(38px, 4vw, 52px);
   letter-spacing: -0.05em;
@@ -345,7 +363,7 @@ input[type="search"] {
   font-size: 14px;
 }
 .live-session strong {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   font-size: 24px;
   font-variant-numeric: tabular-nums;
 }
@@ -364,7 +382,7 @@ input[type="search"] {
   font-size: 15px;
 }
 .subject-row strong {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   font-size: 14px;
   font-weight: 500;
 }
@@ -405,7 +423,7 @@ input[type="search"] {
   font-size: 15px;
 }
 .history-total strong {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   font-size: clamp(38px, 6vw, 56px);
   letter-spacing: -0.05em;
   color: #1b4430;
@@ -484,7 +502,7 @@ input[type="search"] {
   color: #66816d;
 }
 .member-row strong {
-  font-family: "DM Mono", monospace;
+  font-family: "Pretendard Variable", sans-serif;
   font-size: 14px;
   font-weight: 500;
 }

@@ -23,9 +23,11 @@ export async function ypt(
   body?: object,
   jwt?: string,
   fetcher: typeof fetch = fetch,
+  onClockOffset?: (offsetMs: number | null) => void,
 ): Promise<Record<string, unknown>> {
   const route = path.split("?")[0];
   let response: Response;
+  const requestAt = Date.now();
   try {
     response = await fetcher(`${BASE}${path}`, {
       method,
@@ -42,6 +44,7 @@ export async function ypt(
     console.warn("YPT fetch failed", route, error instanceof Error ? error.name : "unknown");
     throw new YptError("UNCERTAIN");
   }
+  const responseAt = Date.now();
   // Do not forward login credentials or JWTs to a redirect target.
   if (response.status >= 300 && response.status < 400) {
     console.warn("YPT redirect rejected", route, response.status);
@@ -73,6 +76,19 @@ export async function ypt(
   if (reply.s !== true) {
     console.warn("YPT rejected", route, response.status);
     throw new YptError("REJECTED");
+  }
+  if (onClockOffset) {
+    // HTTP Date has one-second precision. Its midpoint limits display error
+    // while the original p.st remains untouched for stop requests.
+    const date = Date.parse(response.headers.get("date") ?? "");
+    const roundTripMs = responseAt - requestAt;
+    const offsetMs = date + 500 - (requestAt + responseAt) / 2;
+    onClockOffset(
+      Number.isFinite(offsetMs) && roundTripMs >= 0 && roundTripMs < 3_000 &&
+        Math.abs(offsetMs) < 60_000
+        ? Math.round(offsetMs)
+        : null,
+    );
   }
   return reply;
 }
@@ -109,11 +125,28 @@ function title(value: Record<string, unknown>): string | null {
       return value[key].trim() as string;
   return null;
 }
+function subjectColor(value: Record<string, unknown>): string | null {
+  const raw = value.co ?? value.c;
+  const parsed = typeof raw === "number"
+    ? raw
+    : typeof raw === "string" && /^-?\d+$/.test(raw)
+      ? Number(raw)
+      : NaN;
+  if (!Number.isInteger(parsed) || parsed === 0 || parsed < -0x80000000 || parsed > 0xffffffff)
+    return null;
+  return `#${((parsed >>> 0) & 0xffffff).toString(16).padStart(6, "0")}`;
+}
 export function subjectsFrom(info: Record<string, unknown>): Subject[] {
   if (!Array.isArray(info.ss)) throw new YptError("INVALID_DATA");
   return array(info.ss)
     .filter((v) => v.dl !== true)
-    .map((v) => ({ title: title(v), studyMs: number(v.sm) }))
+    .map((v) => {
+      const color = subjectColor(v);
+      return {
+        title: title(v), studyMs: number(v.sm),
+        ...(color ? { color } : {}),
+      };
+    })
     .filter((v): v is Subject => !!v.title);
 }
 export function dayFrom(value: unknown, subjects: Subject[] = []): Day {
@@ -136,11 +169,13 @@ export function dayFrom(value: unknown, subjects: Subject[] = []): Day {
   const names = [
     ...new Set([...subjects.map((s) => s.title), ...times.keys()]),
   ];
+  const colors = new Map(subjects.filter((s) => s.color).map((s) => [s.title, s.color!]));
   return {
     date: log.dt,
     totalMs: number(log.sm)!,
     subjects: names.map((name) => ({
       title: name,
+      ...(colors.has(name) ? { color: colors.get(name)! } : {}),
       studyMs: times.has(name)
         ? times.get(name)!
         : Array.isArray(log.ls)
@@ -159,7 +194,7 @@ export function groupsFrom(reply: Record<string, unknown>): Group[] {
     .map((g) => ({
       id: number(g.id),
       title: typeof g.t === "string" ? g.t : "",
-      memberCount: number(g.mc),
+      capacity: number(g.mc),
     }))
     .filter(
       (g): g is Group =>
@@ -177,7 +212,9 @@ export function membersFrom(reply: Record<string, unknown>): Member[] {
     .map((m) => ({
       id: number(m.ud),
       nickname: typeof m.n === "string" ? m.n : "",
-      studying: typeof m.im === "boolean" ? m.im : null,
+      // im remained true for idle members in a live comparison. Its meaning
+      // is not verified as current study status, so never present it as such.
+      studying: null as Member["studying"],
       studyMs: number(object(m.dl)?.sm),
     }))
     .filter(
@@ -226,8 +263,8 @@ export async function login(email: string, password: string) {
   }
   return reply.jwt;
 }
-export async function reload(jwt: string) {
-  return ypt("/user/v2/reload/info", "POST", RELOAD_BODY, jwt);
+export async function reload(jwt: string, onClockOffset?: (offsetMs: number | null) => void) {
+  return ypt("/user/v2/reload/info", "POST", RELOAD_BODY, jwt, fetch, onClockOffset);
 }
 export async function start(jwt: string, subject: string) {
   const reply = await ypt(

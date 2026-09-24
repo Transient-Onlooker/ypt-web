@@ -72,6 +72,15 @@ test("day totals use completed segment logs and preserve missing per-subject val
 test("group arrays deduplicate and members keep unverified status distinct", () => {
   assert.throws(() => groupsFrom({}), YptError);
   assert.throws(() => subjectsFrom({}), YptError);
+  const subjects = subjectsFrom({ ss: [
+    { tt: "수학", sm: 0, co: 0xffff8c00 },
+    { tt: "영어", sm: 0, co: "invalid" },
+  ] });
+  assert.deepEqual(subjects, [
+    { title: "수학", studyMs: 0, color: "#ff8c00" },
+    { title: "영어", studyMs: 0 },
+  ]);
+  assert.equal(dayFrom({ dt: "2026-09-24", sm: 0, ls: [] }, subjects).subjects[0].color, "#ff8c00");
   assert.deepEqual(
     groupsFrom({
       gs: [{ id: 3, t: "A", mc: 2 }],
@@ -81,8 +90,8 @@ test("group arrays deduplicate and members keep unverified status distinct", () 
       ],
     }),
     [
-      { id: 3, title: "A", memberCount: 2 },
-      { id: 5, title: "B", memberCount: null },
+      { id: 3, title: "A", capacity: 2 },
+      { id: 5, title: "B", capacity: null },
     ],
   );
   assert.deepEqual(
@@ -93,7 +102,7 @@ test("group arrays deduplicate and members keep unverified status distinct", () 
       ],
     }),
     [
-      { id: 1, nickname: "멤버", studying: true, studyMs: 1000 },
+      { id: 1, nickname: "멤버", studying: null, studyMs: 1000 },
       { id: 2, nickname: "다른 멤버", studying: null, studyMs: null },
     ],
   );
@@ -131,6 +140,16 @@ test("upstream redirects are returned manually and rejected without following", 
     (error) => error instanceof YptError && error.code === "UNCERTAIN",
   );
   assert.equal(redirectMode, "manual");
+});
+
+test("upstream Date adjusts display clock without changing the timer start", async () => {
+  let offset = null;
+  const upstreamDate = new Date(Date.now() - 2_000).toUTCString();
+  await ypt("/user/v2/reload/info", "POST", {}, "secret", async () =>
+    new Response(JSON.stringify({ s: true }), {
+      headers: { Date: upstreamDate },
+    }), (value) => { offset = value; });
+  assert.ok(offset >= -2_600 && offset <= -1_400, `offset: ${offset}`);
 });
 
 test("session endpoint is anonymous without a cookie; mutation rejects untrusted origin", async () => {

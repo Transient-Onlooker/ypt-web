@@ -611,7 +611,10 @@ export default {
     try {
       const jwt = await credential(env, s.account_id);
       if (path === "/api/snapshot" && request.method === "GET") {
-        const info = await reload(jwt);
+        let upstreamClockOffsetMs: number | null = null;
+        const info = await reload(jwt, (offset) => {
+          upstreamClockOffsetMs = offset;
+        });
         const subjects = subjectsFrom(info);
         const today = dayFrom(info.dl, subjects);
         const remote = remoteFrom(info);
@@ -625,6 +628,7 @@ export default {
             groups: true,
           },
           serverNow: Date.now(),
+          upstreamClockOffsetMs,
           remoteStatus: remote.status,
           remoteStartedAt: remote.startedAt,
           remoteSubject: remote.subject,

@@ -5,7 +5,7 @@ import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
-type MemberSort = "studying" | "time" | "name";
+type MemberSort = "time" | "name";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 let csrf = "";
@@ -163,7 +163,7 @@ function App() {
   const [groupError, setGroupError] = useState("");
   const [memberError, setMemberError] = useState("");
   const [memberQuery, setMemberQuery] = useState("");
-  const [memberSort, setMemberSort] = useState<MemberSort>("studying");
+  const [memberSort, setMemberSort] = useState<MemberSort>("time");
   const inFlight = useRef(false);
   const authEpoch = useRef(0);
   const snapshotRequest = useRef(0);
@@ -182,7 +182,9 @@ function App() {
       if (requestId !== snapshotRequest.current || epoch !== authEpoch.current)
         return;
       setSnapshot(result);
-      setClockOffset(result.serverNow - Date.now());
+      setClockOffset(
+        result.serverNow - Date.now() + (result.upstreamClockOffsetMs ?? 0),
+      );
       setDate((old) => old || result.today.date);
       setSelectedSubject((old) =>
         result.subjects.some((subject) => subject.title === old)
@@ -216,7 +218,7 @@ function App() {
         setGroupError("");
         setMemberError("");
         setMemberQuery("");
-        setMemberSort("studying");
+        setMemberSort("time");
         setTab("study");
         setLoginNotice(
           cause instanceof Error ? cause.message : "다시 로그인해 주세요.",
@@ -469,7 +471,7 @@ function App() {
       setGroupError("");
       setMemberError("");
       setMemberQuery("");
-      setMemberSort("studying");
+      setMemberSort("time");
       setHistoryError("");
       setDay(null);
       setSelectedSubject("");
@@ -519,6 +521,9 @@ function App() {
       />
     );
   const timer = snapshot?.timer;
+  const selectedSubjectColor = snapshot?.subjects.find(
+    (subject) => subject.title === selectedSubject,
+  )?.color;
   const remoteActive = snapshot?.remoteStatus === "running";
   const remoteUnverified = snapshot?.remoteStatus === "unverified";
   const appOnly = timer?.state === "idle" && remoteActive;
@@ -561,12 +566,7 @@ function App() {
       const nameOrder = a.nickname.localeCompare(b.nickname, "ko-KR");
       if (memberSort === "name") return nameOrder;
       const timeOrder = (b.studyMs ?? -1) - (a.studyMs ?? -1);
-      if (memberSort === "time") return timeOrder || nameOrder;
-      return (
-        Number(b.studying === true) - Number(a.studying === true) ||
-        timeOrder ||
-        nameOrder
-      );
+      return timeOrder || nameOrder;
     });
   return (
     <div className="shell">
@@ -698,19 +698,28 @@ function App() {
                 {timer?.state === "idle" && !appOnly && (
                   <div className="form-area">
                     <label htmlFor="subject">과목</label>
-                    <select
-                      id="subject"
-                      value={selectedSubject}
-                      onChange={(event) =>
-                        setSelectedSubject(event.target.value)
-                      }
-                    >
-                      {snapshot?.subjects.map((subject) => (
-                        <option key={subject.title} value={subject.title}>
-                          {subject.title}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="subject-select">
+                      {selectedSubjectColor && (
+                        <span
+                          className="subject-color"
+                          aria-hidden="true"
+                          style={{ backgroundColor: selectedSubjectColor }}
+                        />
+                      )}
+                      <select
+                        id="subject"
+                        value={selectedSubject}
+                        onChange={(event) =>
+                          setSelectedSubject(event.target.value)
+                        }
+                      >
+                        {snapshot?.subjects.map((subject) => (
+                          <option key={subject.title} value={subject.title}>
+                            {subject.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
                 <div className="timer-actions">
@@ -837,7 +846,16 @@ function App() {
                 <div className="subject-list">
                   {snapshot?.today.subjects.map((subject) => (
                     <div className="subject-row" key={subject.title}>
-                      <span>{subject.title}</span>
+                      <span className="subject-name">
+                        {subject.color && (
+                          <span
+                            className="subject-color"
+                            aria-hidden="true"
+                            style={{ backgroundColor: subject.color }}
+                          />
+                        )}
+                        {subject.title}
+                      </span>
                       <strong>{duration(subject.studyMs)}</strong>
                     </div>
                   ))}
@@ -918,7 +936,16 @@ function App() {
                   <div className="subject-list">
                     {displayedDay.subjects.map((subject) => (
                       <div className="subject-row" key={subject.title}>
-                        <span>{subject.title}</span>
+                        <span className="subject-name">
+                          {subject.color && (
+                            <span
+                              className="subject-color"
+                              aria-hidden="true"
+                              style={{ backgroundColor: subject.color }}
+                            />
+                          )}
+                          {subject.title}
+                        </span>
                         <strong>{duration(subject.studyMs)}</strong>
                       </div>
                     ))}
@@ -975,9 +1002,11 @@ function App() {
                       >
                         {group.title}
                         <span>
-                          {group.memberCount == null
-                            ? ""
-                            : `${group.memberCount}명`}
+                          {selectedGroup === group.id && members
+                            ? `현재 ${members.length}명${group.capacity === null ? "" : ` / 정원 ${group.capacity}명`}`
+                            : group.capacity === null
+                              ? ""
+                              : `정원 ${group.capacity}명`}
                         </span>
                       </button>
                     ))}
@@ -1005,8 +1034,7 @@ function App() {
                 </div>
                 {members && (
                   <p className="member-summary">
-                    공부 중 {members.filter((member) => member.studying === true).length}명
-                    {" · "}전체 {members.length}명
+                    조회된 멤버 {members.length}명 · 공부 상태 미확인
                     {memberQuery.trim() &&
                       ` · 검색 결과 ${visibleMembers?.length ?? 0}명`}
                   </p>
@@ -1032,7 +1060,6 @@ function App() {
                           setMemberSort(event.target.value as MemberSort)
                         }
                       >
-                        <option value="studying">공부 중 우선</option>
                         <option value="time">시간 많은 순</option>
                         <option value="name">이름순</option>
                       </select>
@@ -1061,11 +1088,7 @@ function App() {
                         <span className="member-name">
                           {member.nickname}
                           <small>
-                            {member.studying === null
-                              ? "상태 미확인"
-                              : member.studying
-                                ? "공부 중"
-                                : "쉬는 중"}
+                            공부 상태 미확인 · 오늘 기록
                           </small>
                         </span>
                         <strong>{duration(member.studyMs)}</strong>
