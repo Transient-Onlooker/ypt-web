@@ -8,7 +8,18 @@ type Tab = "study" | "history" | "groups";
 type MemberSort = "time" | "name";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
+const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
+const SYNC_STORAGE_KEY = "ypt-web-sync-seconds";
 let csrf = "";
+
+function savedSyncSeconds(): number {
+  try {
+    const saved = Number(localStorage.getItem(SYNC_STORAGE_KEY));
+    return SYNC_SECONDS.find((value) => value === saved) ?? 15;
+  } catch {
+    return 15;
+  }
+}
 
 async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
   let response: Response;
@@ -143,6 +154,7 @@ function App() {
   const [snapshotCheckedAt, setSnapshotCheckedAt] = useState<number | null>(null);
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
   const [tab, setTab] = useState<Tab>("study");
+  const [syncSeconds, setSyncSeconds] = useState(savedSyncSeconds);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -172,6 +184,7 @@ function App() {
   const memberLoadingGroup = useRef<{ id: number; requestId: number } | null>(
     null,
   );
+  const previousTimerKey = useRef<string | null>(null);
 
   const loadSnapshot = useCallback(async () => {
     const requestId = ++snapshotRequest.current;
@@ -278,12 +291,12 @@ function App() {
       if (document.visibilityState === "visible") void loadSnapshot();
     };
     document.addEventListener("visibilitychange", onVisible);
-    const interval = setInterval(onVisible, 15_000);
+    const interval = setInterval(onVisible, syncSeconds * 1000);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(interval);
     };
-  }, [session?.authenticated, loadSnapshot]);
+  }, [session?.authenticated, loadSnapshot, syncSeconds]);
   useEffect(() => {
     if (tab !== "history" || !date || !session?.authenticated) return;
     if (snapshot?.today.date === date) {
@@ -399,17 +412,33 @@ function App() {
     setMemberError("");
     setMemberQuery("");
     void loadMembers(selectedGroup);
+  }, [tab, selectedGroup, session?.authenticated, loadMembers]);
+  useEffect(() => {
+    if (tab !== "groups" || selectedGroup === null || !session?.authenticated)
+      return;
     const refresh = () => {
       if (document.visibilityState === "visible")
         void loadMembers(selectedGroup);
     };
     document.addEventListener("visibilitychange", refresh);
-    const interval = setInterval(refresh, 15_000);
+    const interval = setInterval(refresh, syncSeconds * 1000);
     return () => {
       document.removeEventListener("visibilitychange", refresh);
       clearInterval(interval);
     };
-  }, [tab, selectedGroup, session?.authenticated, loadMembers]);
+  }, [tab, selectedGroup, session?.authenticated, loadMembers, syncSeconds]);
+  useEffect(() => {
+    const key = snapshot?.timer
+      ? `${snapshot.timer.state}:${snapshot.timer.startedAt ?? ""}`
+      : null;
+    if (
+      previousTimerKey.current !== null && key !== null &&
+      previousTimerKey.current !== key && tab === "groups" &&
+      selectedGroup !== null && session?.authenticated
+    )
+      void loadMembers(selectedGroup);
+    previousTimerKey.current = key;
+  }, [snapshot?.timer.state, snapshot?.timer.startedAt, tab, selectedGroup, session?.authenticated, loadMembers]);
   async function change(
     action: "start" | "pause" | "resume" | "stop" | "resolve",
   ) {
@@ -652,16 +681,39 @@ function App() {
             </div>
           )}
           <div className="page-title">
-            <p className="eyebrow">
-              {tab === "study"
-                ? "FOCUS"
-                : tab === "history"
-                  ? "HISTORY"
-                  : "TOGETHER"}
-            </p>
-            <h1>
-              {tab === "study" ? "공부" : tab === "history" ? "기록" : "그룹"}
-            </h1>
+            <div>
+              <p className="eyebrow">
+                {tab === "study"
+                  ? "FOCUS"
+                  : tab === "history"
+                    ? "HISTORY"
+                    : "TOGETHER"}
+              </p>
+              <h1>
+                {tab === "study" ? "공부" : tab === "history" ? "기록" : "그룹"}
+              </h1>
+            </div>
+            <label className="sync-control" htmlFor="sync-seconds" title="타이머 상태와 선택한 그룹 멤버의 서버 조회 주기입니다. 화면의 시간 표시는 매초 갱신됩니다.">
+              자동 동기화
+              <select
+                id="sync-seconds"
+                value={syncSeconds}
+                onChange={(event) => {
+                  const seconds = Number(event.target.value);
+                  if (!SYNC_SECONDS.some((value) => value === seconds)) return;
+                  setSyncSeconds(seconds);
+                  try {
+                    localStorage.setItem(SYNC_STORAGE_KEY, String(seconds));
+                  } catch {
+                    // Storage can be unavailable in private browsing.
+                  }
+                }}
+              >
+                {SYNC_SECONDS.map((seconds) => (
+                  <option key={seconds} value={seconds}>{seconds}초</option>
+                ))}
+              </select>
+            </label>
           </div>
           {error && (
             <div className="error-banner" role="alert">

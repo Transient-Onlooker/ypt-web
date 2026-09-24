@@ -19,7 +19,7 @@ export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   YPT_ENCRYPTION_KEY: string;
-  APP_ORIGIN: string;
+  APP_ORIGIN?: string;
 }
 type Session = {
   token_hash: string;
@@ -247,9 +247,12 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
 }
 function mutationAllowed(request: Request, env: Env, s?: Session | null) {
   const origin = request.headers.get("Origin");
+  const url = new URL(request.url);
+  const localProxy = (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+    origin === env.APP_ORIGIN;
   return (
     !!origin &&
-    origin === env.APP_ORIGIN &&
+    (origin === url.origin || localProxy) &&
     request.headers.get("Sec-Fetch-Site") !== "cross-site" &&
     (!s || request.headers.get("X-CSRF-Token") === s.csrf)
   );

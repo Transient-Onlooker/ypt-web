@@ -186,6 +186,23 @@ test("session endpoint is anonymous without a cookie; mutation rejects untrusted
     env,
   );
   assert.equal(login.status, 403);
+  env.APP_ORIGIN = "http://localhost:5173";
+  const sameOrigin = await worker.fetch(
+    new Request("https://study.example/api/login", {
+      method: "POST",
+      headers: { Origin: "https://study.example" },
+    }),
+    env,
+  );
+  assert.equal(sameOrigin.status, 400);
+  const localProxy = await worker.fetch(
+    new Request("http://127.0.0.1:8787/api/login", {
+      method: "POST",
+      headers: { Origin: "http://localhost:5173" },
+    }),
+    env,
+  );
+  assert.equal(localProxy.status, 400);
 });
 
 test("server state adopts app start, clears app stop, and quarantines mismatched starts", async () => {
