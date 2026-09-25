@@ -1,6 +1,6 @@
 # YPT Web
 
-현재 버전: **v0.4.0 · 로그인 기억하기**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. Pages 도메인 `ypt.mcv.kr`의 DNS 연결은 완료됐으며 HTTPS 인증서 발급을 기다리고 있습니다. 그동안 [Worker 주소](https://ypt-web.junuh145858.workers.dev)에서 접속할 수 있습니다.
+현재 버전: **v0.4.0 · 로그인 기억하기**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 React + GitHub Pages + Cloudflare Worker + D1 앱입니다. 별도 서비스 가입이나 허용 목록은 없습니다.
 
