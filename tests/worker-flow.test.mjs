@@ -40,7 +40,9 @@ function upstream() {
   let dropStartResponse = false;
   let dropStopResponse = false;
   let nextStartOffsetMs = 0;
+  let nextStartTimestamp = null;
   let hideActiveStartTimeOnce = false;
+  let expireAfterNextStart = false;
   const reply = (data) =>
     new Response(JSON.stringify({ s: true, ...data }), {
       status: 200,
@@ -92,8 +94,13 @@ function upstream() {
         });
       state.active = true;
       state.subject = inputBody.subject;
-      state.startedAt = Date.now() + nextStartOffsetMs;
+      state.startedAt = nextStartTimestamp ?? Date.now() + nextStartOffsetMs;
       nextStartOffsetMs = 0;
+      nextStartTimestamp = null;
+      if (expireAfterNextStart) {
+        expireAfterNextStart = false;
+        users.delete(token);
+      }
       if (dropStartResponse) {
         dropStartResponse = false;
         throw new Error("lost response");
@@ -161,8 +168,14 @@ function upstream() {
     offsetNextStart(ms) {
       nextStartOffsetMs = ms;
     },
+    keepNextStartAt(timestamp) {
+      nextStartTimestamp = timestamp;
+    },
     hideNextStartTime() {
       hideActiveStartTimeOnce = true;
+    },
+    expireAfterNextStart() {
+      expireAfterNextStart = true;
     },
   };
 }
@@ -370,6 +383,52 @@ test("remembered Pages cookie restores a new tab and revokes linked sessions", a
   }
 });
 
+test("timer auth expiry revokes both remembered and current-tab sessions", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const env = {
+    DB: database(),
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    const login = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct", rememberDevice: true,
+    });
+    assert.equal(login.status, 200);
+    const rememberedCookie = login.cookie.split(";")[0];
+    stub.users.delete("jwt-a@example.test");
+    const expired = await pagesCall(env, "/timer/start", "POST", {
+      revision: 0, operationId: randomUUID(), subject: "\uC218\uD559",
+    }, undefined, login.data.csrf, "https://ypt.mcv.kr", rememberedCookie);
+    assert.equal(expired.status, 401);
+    assert.equal(expired.data.code, "AUTH_EXPIRED");
+    assert.match(expired.cookie, /Max-Age=0/);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      login.data.sessionToken)).data.authenticated, false);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      undefined, undefined, "https://ypt.mcv.kr", rememberedCookie)).data.authenticated, false);
+    const nextLogin = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct", rememberDevice: true,
+    });
+    assert.equal(nextLogin.status, 200);
+    stub.expireAfterNextStart();
+    const expiredAfterStart = await pagesCall(env, "/timer/start", "POST", {
+      revision: 0, operationId: randomUUID(), subject: "\uC218\uD559",
+    }, undefined, nextLogin.data.csrf, "https://ypt.mcv.kr", nextLogin.cookie.split(";")[0]);
+    assert.equal(expiredAfterStart.status, 401);
+    assert.equal(expiredAfterStart.data.code, "AUTH_EXPIRED");
+    assert.match(expiredAfterStart.cookie, /Max-Age=0/);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      nextLogin.data.sessionToken)).data.authenticated, false);
+    assert.equal(env.DB.sqlite.prepare("SELECT state FROM timers").get().state, "uncertain");
+    env.DB.sqlite.close();
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("login, account isolation, timer transitions, app adoption, and response loss", async () => {
   const stub = upstream();
   const realFetch = globalThis.fetch;
@@ -558,6 +617,9 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     assert.equal(conflictingPausedStop.status, 409);
     assert.equal(conflictingPausedStop.data.code, "REMOTE_MISMATCH");
     app.active = false;
+    // If YPT preserves the earlier start across a short pause, display that
+    // verified timestamp rather than inventing a new one locally.
+    stub.keepNextStartAt(start.data.timer.startedAt);
     const resume = await call(
       env,
       "/timer/resume",
@@ -571,6 +633,8 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     );
     assert.equal(resume.status, 200);
     assert.equal(resume.data.timer.state, "running");
+    assert.equal(resume.data.timer.startedAt, start.data.timer.startedAt);
+    assert.equal(resume.data.timer.startedAt, app.startedAt);
     const stop = await call(
       env,
       "/timer/stop",

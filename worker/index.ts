@@ -424,6 +424,7 @@ async function changeTimer(
           "앱 타이머 상태를 확인할 수 없습니다. 잠시 뒤 다시 확인해 주세요.",
         );
     } catch (e) {
+      if (e instanceof YptError && e.code === "AUTH_EXPIRED") throw e;
       return resultError(e);
     }
     const updated = await env.DB.prepare(
@@ -526,6 +527,7 @@ async function changeTimer(
     )
       return fail("SUBJECT", 422, "열품타에 있는 과목을 선택해 주세요.");
   } catch (e) {
+    if (e instanceof YptError && e.code === "AUTH_EXPIRED") throw e;
     return resultError(e);
   }
   const previous = row.state;
@@ -606,13 +608,12 @@ async function changeTimer(
     )
       .bind(Date.now(), s.account_id, pending, op)
       .run();
-    return e instanceof YptError && e.code === "AUTH_EXPIRED"
-      ? resultError(e)
-      : fail(
-          "UNCERTAIN",
-          503,
-          "결과가 불확실합니다. 열품타 앱에서 상태를 확인해 주세요.",
-        );
+    if (e instanceof YptError && e.code === "AUTH_EXPIRED") throw e;
+    return fail(
+      "UNCERTAIN",
+      503,
+      "결과가 불확실합니다. 열품타 앱에서 상태를 확인해 주세요.",
+    );
   }
 }
 
@@ -721,7 +722,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         /^\/api\/timer\/(start|pause|resume|stop|resolve)$/,
       )?.[1] as "start" | "pause" | "resume" | "stop" | "resolve" | undefined;
       if (action && request.method === "POST")
-        return changeTimer(action, request, env, s);
+        return await changeTimer(action, request, env, s);
       return fail("NOT_FOUND", 404, "요청을 찾을 수 없습니다.");
     } catch (e) {
       if (e instanceof YptError && e.code === "AUTH_EXPIRED") {
