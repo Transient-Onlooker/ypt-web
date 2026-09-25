@@ -151,6 +151,18 @@ function Login({
       });
       csrf = response.csrf ?? "";
       rememberEmail(keepEmail ? email : "");
+      const PasswordCredentialType = (window as Window & {
+        PasswordCredential?: new (data: { id: string; password: string }) => Credential;
+      }).PasswordCredential;
+      if (window.isSecureContext && PasswordCredentialType && navigator.credentials?.store) {
+        try {
+          void navigator.credentials.store(
+            new PasswordCredentialType({ id: email, password }),
+          ).catch(() => {});
+        } catch {
+          // Browser password storage is optional and must not block login.
+        }
+      }
       await onLogin();
     } catch (cause) {
       setError(

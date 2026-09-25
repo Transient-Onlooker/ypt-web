@@ -1,6 +1,6 @@
 # YPT Web
 
-현재 버전: **v0.4.0 · 로그인 기억하기**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
+현재 버전: **v0.4.1 · 비밀번호 관리자 연결**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 React + GitHub Pages + Cloudflare Worker + D1 앱입니다. 별도 서비스 가입이나 허용 목록은 없습니다.
 
@@ -26,7 +26,7 @@ try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
 
 ## 로그인 기억하기
 
-로그인 화면의 **이메일 기억하기**를 선택하면 해당 브라우저의 로컬 저장소에 이메일만 저장합니다. 비밀번호는 앱이 저장하지 않습니다. 브라우저의 비밀번호 관리자에서 저장·자동완성을 선택할 수 있으며, 브라우저별 지원과 설정에 따라 동작이 다릅니다. Pages 로그인 세션은 현재 탭을 닫으면 종료됩니다.
+로그인 화면의 **이메일 기억하기**를 선택하면 해당 브라우저의 로컬 저장소에 이메일만 저장합니다. 비밀번호는 앱이 저장하지 않습니다. 지원 브라우저에서는 로그인 성공 뒤 비밀번호 관리자에 저장 제안을 요청하고, 그 외에는 일반 자동완성 필드를 사용합니다. 저장 여부와 동작은 브라우저 설정에 따릅니다. Pages 로그인 세션은 현재 탭을 닫으면 종료됩니다.
 
 ## 기능과 안전한 상태 복구
 
