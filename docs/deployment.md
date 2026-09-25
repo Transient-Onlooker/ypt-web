@@ -1,12 +1,12 @@
 # 배포와 도메인 연결
 
-화면은 GitHub Pages의 `https://ypt.mcv.kr`, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)의 `/api`로 제공하는 구성입니다. Pages는 GitHub Actions의 `.github/workflows/pages.yml`에서 빌드합니다. Worker의 D1 `ypt-web`에는 초기 마이그레이션을, Worker secret에는 `YPT_ENCRYPTION_KEY`를 적용했습니다. 현재 `ypt.mcv.kr` DNS는 아직 Worker 주소를 가리키므로 Pages 도메인 연결은 완료되지 않았습니다.
+화면은 GitHub Pages의 `https://ypt.mcv.kr`, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)의 `/api`로 제공하는 구성입니다. Pages는 GitHub Actions의 `.github/workflows/pages.yml`에서 빌드합니다. Worker의 D1 `ypt-web`에는 초기 마이그레이션을, Worker secret에는 `YPT_ENCRYPTION_KEY`를 적용했습니다. `ypt.mcv.kr` CNAME은 GitHub Pages를 가리키고 HTTP 화면 응답을 확인했습니다. HTTPS 인증서는 아직 발급 중입니다. 인증서가 준비되기 전에는 실제 계정으로 이 주소에서 로그인하지 않습니다.
 
 ## 현재 검증 범위
 
 - Worker의 `GET /api/session`은 비로그인 상태를 반환합니다. `ypt.mcv.kr` 출처의 CORS 사전 요청은 204, 다른 출처의 로그인 요청은 403입니다.
 - 통합 테스트에서 Pages 출처의 사용자별 로그인·계정 분리·타이머 제어·로그아웃을 모의 열품타 응답으로 검증했습니다.
-- 실제 열품타 계정으로 Pages 주소의 로그인과 타이머를 확인하는 일은 DNS·HTTPS 연결 뒤에 남아 있습니다. 로컬 실제 계정 검증은 [API 검증 기록](api-validation.md)을 참고합니다.
+- Pages 배포 워크플로 성공, DNS CNAME 변경, Pages HTTP 200 응답을 확인했습니다. GitHub Pages DNS 상태는 유효하고 HTTPS 발급 대상입니다. 실제 열품타 계정으로 Pages 주소의 로그인과 타이머를 확인하는 일은 HTTPS 인증서 발급 뒤에 남아 있습니다. 로컬 실제 계정 검증은 [API 검증 기록](api-validation.md)을 참고합니다.
 
 ## 재배포
 
@@ -25,6 +25,4 @@ npx wrangler deploy
 
 ## `ypt.mcv.kr` 연결
 
-GitHub Pages의 사용자 도메인은 `ypt.mcv.kr`로 등록했습니다. 현재 DNS의 `ypt.mcv.kr → ypt-web.junuh145858.workers.dev` CNAME을 **`ypt.mcv.kr → transient-onlooker.github.io`**로 변경해야 합니다. 같은 계정의 다른 Pages 서브도메인과 동일한 대상입니다. `mcv.kr` 전체 네임서버나 다른 레코드는 변경하지 않습니다. [GitHub Pages 사용자 도메인 안내](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)를 참고하세요.
-
-DNS가 전파되면 `https://ypt.mcv.kr`의 화면·인증서, Pages에서 Worker로 가는 `/api/session`, 실제 계정의 로그인과 타이머 동작을 확인합니다. GitHub Pages의 HTTPS 강제는 인증서가 준비된 뒤 켭니다. GitHub Actions 배포에서 `CNAME` 파일은 필요하지 않습니다.
+Linode의 기존 `ypt.mcv.kr` CNAME 대상만 `transient-onlooker.github.io`로 변경했습니다. `mcv.kr`의 다른 DNS 기록과 네임서버는 그대로입니다. 공개 DNS와 GitHub Pages DNS 진단에서 올바른 대상·Pages 제공 상태를 확인했습니다. GitHub Pages 인증서가 준비되면 `https://ypt.mcv.kr`의 응답을 확인하고 HTTPS 강제를 켭니다. GitHub 공식 안내에 따르면 HTTPS 준비에는 시간이 걸릴 수 있습니다. [GitHub Pages HTTPS 안내](https://docs.github.com/en/pages/getting-started-with-github-pages/securing-your-github-pages-site-with-https)를 참고하세요.

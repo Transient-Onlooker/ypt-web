@@ -626,8 +626,28 @@ input[type="search"] {
   font-size: 14px;
   margin-top: 8px;
 }
+.remember-email {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  cursor: pointer;
+  color: #314c39;
+}
+.remember-email input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #216f3e;
+}
+.password-manager-note {
+  margin: 0;
+  color: #627767;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .login-card form button {
-  margin-top: 20px;
+  margin-top: 12px;
 }
 .login-card .error {
   margin-top: 20px;

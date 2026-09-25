@@ -10,6 +10,7 @@ type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
 const SYNC_STORAGE_KEY = "ypt-web-sync-seconds";
+const REMEMBERED_EMAIL_KEY = "ypt-web-remembered-email";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const CROSS_ORIGIN_API = API_BASE_URL !== "" &&
   new URL(API_BASE_URL).origin !== window.location.origin;
@@ -40,6 +41,23 @@ function savedSyncSeconds(): number {
     return SYNC_SECONDS.find((value) => value === saved) ?? 15;
   } catch {
     return 15;
+  }
+}
+
+function savedEmail(): string {
+  try {
+    return localStorage.getItem(REMEMBERED_EMAIL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberEmail(email: string) {
+  try {
+    if (email) localStorage.setItem(REMEMBERED_EMAIL_KEY, email);
+    else localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+  } catch {
+    // Login still works when browser storage is unavailable.
   }
 }
 
@@ -114,13 +132,16 @@ function Login({
   onLogin: () => Promise<void>;
   notice: string;
 }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [initialEmail] = useState(savedEmail);
+  const [keepEmail, setKeepEmail] = useState(Boolean(initialEmail));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
+    const fields = new FormData(event.currentTarget as HTMLFormElement);
+    const email = String(fields.get("email") ?? "").trim();
+    const password = String(fields.get("password") ?? "");
     setBusy(true);
     setError("");
     try {
@@ -129,7 +150,7 @@ function Login({
         password,
       });
       csrf = response.csrf ?? "";
-      setPassword("");
+      rememberEmail(keepEmail ? email : "");
       await onLogin();
     } catch (cause) {
       setError(
@@ -149,25 +170,39 @@ function Login({
         <h1>공부를 이어가세요</h1>
         <p className="intro">열품타 이메일 계정으로 로그인합니다.</p>
         {notice && <p className="login-notice" role="status">{notice}</p>}
-        <form onSubmit={submit}>
+        <form onSubmit={submit} autoComplete="on">
           <label htmlFor="email">이메일</label>
           <input
             id="email"
+            name="email"
             type="email"
             autoComplete="username"
             required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            defaultValue={initialEmail}
           />
           <label htmlFor="password">비밀번호</label>
           <input
             id="password"
+            name="password"
             type="password"
             autoComplete="current-password"
             required
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
           />
+          <label className="remember-email" htmlFor="remember-email">
+            <input
+              id="remember-email"
+              type="checkbox"
+              checked={keepEmail}
+              onChange={(event) => {
+                setKeepEmail(event.target.checked);
+                if (!event.target.checked) rememberEmail("");
+              }}
+            />
+            이메일 기억하기
+          </label>
+          <p className="password-manager-note">
+            비밀번호는 브라우저의 비밀번호 관리자에서 저장할 수 있습니다.
+          </p>
           <button className="primary" disabled={busy} type="submit">
             {busy ? "확인 중…" : "로그인"}
           </button>

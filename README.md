@@ -1,6 +1,6 @@
 # YPT Web
 
-현재 버전: **v0.3.0 · 웹 배포 분리**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 목표 주소는 `https://ypt.mcv.kr`입니다. DNS 전환 전에는 [Worker 주소](https://ypt-web.junuh145858.workers.dev)에서 접속할 수 있습니다.
+현재 버전: **v0.4.0 · 로그인 기억하기**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. Pages 도메인 `ypt.mcv.kr`의 DNS 연결은 완료됐으며 HTTPS 인증서 발급을 기다리고 있습니다. 그동안 [Worker 주소](https://ypt-web.junuh145858.workers.dev)에서 접속할 수 있습니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 React + GitHub Pages + Cloudflare Worker + D1 앱입니다. 별도 서비스 가입이나 허용 목록은 없습니다.
 
@@ -23,6 +23,10 @@ try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
 ```
 
 `APP_ORIGIN=http://localhost:5173`을 유지하고 `npm run db:local`을 실행합니다. 터미널 두 개에서 `npm run dev:worker`와 `npm run dev`를 각각 실행한 뒤 `http://localhost:5173`에 접속합니다. 브라우저 비밀번호·JWT는 출력하거나 로컬 파일에 저장하지 않습니다. D1에는 암호화된 JWT, 해시된 세션 토큰, 타이머 상태가 저장됩니다. 로컬 개발과 Worker 단독 주소는 HttpOnly·Secure·SameSite=Strict 쿠키를 사용합니다. Pages 주소는 사용자별 불투명 세션 토큰을 탭의 `sessionStorage`에 보관하며, 탭을 닫으면 다시 로그인해야 합니다. 로컬 HTTP에서 Secure 쿠키의 예외 동작은 브라우저별로 차이가 있으므로, 운영 환경은 HTTPS를 사용합니다.
+
+## 로그인 기억하기
+
+로그인 화면의 **이메일 기억하기**를 선택하면 해당 브라우저의 로컬 저장소에 이메일만 저장합니다. 비밀번호는 앱이 저장하지 않습니다. 브라우저의 비밀번호 관리자에서 저장·자동완성을 선택할 수 있으며, 브라우저별 지원과 설정에 따라 동작이 다릅니다. Pages 로그인 세션은 현재 탭을 닫으면 종료됩니다.
 
 ## 기능과 안전한 상태 복구
 
