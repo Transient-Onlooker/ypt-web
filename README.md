@@ -1,8 +1,8 @@
 # YPT Web
 
-현재 버전: **v0.2.0 · 그룹 동기화 개선**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [Worker 배포 주소](https://ypt-web.junuh145858.workers.dev)에서 접속할 수 있으며, `ypt.mcv.kr` 연결은 준비 중입니다.
+현재 버전: **v0.3.0 · 웹 배포 분리**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 목표 주소는 `https://ypt.mcv.kr`입니다. DNS 전환 전에는 [Worker 주소](https://ypt-web.junuh145858.workers.dev)에서 접속할 수 있습니다.
 
-휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 React + Cloudflare Worker + D1 앱입니다. 별도 서비스 가입이나 허용 목록은 없습니다.
+휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 React + GitHub Pages + Cloudflare Worker + D1 앱입니다. 별도 서비스 가입이나 허용 목록은 없습니다.
 
 ## 로컬 실행
 
@@ -22,7 +22,7 @@ try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
 [Convert]::ToBase64String($bytes)
 ```
 
-`APP_ORIGIN=http://localhost:5173`을 유지하고 `npm run db:local`을 실행합니다. 터미널 두 개에서 `npm run dev:worker`와 `npm run dev`를 각각 실행한 뒤 `http://localhost:5173`에 접속합니다. 브라우저 비밀번호·JWT는 출력하거나 로컬 파일에 저장하지 않습니다. D1에는 암호화된 JWT, 해시된 세션 토큰, 타이머 상태가 저장됩니다. 세션 쿠키는 HttpOnly·Secure·SameSite=Strict입니다. 로컬 HTTP에서 Secure 쿠키의 예외 동작은 브라우저별로 차이가 있으므로, 운영 환경은 반드시 HTTPS를 사용합니다.
+`APP_ORIGIN=http://localhost:5173`을 유지하고 `npm run db:local`을 실행합니다. 터미널 두 개에서 `npm run dev:worker`와 `npm run dev`를 각각 실행한 뒤 `http://localhost:5173`에 접속합니다. 브라우저 비밀번호·JWT는 출력하거나 로컬 파일에 저장하지 않습니다. D1에는 암호화된 JWT, 해시된 세션 토큰, 타이머 상태가 저장됩니다. 로컬 개발과 Worker 단독 주소는 HttpOnly·Secure·SameSite=Strict 쿠키를 사용합니다. Pages 주소는 사용자별 불투명 세션 토큰을 탭의 `sessionStorage`에 보관하며, 탭을 닫으면 다시 로그인해야 합니다. 로컬 HTTP에서 Secure 쿠키의 예외 동작은 브라우저별로 차이가 있으므로, 운영 환경은 HTTPS를 사용합니다.
 
 ## 기능과 안전한 상태 복구
 
@@ -46,4 +46,4 @@ git diff --check
 
 ## 운영 배포
 
-Worker 정적 자산이 화면을, 같은 주소의 `/api`가 백엔드를 제공합니다. 운영 D1 마이그레이션과 `YPT_ENCRYPTION_KEY` secret을 적용했습니다. 실제 계정의 운영 주소 로그인·타이머 검증은 아직 남아 있습니다. `ypt.mcv.kr` 연결과 재배포 절차는 [배포 안내](docs/deployment.md)에 있습니다.
+GitHub Pages가 화면을, Worker의 `/api`가 백엔드를 제공합니다. 운영 D1 마이그레이션과 `YPT_ENCRYPTION_KEY` secret을 적용했습니다. 실제 계정의 Pages 주소 로그인·타이머 검증은 아직 남아 있습니다. `ypt.mcv.kr` 연결과 재배포 절차는 [배포 안내](docs/deployment.md)에 있습니다.

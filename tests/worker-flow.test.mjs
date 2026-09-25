@@ -194,6 +194,87 @@ async function call(env, path, method = "GET", data, cookie, csrf, reqOrigin) {
   };
 }
 
+async function pagesCall(env, path, method = "GET", data, token, csrf, reqOrigin = "https://ypt.mcv.kr") {
+  const response = await worker.fetch(
+    new Request(`https://ypt-web.example/api${path}`, {
+      method,
+      headers: {
+        Origin: reqOrigin,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(method !== "GET" ? {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrf ?? "",
+          "Sec-Fetch-Site": "cross-site",
+        } : {}),
+      },
+      ...(data ? { body: JSON.stringify(data) } : {}),
+    }),
+    env,
+  );
+  return {
+    status: response.status,
+    data: await response.json(),
+    cookie: response.headers.get("Set-Cookie"),
+    allowOrigin: response.headers.get("Access-Control-Allow-Origin"),
+  };
+}
+
+test("Pages uses isolated bearer sessions and restricted CORS", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const env = {
+    DB: database(),
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    const preflight = await worker.fetch(new Request("https://ypt-web.example/api/login", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://ypt.mcv.kr",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+      },
+    }), env);
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("Access-Control-Allow-Origin"), "https://ypt.mcv.kr");
+    const rejected = await worker.fetch(new Request("https://ypt-web.example/api/login", {
+      method: "OPTIONS", headers: { Origin: "https://evil.example" },
+    }), env);
+    assert.equal(rejected.status, 403);
+    const a = await pagesCall(env, "/login", "POST", { email: "a@example.test", password: "correct" });
+    const b = await pagesCall(env, "/login", "POST", { email: "b@example.test", password: "correct" });
+    assert.equal(a.status, 200);
+    assert.equal(b.status, 200);
+    assert.equal(a.cookie, null);
+    assert.equal(a.allowOrigin, "https://ypt.mcv.kr");
+    assert.match(a.data.sessionToken, /^[0-9a-f]{64}$/);
+    assert.notEqual(a.data.sessionToken, b.data.sessionToken);
+    assert.equal("jwt" in a.data, false);
+    assert.equal("password" in a.data, false);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined, a.data.sessionToken)).data.authenticated, true);
+    const start = await pagesCall(env, "/timer/start", "POST", {
+      revision: 0, operationId: randomUUID(), subject: "수학",
+    }, a.data.sessionToken, a.data.csrf);
+    assert.equal(start.status, 200);
+    assert.equal((await pagesCall(env, "/snapshot", "GET", undefined, b.data.sessionToken)).data.timer.state, "idle");
+    assert.equal((await pagesCall(env, "/timer/start", "POST", {
+      revision: 0, operationId: randomUUID(), subject: "수학",
+    }, b.data.sessionToken, a.data.csrf)).status, 403);
+    const wrongOrigin = await pagesCall(env, "/timer/stop", "POST", {
+      revision: start.data.timer.revision, operationId: randomUUID(),
+    }, a.data.sessionToken, a.data.csrf, "https://evil.example");
+    assert.equal(wrongOrigin.status, 403);
+    assert.equal(wrongOrigin.allowOrigin, null);
+    assert.equal((await pagesCall(env, "/logout", "POST", {}, a.data.sessionToken, a.data.csrf)).status, 200);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined, a.data.sessionToken)).data.authenticated, false);
+    env.DB.sqlite.close();
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("login, account isolation, timer transitions, app adoption, and response loss", async () => {
   const stub = upstream();
   const realFetch = globalThis.fetch;

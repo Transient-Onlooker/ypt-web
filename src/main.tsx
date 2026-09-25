@@ -10,7 +10,29 @@ type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
 const SYNC_STORAGE_KEY = "ypt-web-sync-seconds";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const CROSS_ORIGIN_API = API_BASE_URL !== "" &&
+  new URL(API_BASE_URL).origin !== window.location.origin;
+const SESSION_STORAGE_KEY = "ypt-web-session-token";
 let csrf = "";
+let sessionToken = "";
+if (CROSS_ORIGIN_API) {
+  try {
+    sessionToken = sessionStorage.getItem(SESSION_STORAGE_KEY) ?? "";
+  } catch {
+    // Private browsing can disable storage.
+  }
+}
+
+function rememberSessionToken(token: string) {
+  sessionToken = token;
+  try {
+    if (token) sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+    else sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // The current tab can still use an in-memory session.
+  }
+}
 
 function savedSyncSeconds(): number {
   try {
@@ -24,10 +46,13 @@ function savedSyncSeconds(): number {
 async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${API_BASE_URL}/api${path}`, {
       method,
-      credentials: "same-origin",
+      credentials: CROSS_ORIGIN_API ? "omit" : "same-origin",
       headers: {
+        ...(CROSS_ORIGIN_API && sessionToken && path !== "/login"
+          ? { Authorization: `Bearer ${sessionToken}` }
+          : {}),
         ...(method !== "GET"
           ? { "Content-Type": "application/json", "X-CSRF-Token": csrf }
           : {}),
@@ -47,9 +72,15 @@ async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
   const result = parsed as {
     error?: string;
     code?: string;
+    sessionToken?: unknown;
+    authenticated?: unknown;
     [key: string]: unknown;
   };
+  if (CROSS_ORIGIN_API && path === "/session" && result.authenticated === false)
+    rememberSessionToken("");
   if (!response.ok) {
+    if (CROSS_ORIGIN_API && response.status === 401 && path !== "/login")
+      rememberSessionToken("");
     const error = new Error(
       result.error || "요청을 처리하지 못했습니다.",
     ) as ApiError;
@@ -57,6 +88,13 @@ async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
     error.status = response.status;
     throw error;
   }
+  if (CROSS_ORIGIN_API && path === "/login") {
+    if (typeof result.sessionToken !== "string" ||
+        !/^[0-9a-f]{64}$/.test(result.sessionToken))
+      throw new Error("로그인 세션을 확인할 수 없습니다.");
+    rememberSessionToken(result.sessionToken);
+  }
+  if (CROSS_ORIGIN_API && path === "/logout") rememberSessionToken("");
   return result as T;
 }
 function duration(ms: number | null | undefined) {

@@ -39,6 +39,7 @@ type TimerRow = {
 const encoder = new TextEncoder();
 const TTL = 30 * 24 * 60 * 60 * 1000;
 const COOKIE = "ypt_session";
+const PAGES_ORIGIN = "https://ypt.mcv.kr";
 const HISTORY_VALIDATED = true;
 function json(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
@@ -144,7 +145,10 @@ function cookie(request: Request) {
   );
 }
 async function session(request: Request, env: Env) {
-  const value = cookie(request);
+  const authorization = request.headers.get("Authorization");
+  const value = authorization
+    ? authorization.startsWith("Bearer ") ? authorization.slice(7) : null
+    : cookie(request);
   if (!value || !/^[0-9a-f]{64}$/.test(value)) return null;
   return env.DB.prepare(
     "SELECT token_hash, account_id, csrf, expires_at FROM sessions WHERE token_hash=? AND expires_at>?",
@@ -250,10 +254,12 @@ function mutationAllowed(request: Request, env: Env, s?: Session | null) {
   const url = new URL(request.url);
   const localProxy = (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
     origin === env.APP_ORIGIN;
+  const pages = origin === PAGES_ORIGIN &&
+    (!s || /^Bearer [0-9a-f]{64}$/.test(request.headers.get("Authorization") ?? ""));
   return (
     !!origin &&
-    (origin === url.origin || localProxy) &&
-    request.headers.get("Sec-Fetch-Site") !== "cross-site" &&
+    (origin === url.origin || localProxy || pages) &&
+    (request.headers.get("Sec-Fetch-Site") !== "cross-site" || pages) &&
     (!s || request.headers.get("X-CSRF-Token") === s.csrf)
   );
 }
@@ -338,10 +344,11 @@ async function loginRoute(request: Request, env: Env) {
       "INSERT INTO sessions(token_hash,account_id,csrf,expires_at) VALUES(?,?,?,?)",
     ).bind(await sha(token), id, csrf, now + TTL),
   ]);
-  const headers = {
+  if (request.headers.get("Origin") === PAGES_ORIGIN)
+    return json({ authenticated: true, csrf, sessionToken: token });
+  return json({ authenticated: true, csrf }, 200, {
     "Set-Cookie": `${COOKIE}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${TTL / 1000}`,
-  };
-  return json({ authenticated: true, csrf }, 200, headers);
+  });
 }
 async function changeTimer(
   action: "start" | "pause" | "resume" | "stop" | "resolve",
@@ -578,8 +585,7 @@ async function changeTimer(
   }
 }
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+async function handleRequest(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     const path = url.pathname;
@@ -684,5 +690,35 @@ export default {
     } catch (e) {
       return resultError(e);
     }
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const origin = request.headers.get("Origin");
+    const api = new URL(request.url).pathname.startsWith("/api/");
+    if (api && request.method === "OPTIONS") {
+      if (origin !== PAGES_ORIGIN)
+        return fail("ORIGIN", 403, "요청 출처를 확인할 수 없습니다.");
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": PAGES_ORIGIN,
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type, X-CSRF-Token",
+          "Access-Control-Max-Age": "600",
+          "Vary": "Origin",
+        },
+      });
+    }
+    const response = await handleRequest(request, env);
+    if (!api || origin !== PAGES_ORIGIN) return response;
+    const headers = new Headers(response.headers);
+    headers.set("Access-Control-Allow-Origin", PAGES_ORIGIN);
+    headers.append("Vary", "Origin");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
   },
 };
