@@ -568,6 +568,28 @@ input[type="search"] {
   font-size: 20px;
   line-height: 1;
 }
+.remember-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 21px;
+  padding: 13px 16px;
+  border: 1px solid #c8dfc9;
+  border-radius: 10px;
+  background: #edf6ed;
+  color: #285339;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.remember-warning button {
+  flex: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 20px;
+  line-height: 1;
+}
 .bottom-nav {
   display: none;
 }

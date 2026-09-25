@@ -194,13 +194,14 @@ async function call(env, path, method = "GET", data, cookie, csrf, reqOrigin) {
   };
 }
 
-async function pagesCall(env, path, method = "GET", data, token, csrf, reqOrigin = "https://ypt.mcv.kr") {
+async function pagesCall(env, path, method = "GET", data, token, csrf, reqOrigin = "https://ypt.mcv.kr", rememberedCookie) {
   const response = await worker.fetch(
     new Request(`https://ypt-web.example/api${path}`, {
       method,
       headers: {
         Origin: reqOrigin,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(rememberedCookie ? { Cookie: rememberedCookie } : {}),
         ...(method !== "GET" ? {
           "Content-Type": "application/json",
           "X-CSRF-Token": csrf ?? "",
@@ -216,6 +217,7 @@ async function pagesCall(env, path, method = "GET", data, token, csrf, reqOrigin
     data: await response.json(),
     cookie: response.headers.get("Set-Cookie"),
     allowOrigin: response.headers.get("Access-Control-Allow-Origin"),
+    allowCredentials: response.headers.get("Access-Control-Allow-Credentials"),
   };
 }
 
@@ -239,6 +241,7 @@ test("Pages uses isolated bearer sessions and restricted CORS", async () => {
     }), env);
     assert.equal(preflight.status, 204);
     assert.equal(preflight.headers.get("Access-Control-Allow-Origin"), "https://ypt.mcv.kr");
+    assert.equal(preflight.headers.get("Access-Control-Allow-Credentials"), "true");
     const rejected = await worker.fetch(new Request("https://ypt-web.example/api/login", {
       method: "OPTIONS", headers: { Origin: "https://evil.example" },
     }), env);
@@ -269,6 +272,98 @@ test("Pages uses isolated bearer sessions and restricted CORS", async () => {
     assert.equal(wrongOrigin.allowOrigin, null);
     assert.equal((await pagesCall(env, "/logout", "POST", {}, a.data.sessionToken, a.data.csrf)).status, 200);
     assert.equal((await pagesCall(env, "/session", "GET", undefined, a.data.sessionToken)).data.authenticated, false);
+    env.DB.sqlite.close();
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("remembered Pages cookie restores a new tab and revokes linked sessions", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const env = {
+    DB: database(),
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  const pageOrigin = "https://ypt.mcv.kr";
+  try {
+    const login = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct", rememberDevice: true,
+    });
+    assert.equal(login.status, 200);
+    assert.equal(login.allowCredentials, "true");
+    assert.match(login.cookie, /^__Host-ypt_remember=[0-9a-f]{64};/);
+    assert.match(login.cookie, /HttpOnly; Secure; SameSite=None; Partitioned; Path=\/; Max-Age=2592000/);
+    const rememberedCookie = login.cookie.split(";")[0];
+    assert.notEqual(rememberedCookie.split("=")[1], login.data.sessionToken);
+    const restored = await pagesCall(env, "/session", "GET", undefined,
+      undefined, undefined, pageOrigin, rememberedCookie);
+    assert.equal(restored.data.authenticated, true);
+    assert.equal(restored.data.csrf, login.data.csrf);
+    const other = await pagesCall(env, "/login", "POST", {
+      email: "b@example.test", password: "correct", rememberDevice: false,
+    });
+    assert.equal(other.cookie, null);
+    assert.equal((await pagesCall(env, "/timer/start", "POST", {
+      revision: 0, operationId: randomUUID(), subject: "\uC218\uD559",
+    }, undefined, "bad-csrf", pageOrigin, rememberedCookie)).status, 403);
+    assert.equal((await pagesCall(env, "/timer/start", "POST", {
+      revision: 0, operationId: randomUUID(), subject: "\uC218\uD559",
+    }, undefined, restored.data.csrf, "https://evil.example", rememberedCookie)).status, 401);
+    const started = await pagesCall(env, "/timer/start", "POST", {
+      revision: 0, operationId: randomUUID(), subject: "\uC218\uD559",
+    }, undefined, restored.data.csrf, pageOrigin, rememberedCookie);
+    assert.equal(started.status, 200);
+    assert.equal((await pagesCall(env, "/snapshot", "GET", undefined,
+      other.data.sessionToken)).data.timer.state, "idle");
+    const loggedOut = await pagesCall(env, "/logout", "POST", {},
+      undefined, restored.data.csrf, pageOrigin, rememberedCookie);
+    assert.equal(loggedOut.status, 200);
+    assert.match(loggedOut.cookie, /Max-Age=0/);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      undefined, undefined, pageOrigin, rememberedCookie)).data.authenticated, false);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      login.data.sessionToken)).data.authenticated, false);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      other.data.sessionToken)).data.authenticated, true);
+    const rememberedAgain = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct", rememberDevice: true,
+    });
+    const oldCookie = rememberedAgain.cookie.split(";")[0];
+    const optedOut = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct", rememberDevice: false,
+    }, undefined, undefined, pageOrigin, oldCookie);
+    assert.equal(optedOut.status, 200);
+    assert.match(optedOut.cookie, /Max-Age=0/);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      rememberedAgain.data.sessionToken)).data.authenticated, false);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      undefined, undefined, pageOrigin, oldCookie)).data.authenticated, false);
+    const expiring = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct", rememberDevice: true,
+    });
+    env.DB.sqlite.prepare("UPDATE sessions SET expires_at=? WHERE csrf=?")
+      .run(Date.now() - 1, expiring.data.csrf);
+    const expired = await pagesCall(env, "/session", "GET", undefined,
+      undefined, undefined, pageOrigin, expiring.cookie.split(";")[0]);
+    assert.equal(expired.data.authenticated, false);
+    assert.match(expired.cookie, /Max-Age=0/);
+    const upstreamExpired = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct", rememberDevice: true,
+    });
+    const upstreamCookie = upstreamExpired.cookie.split(";")[0];
+    stub.users.delete("jwt-a@example.test");
+    const rejected = await pagesCall(env, "/snapshot", "GET", undefined,
+      undefined, undefined, pageOrigin, upstreamCookie);
+    assert.equal(rejected.status, 401);
+    assert.equal(rejected.data.code, "AUTH_EXPIRED");
+    assert.match(rejected.cookie, /Max-Age=0/);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      upstreamExpired.data.sessionToken)).data.authenticated, false);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      undefined, undefined, pageOrigin, upstreamCookie)).data.authenticated, false);
     env.DB.sqlite.close();
   } finally {
     globalThis.fetch = realFetch;

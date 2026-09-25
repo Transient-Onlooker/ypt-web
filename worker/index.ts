@@ -39,7 +39,11 @@ type TimerRow = {
 const encoder = new TextEncoder();
 const TTL = 30 * 24 * 60 * 60 * 1000;
 const COOKIE = "ypt_session";
+const REMEMBER_COOKIE = "__Host-ypt_remember";
 const PAGES_ORIGIN = "https://ypt.mcv.kr";
+function rememberCookie(value: string, maxAge = TTL / 1000) {
+  return `${REMEMBER_COOKIE}=${value}; HttpOnly; Secure; SameSite=None; Partitioned; Path=/; Max-Age=${maxAge}`;
+}
 const HISTORY_VALIDATED = true;
 function json(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
@@ -51,8 +55,8 @@ function json(data: unknown, status = 200, headers: HeadersInit = {}) {
     },
   });
 }
-function fail(code: string, status: number, message: string) {
-  return json({ code, error: message }, status);
+function fail(code: string, status: number, message: string, headers: HeadersInit = {}) {
+  return json({ code, error: message }, status, headers);
 }
 function bytes64(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes));
@@ -134,27 +138,40 @@ async function decrypt(env: Env, account: string, value: string) {
   );
   return new TextDecoder().decode(decoded);
 }
-function cookie(request: Request) {
+function cookie(request: Request, name = COOKIE) {
   return (
     request.headers
       .get("Cookie")
       ?.split(";")
       .map((v) => v.trim())
-      .find((v) => v.startsWith(`${COOKIE}=`))
-      ?.slice(COOKIE.length + 1) ?? null
+      .find((v) => v.startsWith(`${name}=`))
+      ?.slice(name.length + 1) ?? null
   );
 }
 async function session(request: Request, env: Env) {
   const authorization = request.headers.get("Authorization");
   const value = authorization
     ? authorization.startsWith("Bearer ") ? authorization.slice(7) : null
-    : cookie(request);
+    : cookie(request, request.headers.get("Origin") === PAGES_ORIGIN
+      ? REMEMBER_COOKIE : COOKIE);
   if (!value || !/^[0-9a-f]{64}$/.test(value)) return null;
   return env.DB.prepare(
     "SELECT token_hash, account_id, csrf, expires_at FROM sessions WHERE token_hash=? AND expires_at>?",
   )
     .bind(await sha(value), Date.now())
     .first<Session>();
+}
+async function revokeSessionGroup(env: Env, s: Session) {
+  await env.DB.prepare("DELETE FROM sessions WHERE account_id=? AND csrf=?")
+    .bind(s.account_id, s.csrf).run();
+}
+async function revokeRememberCookie(request: Request, env: Env) {
+  const value = cookie(request, REMEMBER_COOKIE);
+  if (!value || !/^[0-9a-f]{64}$/.test(value)) return;
+  const found = await env.DB.prepare(
+    "SELECT token_hash, account_id, csrf, expires_at FROM sessions WHERE token_hash=?",
+  ).bind(await sha(value)).first<Session>();
+  if (found) await revokeSessionGroup(env, found);
 }
 async function credential(env: Env, account: string) {
   const row = await env.DB.prepare(
@@ -255,7 +272,8 @@ function mutationAllowed(request: Request, env: Env, s?: Session | null) {
   const localProxy = (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
     origin === env.APP_ORIGIN;
   const pages = origin === PAGES_ORIGIN &&
-    (!s || /^Bearer [0-9a-f]{64}$/.test(request.headers.get("Authorization") ?? ""));
+    (!s || /^Bearer [0-9a-f]{64}$/.test(request.headers.get("Authorization") ?? "") ||
+      /^[0-9a-f]{64}$/.test(cookie(request, REMEMBER_COOKIE) ?? ""));
   return (
     !!origin &&
     (origin === url.origin || localProxy || pages) &&
@@ -283,13 +301,14 @@ async function limit(env: Env, email: string, request: Request) {
   }
   return true;
 }
-function resultError(error: unknown) {
+function resultError(error: unknown, headers: HeadersInit = {}) {
   if (error instanceof YptError) {
     if (error.code === "AUTH_EXPIRED")
       return fail(
         "AUTH_EXPIRED",
         401,
         "열품타 로그인이 만료됐습니다. 다시 로그인해 주세요.",
+        headers,
       );
     if (error.code === "REJECTED")
       return fail(
@@ -328,12 +347,17 @@ async function loginRoute(request: Request, env: Env) {
       ? fail("LOGIN_FAILED", 401, "열품타 계정 정보를 확인해 주세요.")
       : resultError(e);
   }
+  const pages = request.headers.get("Origin") === PAGES_ORIGIN;
+  const remember = pages && input?.rememberDevice === true;
   const id = await accountId(env, email);
   const sealed = await encrypt(env, id, jwt);
   const token = hex(crypto.getRandomValues(new Uint8Array(32)));
+  const rememberedToken = remember
+    ? hex(crypto.getRandomValues(new Uint8Array(32))) : null;
   const csrf = hex(crypto.getRandomValues(new Uint8Array(32)));
   const now = Date.now();
-  await env.DB.batch([
+  if (pages) await revokeRememberCookie(request, env);
+  const statements = [
     env.DB.prepare(
       "INSERT INTO accounts(id,encrypted_jwt,created_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET encrypted_jwt=excluded.encrypted_jwt",
     ).bind(id, sealed, now),
@@ -343,9 +367,16 @@ async function loginRoute(request: Request, env: Env) {
     env.DB.prepare(
       "INSERT INTO sessions(token_hash,account_id,csrf,expires_at) VALUES(?,?,?,?)",
     ).bind(await sha(token), id, csrf, now + TTL),
-  ]);
-  if (request.headers.get("Origin") === PAGES_ORIGIN)
-    return json({ authenticated: true, csrf, sessionToken: token });
+  ];
+  if (rememberedToken)
+    statements.push(env.DB.prepare(
+      "INSERT INTO sessions(token_hash,account_id,csrf,expires_at) VALUES(?,?,?,?)",
+    ).bind(await sha(rememberedToken), id, csrf, now + TTL));
+  await env.DB.batch(statements);
+  if (pages)
+    return json({ authenticated: true, csrf, sessionToken: token }, 200,
+      rememberedToken ? { "Set-Cookie": rememberCookie(rememberedToken) } :
+        cookie(request, REMEMBER_COOKIE) ? { "Set-Cookie": rememberCookie("", 0) } : {});
   return json({ authenticated: true, csrf }, 200, {
     "Set-Cookie": `${COOKIE}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${TTL / 1000}`,
   });
@@ -605,16 +636,21 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     if (path === "/api/session" && request.method === "GET")
       return json(
         s ? { authenticated: true, csrf: s.csrf } : { authenticated: false },
+        200,
+        !s && request.headers.get("Origin") === PAGES_ORIGIN &&
+          !request.headers.get("Authorization") && cookie(request, REMEMBER_COOKIE)
+          ? { "Set-Cookie": rememberCookie("", 0) } : {},
       );
     if (!s) return fail("UNAUTHORIZED", 401, "다시 로그인해 주세요.");
     if (request.method !== "GET" && !mutationAllowed(request, env, s))
       return fail("CSRF", 403, "요청을 확인할 수 없습니다.");
     if (path === "/api/logout" && request.method === "POST") {
-      await env.DB.prepare("DELETE FROM sessions WHERE token_hash=?")
-        .bind(s.token_hash)
-        .run();
+      await revokeSessionGroup(env, s);
+      const pages = request.headers.get("Origin") === PAGES_ORIGIN;
+      if (pages) await revokeRememberCookie(request, env);
       return json({ authenticated: false }, 200, {
-        "Set-Cookie": `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
+        "Set-Cookie": pages ? rememberCookie("", 0) :
+          `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
       });
     }
     try {
@@ -688,6 +724,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return changeTimer(action, request, env, s);
       return fail("NOT_FOUND", 404, "요청을 찾을 수 없습니다.");
     } catch (e) {
+      if (e instanceof YptError && e.code === "AUTH_EXPIRED") {
+        await revokeSessionGroup(env, s);
+        const pages = request.headers.get("Origin") === PAGES_ORIGIN;
+        if (pages) await revokeRememberCookie(request, env);
+        return resultError(e, {
+          "Set-Cookie": pages ? rememberCookie("", 0) :
+            `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
+        });
+      }
       return resultError(e);
     }
 }
@@ -703,6 +748,7 @@ export default {
         status: 204,
         headers: {
           "Access-Control-Allow-Origin": PAGES_ORIGIN,
+          "Access-Control-Allow-Credentials": "true",
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           "Access-Control-Allow-Headers": "Authorization, Content-Type, X-CSRF-Token",
           "Access-Control-Max-Age": "600",
@@ -714,6 +760,7 @@ export default {
     if (!api || origin !== PAGES_ORIGIN) return response;
     const headers = new Headers(response.headers);
     headers.set("Access-Control-Allow-Origin", PAGES_ORIGIN);
+    headers.set("Access-Control-Allow-Credentials", "true");
     headers.append("Vary", "Origin");
     return new Response(response.body, {
       status: response.status,

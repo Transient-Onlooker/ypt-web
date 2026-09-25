@@ -66,7 +66,7 @@ async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
   try {
     response = await fetch(`${API_BASE_URL}/api${path}`, {
       method,
-      credentials: CROSS_ORIGIN_API ? "omit" : "same-origin",
+      credentials: CROSS_ORIGIN_API ? "include" : "same-origin",
       headers: {
         ...(CROSS_ORIGIN_API && sessionToken && path !== "/login"
           ? { Authorization: `Bearer ${sessionToken}` }
@@ -94,8 +94,13 @@ async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
     authenticated?: unknown;
     [key: string]: unknown;
   };
-  if (CROSS_ORIGIN_API && path === "/session" && result.authenticated === false)
+  if (CROSS_ORIGIN_API && path === "/session" && result.authenticated === false) {
+    if (sessionToken) {
+      rememberSessionToken("");
+      return api<T>(path, method, data);
+    }
     rememberSessionToken("");
+  }
   if (!response.ok) {
     if (CROSS_ORIGIN_API && response.status === 401 && path !== "/login")
       rememberSessionToken("");
@@ -129,11 +134,12 @@ function Login({
   onLogin,
   notice,
 }: {
-  onLogin: () => Promise<void>;
+  onLogin: (rememberWarning: string) => Promise<void>;
   notice: string;
 }) {
   const [initialEmail] = useState(savedEmail);
   const [keepEmail, setKeepEmail] = useState(Boolean(initialEmail));
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function submit(event: React.FormEvent) {
@@ -148,9 +154,26 @@ function Login({
       const response = await api<Session>("/login", "POST", {
         email,
         password,
+        rememberDevice: CROSS_ORIGIN_API && keepSignedIn,
       });
       csrf = response.csrf ?? "";
       rememberEmail(keepEmail ? email : "");
+      let rememberWarning = "";
+      if (CROSS_ORIGIN_API && keepSignedIn) {
+        try {
+          const check = await fetch(`${API_BASE_URL}/api/session`, {
+            credentials: "include",
+            cache: "no-store",
+          });
+          const state: unknown = await check.json();
+          if (!check.ok || !state || typeof state !== "object" ||
+              !("authenticated" in state) || state.authenticated !== true ||
+              !("csrf" in state) || state.csrf !== csrf)
+            rememberWarning = "이 브라우저에서 로그인 유지 쿠키를 확인하지 못했습니다. 현재 탭에서는 계속 사용할 수 있습니다.";
+        } catch {
+          rememberWarning = "이 브라우저에서 로그인 유지 쿠키를 확인하지 못했습니다. 현재 탭에서는 계속 사용할 수 있습니다.";
+        }
+      }
       const PasswordCredentialType = (window as Window & {
         PasswordCredential?: new (data: { id: string; password: string }) => Credential;
       }).PasswordCredential;
@@ -163,7 +186,7 @@ function Login({
           // Browser password storage is optional and must not block login.
         }
       }
-      await onLogin();
+      await onLogin(rememberWarning);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "로그인하지 못했습니다.",
@@ -212,6 +235,22 @@ function Login({
             />
             이메일 기억하기
           </label>
+          {CROSS_ORIGIN_API && (
+            <>
+              <label className="remember-email" htmlFor="keep-signed-in">
+                <input
+                  id="keep-signed-in"
+                  type="checkbox"
+                  checked={keepSignedIn}
+                  onChange={(event) => setKeepSignedIn(event.target.checked)}
+                />
+                이 기기에서 로그인 유지
+              </label>
+              <p className="password-manager-note">
+                선택하면 최대 30일간 유지됩니다. 브라우저의 쿠키 차단 설정에 따라 동작하지 않을 수 있습니다.
+              </p>
+            </>
+          )}
           <p className="password-manager-note">
             비밀번호는 브라우저의 비밀번호 관리자에서 저장할 수 있습니다.
           </p>
@@ -235,6 +274,7 @@ function App() {
   const [sessionLoadError, setSessionLoadError] = useState(false);
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const [loginNotice, setLoginNotice] = useState("");
+  const [rememberWarning, setRememberWarning] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [snapshotCheckedAt, setSnapshotCheckedAt] = useState<number | null>(null);
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
@@ -592,6 +632,7 @@ function App() {
       setDate("");
       setTab("study");
       setLoginNotice("");
+      setRememberWarning("");
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "로그아웃하지 못했습니다.",
@@ -625,12 +666,13 @@ function App() {
     return (
       <Login
         notice={loginNotice}
-        onLogin={async () => {
+        onLogin={async (warning) => {
           authEpoch.current++;
           setSession({ authenticated: true, csrf });
           setError("");
           setLoginNotice("");
           await loadSnapshot();
+          setRememberWarning(warning);
         }}
       />
     );
@@ -748,6 +790,12 @@ function App() {
           </button>
         </header>
         <main>
+          {rememberWarning && (
+            <div className="remember-warning" role="status">
+              {rememberWarning}
+              <button onClick={() => setRememberWarning("")} aria-label="안내 닫기">×</button>
+            </div>
+          )}
           {tab !== "study" && running && (
             <div className="active-strip">
               <div>

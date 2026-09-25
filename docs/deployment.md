@@ -21,7 +21,7 @@ npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
 ```
 
-로컬 개발은 `.dev.vars`의 `APP_ORIGIN=http://localhost:5173`과 Vite 프록시를 사용합니다. Pages 빌드는 `VITE_API_BASE_URL`에 Worker 주소를 넣습니다. Worker는 정확히 `https://ypt.mcv.kr` 출처에만 CORS를 허용합니다. Pages 로그인은 계정별 불투명 세션 토큰을 발급하고 브라우저 탭의 `sessionStorage`에만 저장합니다. 탭을 닫으면 다시 로그인해야 합니다. 열품타 비밀번호·JWT는 브라우저에 저장하지 않습니다. Worker 단독 주소는 기존 HttpOnly 쿠키 세션을 유지합니다.
+로컬 개발은 `.dev.vars`의 `APP_ORIGIN=http://localhost:5173`과 Vite 프록시를 사용합니다. Pages 빌드는 `VITE_API_BASE_URL`에 Worker 주소를 넣습니다. Worker는 정확히 `https://ypt.mcv.kr` 출처에만 자격 증명 포함 CORS를 허용합니다. Pages 로그인은 기본적으로 계정별 불투명 세션 토큰을 탭의 `sessionStorage`에 저장합니다. **이 기기에서 로그인 유지**를 선택한 경우 별도 HttpOnly·Secure·SameSite=None·Partitioned 쿠키가 최대 30일간 새 탭의 세션을 복원합니다. 쿠키 차단 브라우저에서는 현재 탭 세션만 사용하며 화면에 안내합니다. 로그아웃 시 연결된 세션을 폐기합니다. 열품타 비밀번호·JWT는 브라우저에 저장하지 않습니다. Worker 단독 주소는 기존 HttpOnly 쿠키 세션을 유지합니다.
 
 ## `ypt.mcv.kr` 연결
 

@@ -1,6 +1,6 @@
 # YPT Web
 
-현재 버전: **v0.4.1 · 비밀번호 관리자 연결**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
+현재 버전: **v0.5.0 · 선택형 로그인 유지**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 React + GitHub Pages + Cloudflare Worker + D1 앱입니다. 별도 서비스 가입이나 허용 목록은 없습니다.
 
@@ -22,11 +22,11 @@ try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
 [Convert]::ToBase64String($bytes)
 ```
 
-`APP_ORIGIN=http://localhost:5173`을 유지하고 `npm run db:local`을 실행합니다. 터미널 두 개에서 `npm run dev:worker`와 `npm run dev`를 각각 실행한 뒤 `http://localhost:5173`에 접속합니다. 브라우저 비밀번호·JWT는 출력하거나 로컬 파일에 저장하지 않습니다. D1에는 암호화된 JWT, 해시된 세션 토큰, 타이머 상태가 저장됩니다. 로컬 개발과 Worker 단독 주소는 HttpOnly·Secure·SameSite=Strict 쿠키를 사용합니다. Pages 주소는 사용자별 불투명 세션 토큰을 탭의 `sessionStorage`에 보관하며, 탭을 닫으면 다시 로그인해야 합니다. 로컬 HTTP에서 Secure 쿠키의 예외 동작은 브라우저별로 차이가 있으므로, 운영 환경은 HTTPS를 사용합니다.
+`APP_ORIGIN=http://localhost:5173`을 유지하고 `npm run db:local`을 실행합니다. 터미널 두 개에서 `npm run dev:worker`와 `npm run dev`를 각각 실행한 뒤 `http://localhost:5173`에 접속합니다. 비밀번호·JWT는 출력하거나 로컬 파일에 저장하지 않습니다. D1에는 암호화된 JWT, 해시된 세션 토큰, 타이머 상태가 저장됩니다. 로컬 개발과 Worker 단독 주소는 HttpOnly·Secure·SameSite=Strict 쿠키를 사용합니다. Pages에서는 기본적으로 현재 탭의 `sessionStorage`에 불투명 세션 토큰을 보관합니다. 로그인 유지 옵션을 선택하면 별도의 HttpOnly·Secure·Partitioned 쿠키를 최대 30일간 사용합니다. 로컬 HTTP에서 Secure 쿠키의 예외 동작은 브라우저별로 차이가 있으므로, 운영 환경은 HTTPS를 사용합니다.
 
 ## 로그인 기억하기
 
-로그인 화면의 **이메일 기억하기**를 선택하면 해당 브라우저의 로컬 저장소에 이메일만 저장합니다. 비밀번호는 앱이 저장하지 않습니다. 지원 브라우저에서는 로그인 성공 뒤 비밀번호 관리자에 저장 제안을 요청하고, 그 외에는 일반 자동완성 필드를 사용합니다. 저장 여부와 동작은 브라우저 설정에 따릅니다. Pages 로그인 세션은 현재 탭을 닫으면 종료됩니다.
+로그인 화면의 **이메일 기억하기**를 선택하면 해당 브라우저의 로컬 저장소에 이메일만 저장합니다. 비밀번호는 앱이 저장하지 않습니다. 지원 브라우저에서는 로그인 성공 뒤 비밀번호 관리자에 저장 제안을 요청하고, 그 외에는 일반 자동완성 필드를 사용합니다. 저장 여부와 동작은 브라우저 설정에 따릅니다. Pages의 **이 기기에서 로그인 유지**를 선택하면 별도 HttpOnly·Secure·Partitioned 쿠키로 최대 30일간 새 탭에서 로그인 상태를 복원합니다. 선택하지 않으면 탭을 닫을 때 세션이 종료됩니다. 쿠키가 차단되면 화면에 안내가 표시되며 현재 탭에서는 계속 사용할 수 있습니다. 로그아웃하면 로그인 유지 쿠키와 연결된 세션을 폐기합니다.
 
 ## 기능과 안전한 상태 복구
 
