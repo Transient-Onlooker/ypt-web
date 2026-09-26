@@ -76,3 +76,14 @@ export function longestVerifiedStreak(days: TrendDay[]) {
   }
   return longest;
 }
+
+export function compareVerifiedWeeks(days: TrendDay[]) {
+  if (days.length !== 14 || days.some((day) => day.totalMs === null)) return null;
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.some((day, index) => index > 0 &&
+    Date.parse(`${day.date}T00:00:00Z`) - Date.parse(`${sorted[index - 1].date}T00:00:00Z`) !== 86_400_000))
+    return null;
+  const earlier = sorted.slice(0, 7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
+  const recent = sorted.slice(7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
+  return { earlier, recent, difference: recent - earlier };
+}

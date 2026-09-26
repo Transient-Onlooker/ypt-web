@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak } from "../shared/format.ts";
+import { formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak, compareVerifiedWeeks } from "../shared/format.ts";
 
 test("copied summary includes completed time and only verified subject times", () => {
   const result = formatDaySummary({
@@ -67,4 +67,22 @@ test("weekly CSV and streak keep failed days unknown", () => {
     { date: "2026-09-20", totalMs: 1_000 },
     { date: "2026-09-22", totalMs: 1_000 },
   ]), 1);
+});
+
+test("two-week comparison requires every day to be verified", () => {
+  const days = Array.from({ length: 14 }, (_, index) => ({
+    date: `2026-09-${String(index + 1).padStart(2, "0")}`,
+    totalMs: index < 7 ? 1_000 : 2_000,
+  }));
+  assert.deepEqual(compareVerifiedWeeks(days), {
+    earlier: 7_000, recent: 14_000, difference: 7_000,
+  });
+  days[3].totalMs = null;
+  assert.equal(compareVerifiedWeeks(days), null);
+  assert.equal(compareVerifiedWeeks(days.slice(0, 7)), null);
+  const withGap = Array.from({ length: 14 }, (_, index) => ({
+    date: `2026-09-${String(index + (index > 6 ? 2 : 1)).padStart(2, "0")}`,
+    totalMs: 1_000,
+  }));
+  assert.equal(compareVerifiedWeeks(withGap), null);
 });

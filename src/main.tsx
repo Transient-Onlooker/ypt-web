@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
-import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak } from "../shared/format.ts";
+import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak, compareVerifiedWeeks } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import "./style.css";
@@ -18,6 +18,7 @@ function NavIcon({ tab }: { tab: Tab }) {
 }
 type MemberSort = "time" | "name" | "status";
 type MemberFilter = "all" | "studying" | "resting" | "unknown";
+type TrendRange = 7 | 14;
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
@@ -62,10 +63,14 @@ function savedSyncSeconds(): number {
 function savedGoalMinutes(): number {
   try {
     const saved = Number(localStorage.getItem(GOAL_STORAGE_KEY));
-    return GOAL_MINUTES.find((value) => value === saved) ?? 0;
+    return validGoalMinutes(saved) ? saved : 0;
   } catch {
     return 0;
   }
+}
+
+function validGoalMinutes(minutes: number) {
+  return minutes === 0 || Number.isInteger(minutes) && minutes >= 15 && minutes <= 1440;
 }
 
 function savedEmail(): string {
@@ -161,7 +166,11 @@ function DailyGoal({ minutes, onChange, recordedMs, liveMs }: {
   recordedMs: number;
   liveMs: number;
 }) {
+  const [customMode, setCustomMode] = useState(false);
+  const [customDraft, setCustomDraft] = useState(String(minutes || 45));
+  const [customError, setCustomError] = useState("");
   const goalMs = minutes * 60_000;
+  const customSelected = customMode || minutes > 0 && !GOAL_MINUTES.some((value) => value === minutes);
   const progress = goalMs ? Math.min(100, Math.floor(recordedMs / goalMs * 100)) : 0;
   const previewProgress = goalMs ? Math.min(100, Math.floor((recordedMs + liveMs) / goalMs * 100)) : 0;
   const milestone = progress >= 100 ? "🎉 오늘의 목표 달성!"
@@ -173,15 +182,44 @@ function DailyGoal({ minutes, onChange, recordedMs, liveMs }: {
     <div className="daily-goal">
       <div className="daily-goal-head">
         <label htmlFor="daily-goal-minutes">하루 목표</label>
-        <select id="daily-goal-minutes" value={minutes}
-          onChange={(event) => onChange(Number(event.target.value))}>
+        <select id="daily-goal-minutes" value={customSelected ? "custom" : minutes}
+          onChange={(event) => {
+            if (event.target.value === "custom") {
+              setCustomDraft(String(minutes || 45));
+              setCustomMode(true);
+            } else {
+              setCustomMode(false);
+              setCustomError("");
+              onChange(Number(event.target.value));
+            }
+          }}>
           {GOAL_MINUTES.map((value) => (
             <option key={value} value={value}>
               {value ? goalLabel(value) : minutes ? "목표 지우기" : "목표 정하기"}
             </option>
           ))}
+          <option value="custom">직접 입력</option>
         </select>
       </div>
+      {customSelected && <form className="custom-goal" noValidate onSubmit={(event) => {
+        event.preventDefault();
+        const value = Number(customDraft);
+        if (!validGoalMinutes(value) || value === 0) {
+          setCustomError("15분부터 24시간까지 분 단위로 입력해 주세요.");
+          return;
+        }
+        setCustomError("");
+        onChange(value);
+      }}>
+        <label htmlFor="custom-goal-minutes">직접 목표 (분)</label>
+        <div>
+          <input id="custom-goal-minutes" type="number" inputMode="numeric"
+            min={15} max={1440} step={1} value={customDraft}
+            onChange={(event) => setCustomDraft(event.target.value)} />
+          <button className="secondary" type="submit">적용</button>
+        </div>
+        {customError && <small role="alert">{customError}</small>}
+      </form>}
       {goalMs ? (
         <>
           <div className="daily-goal-numbers">
@@ -213,13 +251,30 @@ function DailyGoal({ minutes, onChange, recordedMs, liveMs }: {
   );
 }
 function SubjectBreakdown({ day, empty }: { day: Day; empty: string }) {
-  const subjects = [...day.subjects].sort((a, b) =>
-    (b.studyMs ?? -1) - (a.studyMs ?? -1) ||
-    a.title.localeCompare(b.title, "ko-KR"),
-  );
+  const [sort, setSort] = useState<"time" | "name">("time");
+  const subjects = [...day.subjects].sort((a, b) => sort === "name"
+    ? a.title.localeCompare(b.title, "ko-KR")
+    : (b.studyMs ?? -1) - (a.studyMs ?? -1) ||
+      a.title.localeCompare(b.title, "ko-KR"));
   const maxMs = Math.max(0, ...subjects.map((subject) => subject.studyMs ?? 0));
+  const shareAvailable = day.subjectTimesAvailable && subjects.length > 0 &&
+    subjects.every((subject) => subject.studyMs !== null);
+  const subjectTotal = shareAvailable
+    ? subjects.reduce((sum, subject) => sum + (subject.studyMs ?? 0), 0) : 0;
   return (
     <div className="subject-list">
+      <div className="subject-list-head">
+        <span>과목별 완료 시간</span>
+        {subjects.length > 1 && <label>정렬
+          <select value={sort} onChange={(event) =>
+            setSort(event.target.value === "name" ? "name" : "time")}>
+            <option value="time">시간순</option>
+            <option value="name">이름순</option>
+          </select>
+        </label>}
+      </div>
+      {shareAvailable && subjectTotal > 0 &&
+        <p className="subject-share-note">비중은 확인된 과목별 완료 시간 합계 기준입니다.</p>}
       {subjects.map((subject) => (
         <div className="subject-row" key={subject.title}>
           <div className="subject-row-top">
@@ -230,7 +285,11 @@ function SubjectBreakdown({ day, empty }: { day: Day; empty: string }) {
               )}
               {subject.title}
             </span>
-            <strong>{duration(subject.studyMs)}</strong>
+            <span className="subject-row-values">
+              <strong>{subject.studyMs === null ? "미확인" : duration(subject.studyMs)}</strong>
+              {shareAvailable && subjectTotal > 0 && subject.studyMs !== null &&
+                <small>{Math.round(subject.studyMs / subjectTotal * 100)}%</small>}
+            </span>
           </div>
           {subject.studyMs !== null && maxMs > 0 && (
             <div className="subject-track" aria-hidden="true">
@@ -376,8 +435,10 @@ function CsvButton({ filename, csv, label }: { filename: string; csv: string; la
     {notice && <small role="status">{notice}</small>}
   </span>;
 }
-function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
+function HistoryTrend({ today, rangeDays, onRangeChange, previous, onLoaded, onSelect, loadDay }: {
   today: Day;
+  rangeDays: TrendRange;
+  onRangeChange: (range: TrendRange) => void;
   previous: TrendDay[] | null;
   onLoaded: (days: TrendDay[]) => void;
   onSelect: (date: string) => void;
@@ -397,8 +458,10 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
     setError("");
     try {
       const rows: TrendDay[] = [];
-      for (let offset = 1; offset <= 6; offset += 2) {
-        const dates = [offset, offset + 1].map((days) => shiftDate(today.date, -days));
+      for (let offset = 1; offset < rangeDays; offset += 2) {
+        const dates = [offset, offset + 1]
+          .filter((days) => days < rangeDays)
+          .map((days) => shiftDate(today.date, -days));
         const results = await Promise.allSettled(dates.map((date) => loadDay(date, previous !== null)));
         if (currentRequest !== requestId.current) return;
         results.forEach((result, index) => {
@@ -415,7 +478,7 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
         setError("일부 날짜를 확인하지 못했습니다. 다시 불러오면 전체 기간을 확인합니다.");
     } catch {
       if (currentRequest === requestId.current)
-        setError("7일 기록을 확인하지 못했습니다. 다시 시도해 주세요.");
+        setError(`${rangeDays}일 기록을 확인하지 못했습니다. 다시 시도해 주세요.`);
     } finally {
       loadingRef.current = false;
       if (currentRequest === requestId.current) setLoading(false);
@@ -431,17 +494,32 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
   const bestDay = known.reduce<TrendDay | null>((best, row) =>
     !best || (row.totalMs ?? 0) > (best.totalMs ?? 0) ? row : best, null);
   const streak = days ? longestVerifiedStreak(days) : 0;
+  const weekComparison = rangeDays === 14 && days ? compareVerifiedWeeks(days) : null;
   return (
     <div className="history-trend">
       <div className="card-head">
-        <span>최근 7일</span>
-        <button className="text-button" disabled={loading} onClick={() => void load()}>
-          {loading ? "확인 중…" : previous ? "다시 불러오기" : "7일 기록 불러오기"}
-        </button>
+        <span>최근 기록</span>
+        <div className="history-trend-actions">
+          <label className="trend-range" htmlFor="trend-range">기간
+            <select id="trend-range" value={rangeDays} disabled={loading}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                if (value === 7 || value === 14) onRangeChange(value);
+              }}>
+              <option value={7}>7일</option>
+              <option value={14}>14일</option>
+            </select>
+          </label>
+          <button className="text-button" disabled={loading} onClick={() => void load()}>
+            {loading ? "확인 중…" : previous ? "다시 불러오기" : `${rangeDays}일 기록 불러오기`}
+          </button>
+        </div>
       </div>
-      <p className="card-note">누르면 오늘을 포함한 7일의 완료 기록을 확인합니다. 자동으로 추가 요청하지 않습니다.</p>
+      <p className="card-note">누르면 오늘을 포함한 {rangeDays}일의 완료 기록을 확인합니다. 과거 날짜는 한 번에 최대 두 건씩 조회합니다.</p>
       {days && (
         <>
+          {days.some((row) => row.totalMs === null) && !error &&
+            <p className="card-note">확인할 수 없는 날짜는 합계·평균에서 제외합니다.{rangeDays === 14 && " 앞뒤 7일 비교도 보류합니다."}</p>}
           <p className="week-total">확인된 {known.length}일 합계 <strong>{duration(knownTotal)}</strong></p>
           <div className="week-insights">
             <span>공부한 날 <strong>{studyDays}/{known.length}일</strong></span>
@@ -451,8 +529,21 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
               <span>가장 많이 한 날 <strong>{bestDay.date.slice(5).replace("-", ".")} · {duration(bestDay.totalMs)}</strong></span>
             )}
           </div>
-          <CsvButton filename={`ypt-week-${today.date}.csv`}
-            csv={formatTrendCsv(days)} label="7일 기록 CSV 저장" />
+          {rangeDays === 14 && (
+            <p className="week-comparison">
+              {weekComparison
+                ? <>이전 7일 {duration(weekComparison.earlier)} · 최근 7일 {duration(weekComparison.recent)}
+                    <strong>{weekComparison.difference > 0
+                      ? ` ${duration(weekComparison.difference)} 증가`
+                      : weekComparison.difference < 0
+                        ? ` ${duration(-weekComparison.difference)} 감소`
+                        : " 같은 시간"}</strong>
+                    <small>오늘 진행 중인 시간은 제외한 완료 기록입니다.</small></>
+                : "7일씩 비교하려면 14일 모두의 기록을 확인해야 합니다."}
+            </p>
+          )}
+          <CsvButton filename={`ypt-${rangeDays}days-${today.date}.csv`}
+            csv={formatTrendCsv(days)} label={`${rangeDays}일 기록 CSV 저장`} />
           <div className="week-list">
             {days.map((row) => (
               <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
@@ -622,6 +713,9 @@ function App() {
   const [tab, setTab] = useState<Tab>("study");
   const [syncSeconds, setSyncSeconds] = useState(savedSyncSeconds);
   const [goalMinutes, setGoalMinutes] = useState(savedGoalMinutes);
+  const [keepScreenOn, setKeepScreenOn] = useState(false);
+  const [screenAwake, setScreenAwake] = useState(false);
+  const [wakeError, setWakeError] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -633,7 +727,8 @@ function App() {
   const [loadingDay, setLoadingDay] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const [trend, setTrend] = useState<{ todayDate: string; days: TrendDay[] } | null>(null);
+  const [trendRange, setTrendRange] = useState<TrendRange>(7);
+  const [trends, setTrends] = useState<Partial<Record<TrendRange, { todayDate: string; days: TrendDay[] }>>>({});
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -659,6 +754,64 @@ function App() {
   const historyCache = useRef(new Map<string, { day: Day; checkedAt: number }>());
   const historyRequests = useRef(new Map<string, Promise<Day>>());
   const forceHistoryDate = useRef<string | null>(null);
+  const wakeRunning = (snapshot?.timer.state === "running" && snapshot.timer.startedAt !== null) ||
+    (snapshot?.timer.state === "idle" && snapshot.remoteStatus === "running" && snapshot.remoteStartedAt !== null);
+
+  useEffect(() => {
+    if (snapshot && !wakeRunning) setKeepScreenOn(false);
+  }, [snapshot, wakeRunning]);
+  useEffect(() => {
+    if (!keepScreenOn || !wakeRunning || !session?.authenticated) {
+      setScreenAwake(false);
+      return;
+    }
+    if (!window.isSecureContext || !("wakeLock" in navigator)) {
+      setWakeError("이 브라우저에서는 화면 켜두기를 사용할 수 없습니다.");
+      setKeepScreenOn(false);
+      return;
+    }
+    let cancelled = false;
+    let lock: WakeLockSentinel | null = null;
+    async function acquire() {
+      if (document.visibilityState !== "visible" || lock || cancelled) return;
+      try {
+        const requested = await navigator.wakeLock.request("screen");
+        if (cancelled) {
+          await requested.release();
+          return;
+        }
+        lock = requested;
+        setScreenAwake(true);
+        setWakeError("");
+        requested.addEventListener("release", () => {
+          if (lock !== requested || cancelled) return;
+          lock = null;
+          setScreenAwake(false);
+          setWakeError("화면 켜두기가 해제되었습니다. 필요하면 다시 켜 주세요.");
+          setKeepScreenOn(false);
+        });
+      } catch {
+        if (!cancelled) {
+          setWakeError("화면 켜두기를 시작하지 못했습니다. 브라우저나 절전 설정을 확인해 주세요.");
+          setKeepScreenOn(false);
+        }
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        setScreenAwake(false);
+        setWakeError("다른 화면으로 이동해 화면 켜두기를 해제했습니다. 웹 타이머는 계속됩니다.");
+        setKeepScreenOn(false);
+      }
+    };
+    void acquire();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (lock) void lock.release();
+    };
+  }, [keepScreenOn, wakeRunning, session?.authenticated]);
 
   const getHistoryDay = useCallback((requestedDate: string, force = false) => {
     const pending = historyRequests.current.get(requestedDate);
@@ -726,9 +879,11 @@ function App() {
         historyCache.current.clear();
         historyRequests.current.clear();
         forceHistoryDate.current = null;
-        setTrend(null);
+        setTrends({});
         setRefreshingSnapshot(false);
         setSnapshot(null);
+        setKeepScreenOn(false);
+        setWakeError("");
         setSnapshotCheckedAt(null);
         setGroups(null);
         setMembers(null);
@@ -1023,7 +1178,7 @@ function App() {
         historyCache.current.clear();
         historyRequests.current.clear();
         forceHistoryDate.current = null;
-        setTrend(null);
+        setTrends({});
         snapshotGate.current.invalidate();
         groupGate.current.invalidate();
         memberRequest.current++;
@@ -1032,6 +1187,8 @@ function App() {
         csrf = "";
         setSession({ authenticated: false });
         setSnapshot(null);
+        setKeepScreenOn(false);
+        setWakeError("");
         setSnapshotCheckedAt(null);
         setRefreshingSnapshot(false);
         setGroups(null);
@@ -1090,7 +1247,8 @@ function App() {
           historyCache.current.clear();
           historyRequests.current.clear();
           forceHistoryDate.current = null;
-          setTrend(null);
+          setTrends({});
+          setWakeError("");
           setSession({ authenticated: true, csrf });
           setError("");
           setLoginNotice("");
@@ -1429,6 +1587,23 @@ function App() {
                       </button>
                     )}
                 </div>
+                {wakeRunning && <div className="screen-awake-control">
+                  <button className="secondary" type="button"
+                    disabled={!window.isSecureContext || !("wakeLock" in navigator)}
+                    aria-pressed={keepScreenOn}
+                    onClick={() => {
+                      setWakeError("");
+                      setKeepScreenOn((old) => !old);
+                    }}>
+                    {keepScreenOn ? "화면 켜두기 끄기" : "화면 켜두기"}
+                  </button>
+                  <span role="status">{wakeError || (screenAwake
+                    ? "이 화면이 보이는 동안 켜져 있습니다."
+                    : keepScreenOn ? "화면 켜두기 요청 중…"
+                    : !window.isSecureContext || !("wakeLock" in navigator)
+                      ? "이 브라우저에서 지원하지 않습니다."
+                      : "선택하면 공부 중 화면이 꺼지지 않도록 요청합니다.")}</span>
+                </div>}
                 <details className="timer-help">
                   <summary>타이머 이용 안내</summary>
                   <p>일시정지는 과목을 기억해 재개할 수 있습니다. 공부 끝내기는 구간을 마무리하고 다음 시작 때 과목을 다시 고릅니다.</p>
@@ -1484,7 +1659,7 @@ function App() {
                   <DailyGoal minutes={goalMinutes} recordedMs={snapshot.today.totalMs}
                     liveMs={running && !statusStale && !remoteUnverified ? liveMs : 0}
                     onChange={(minutes) => {
-                      if (!GOAL_MINUTES.some((value) => value === minutes)) return;
+                      if (!validGoalMinutes(minutes)) return;
                       setGoalMinutes(minutes);
                       try {
                         localStorage.setItem(GOAL_STORAGE_KEY, String(minutes));
@@ -1634,9 +1809,13 @@ function App() {
                 <p className="empty">해당 날짜의 기록을 확인할 수 없습니다.</p>
               )}
               {snapshot?.capabilities.history && snapshot.today && (
-                <HistoryTrend key={snapshot.today.date} today={snapshot.today}
-                  previous={trend?.todayDate === snapshot.today.date ? trend.days : null}
-                  onLoaded={(days) => setTrend({ todayDate: snapshot.today.date, days })}
+                <HistoryTrend key={`${snapshot.today.date}:${trendRange}`} today={snapshot.today}
+                  rangeDays={trendRange} onRangeChange={setTrendRange}
+                  previous={trends[trendRange]?.todayDate === snapshot.today.date
+                    ? trends[trendRange]?.days ?? null : null}
+                  onLoaded={(days) => setTrends((old) => ({
+                    ...old, [trendRange]: { todayDate: snapshot.today.date, days },
+                  }))}
                   loadDay={getHistoryDay}
                   onSelect={(selectedDate) => {
                     setDate(selectedDate);
@@ -1822,7 +2001,7 @@ function App() {
                           </small>
                         </span>
                         <span className="member-time">
-                          <strong>{duration(member.studyMs)}</strong>
+                          <strong>{member.studyMs === null ? "미확인" : duration(member.studyMs)}</strong>
                           <small>오늘 기록</small>
                           {member.studying === true && member.startedAt !== null && (
                             <>
