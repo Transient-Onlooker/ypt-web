@@ -55,8 +55,10 @@ function upstream() {
     const inputBody = options?.body ? JSON.parse(options.body) : {};
     if (path === "/user/sign-in-jwt") {
       if (inputBody.password !== "correct")
-        return new Response(JSON.stringify({ s: false, c: 113 }), {
-          status: 200,
+        return new Response(JSON.stringify({
+          s: false, c: inputBody.password === "wrong-rejected" ? 113 : 112,
+        }), {
+          status: inputBody.password === "wrong-unauthorized" ? 401 : 200,
         });
       const token = `jwt-${inputBody.email}`;
       if (!users.has(token))
@@ -493,15 +495,14 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     ASSETS: { fetch: () => new Response("page") },
   };
   try {
-    assert.equal(
-      (
-        await call(env, "/login", "POST", {
-          email: "a@example.test",
-          password: "wrong",
-        })
-      ).status,
-      401,
-    );
+    for (const password of ["wrong", "wrong-rejected", "wrong-unauthorized"]) {
+      const rejected = await call(env, "/login", "POST", {
+        email: "a@example.test", password,
+      });
+      assert.equal(rejected.status, 401);
+      assert.equal(rejected.data.code, "LOGIN_FAILED");
+      assert.equal(rejected.data.error, "열품타 계정 정보를 확인해 주세요.");
+    }
     const loginA = await call(env, "/login", "POST", {
       email: "a@example.test",
       password: "correct",

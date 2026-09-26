@@ -341,11 +341,15 @@ async function loginRoute(request: Request, env: Env) {
   let jwt: string;
   try {
     jwt = await login(email, password);
-    await reload(jwt);
   } catch (e) {
-    return e instanceof YptError && e.code === "REJECTED"
+    return e instanceof YptError && (e.code === "REJECTED" || e.code === "AUTH_EXPIRED")
       ? fail("LOGIN_FAILED", 401, "열품타 계정 정보를 확인해 주세요.")
       : resultError(e);
+  }
+  try {
+    await reload(jwt);
+  } catch (e) {
+    return resultError(e);
   }
   const pages = request.headers.get("Origin") === PAGES_ORIGIN;
   const remember = pages && input?.rememberDevice === true;
