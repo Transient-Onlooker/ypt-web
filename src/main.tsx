@@ -16,6 +16,7 @@ function NavIcon({ tab }: { tab: Tab }) {
   return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[tab]}</svg>;
 }
 type MemberSort = "time" | "name";
+type MemberFilter = "all" | "studying" | "resting" | "unknown";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
@@ -605,6 +606,7 @@ function App() {
   const [memberError, setMemberError] = useState("");
   const [memberQuery, setMemberQuery] = useState("");
   const [memberSort, setMemberSort] = useState<MemberSort>("time");
+  const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const inFlight = useRef(false);
   const authEpoch = useRef(0);
   const snapshotGate = useRef(new RequestGate());
@@ -708,6 +710,7 @@ function App() {
         setMemberError("");
         setMemberQuery("");
         setMemberSort("time");
+        setMemberFilter("all");
         setTab("study");
         setLoginNotice(
           cause instanceof Error ? cause.message : "다시 로그인해 주세요.",
@@ -898,6 +901,7 @@ function App() {
       setGroupCheckedAt(null);
       setMemberError("");
       setMemberQuery("");
+      setMemberFilter("all");
     }
     if (selectedGroup === null) return;
     void loadMembers(selectedGroup);
@@ -1004,6 +1008,7 @@ function App() {
         setMemberError("");
         setMemberQuery("");
         setMemberSort("time");
+        setMemberFilter("all");
         setHistoryError("");
         setDay(null);
         setSelectedSubject("");
@@ -1104,11 +1109,16 @@ function App() {
   const focusMessage = running && !statusStale && !remoteUnverified
     ? focusMilestone(liveMs) : null;
   const visibleMembers = shownMembers
-    ?.filter((member) =>
-      member.nickname
+    ?.filter((member) => {
+      const matchesName = member.nickname
         .toLocaleLowerCase("ko-KR")
-        .includes(memberQuery.trim().toLocaleLowerCase("ko-KR")),
-    )
+        .includes(memberQuery.trim().toLocaleLowerCase("ko-KR"));
+      const matchesStatus = memberFilter === "all" ||
+        (memberFilter === "studying" && member.studying === true) ||
+        (memberFilter === "resting" && member.studying === false) ||
+        (memberFilter === "unknown" && member.studying === null);
+      return matchesName && matchesStatus;
+    })
     .sort((a, b) => {
       const nameOrder = a.nickname.localeCompare(b.nickname, "ko-KR");
       if (memberSort === "name") return nameOrder;
@@ -1371,18 +1381,11 @@ function App() {
                       </button>
                     )}
                 </div>
-                {(timer?.state === "running" || timer?.state === "paused") && (
-                  <p className="card-note">
-                    일시정지는 과목을 기억해 재개할 수 있습니다. 공부 끝내기는
-                    구간을 마무리하고 다음 시작 때 과목을 다시 고릅니다.
-                  </p>
-                )}
-                {((timer?.state === "idle" && !appOnly) ||
-                  timer?.state === "paused") && (
-                  <p className="card-note">
-                    시작·재개 전에 서버가 앱 타이머 상태를 다시 확인합니다.
-                  </p>
-                )}
+                <details className="timer-help">
+                  <summary>타이머 이용 안내</summary>
+                  <p>일시정지는 과목을 기억해 재개할 수 있습니다. 공부 끝내기는 구간을 마무리하고 다음 시작 때 과목을 다시 고릅니다.</p>
+                  <p>시작·재개 전에 서버가 앱 타이머 상태를 다시 확인합니다. 화면을 닫아도 타이머는 계속되며, 앱에서 시작한 공부도 여기서 제어할 수 있습니다.</p>
+                </details>
                 {pendingRecoveryWait ? (
                   <p className="caution">
                     요청을 처리 중입니다. 같은 요청은 다시 보내지 않습니다. 처리
@@ -1409,10 +1412,6 @@ function App() {
                     새로고침해 주세요.
                   </p>
                 )}
-                <p className="card-note">
-                  화면을 닫아도 타이머는 계속됩니다. 앱에서 시작한 타이머도
-                  여기서 일시정지하거나 종료할 수 있습니다.
-                </p>
                 {snapshotCheckedAt && (
                   <p className="checked-time">
                     마지막 상태 확인 {new Date(snapshotCheckedAt).toLocaleTimeString("ko-KR")}
@@ -1678,34 +1677,51 @@ function App() {
                     {" · "}조회된 멤버 {shownMembers.length}명
                     {shownMembers.some((member) => member.studying === null) &&
                       ` · 상태 미확인 ${shownMembers.filter((member) => member.studying === null).length}명`}
-                    {memberQuery.trim() &&
-                      ` · 검색 결과 ${visibleMembers?.length ?? 0}명`}
+                    {(memberQuery.trim() || memberFilter !== "all") &&
+                      ` · 표시 ${visibleMembers?.length ?? 0}명`}
                   </p>
                 )}
                 {shownMembers && shownMembers.length > 0 && (
-                  <div className="member-controls">
-                    <div>
-                      <label htmlFor="member-search">멤버 검색</label>
-                      <input
-                        id="member-search"
-                        type="search"
-                        placeholder="닉네임으로 찾기"
-                        value={memberQuery}
-                        onChange={(event) => setMemberQuery(event.target.value)}
-                      />
+                  <div className="member-tools">
+                    <div className="member-filters" role="group" aria-label="공부 상태 필터">
+                      {([
+                        ["all", "전체", shownMembers.length],
+                        ["studying", "공부 중", shownMembers.filter((member) => member.studying === true).length],
+                        ["resting", "쉬는 중", shownMembers.filter((member) => member.studying === false).length],
+                        ["unknown", "미확인", shownMembers.filter((member) => member.studying === null).length],
+                      ] as const).map(([filter, label, count]) => (
+                        <button key={filter} type="button"
+                          className={memberFilter === filter ? "selected" : ""}
+                          aria-pressed={memberFilter === filter}
+                          onClick={() => setMemberFilter(filter)}>
+                          {label} <span>{count}</span>
+                        </button>
+                      ))}
                     </div>
-                    <div>
-                      <label htmlFor="member-sort">정렬</label>
-                      <select
-                        id="member-sort"
-                        value={memberSort}
-                        onChange={(event) =>
-                          setMemberSort(event.target.value as MemberSort)
-                        }
-                      >
-                        <option value="time">시간 많은 순</option>
-                        <option value="name">이름순</option>
-                      </select>
+                    <div className="member-controls">
+                      <div>
+                        <label htmlFor="member-search">멤버 검색</label>
+                        <input
+                          id="member-search"
+                          type="search"
+                          placeholder="닉네임으로 찾기"
+                          value={memberQuery}
+                          onChange={(event) => setMemberQuery(event.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="member-sort">정렬</label>
+                        <select
+                          id="member-sort"
+                          value={memberSort}
+                          onChange={(event) =>
+                            setMemberSort(event.target.value as MemberSort)
+                          }
+                        >
+                          <option value="time">시간 많은 순</option>
+                          <option value="name">이름순</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1756,8 +1772,8 @@ function App() {
                   <p className="empty">
                     {selectedGroup === null
                       ? "그룹을 선택해 주세요."
-                      : shownMembers?.length && memberQuery.trim()
-                        ? "검색 결과가 없습니다."
+                      : shownMembers?.length && (memberQuery.trim() || memberFilter !== "all")
+                        ? "조건에 맞는 멤버가 없습니다."
                       : shownMembers
                         ? "표시할 멤버가 없습니다."
                         : loadingMembers
