@@ -1146,9 +1146,9 @@ function App() {
     }
   }, []);
   useEffect(() => {
-    if (tab === "groups" && session?.authenticated && groups === null)
+    if (tab === "groups" && session?.authenticated)
       void loadGroups();
-  }, [tab, session?.authenticated, groups, loadGroups]);
+  }, [tab, session?.authenticated, loadGroups]);
   useEffect(() => {
     if (tab !== "groups" || !session?.authenticated) return;
     const refresh = () => {
