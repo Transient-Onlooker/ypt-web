@@ -2147,3 +2147,267 @@ input[type="search"] {
 :root[data-theme="dark"] .subject-track,
 :root[data-theme="dark"] .week-track,
 :root[data-theme="dark"] .plan-progress { background: #34483a; }
+
+/* Keep the interface monochrome and use green only for interactive emphasis. */
+:root:not([data-theme="dark"]) {
+  color-scheme: light;
+  --ink: #000;
+  --muted: #000;
+  --line: #000;
+  --canvas: #fff;
+  --forest: #000;
+  --leaf: #22a447;
+  --surface: #fff;
+  color: #000;
+  background: #fff;
+}
+:root:not([data-theme="dark"]) ::selection { background: #22a447; color: #fff; }
+:root:not([data-theme="dark"]) body,
+:root:not([data-theme="dark"]) .shell,
+:root:not([data-theme="dark"]) .content,
+:root:not([data-theme="dark"]) .content main,
+:root:not([data-theme="dark"]) .topbar,
+:root:not([data-theme="dark"]) .timer-card,
+:root:not([data-theme="dark"]) .summary-card,
+:root:not([data-theme="dark"]) .history-card,
+:root:not([data-theme="dark"]) .group-card,
+:root:not([data-theme="dark"]) .tool-card,
+:root:not([data-theme="dark"]) .daily-goal,
+:root:not([data-theme="dark"]) .live-session,
+:root:not([data-theme="dark"]) .timer-help,
+:root:not([data-theme="dark"]) .pomodoro-settings,
+:root:not([data-theme="dark"]) .plan-template,
+:root:not([data-theme="dark"]) .plan-vs-record,
+:root:not([data-theme="dark"]) .trend-subjects,
+:root:not([data-theme="dark"]) .week-comparison,
+:root:not([data-theme="dark"]) .history-facts > div,
+:root:not([data-theme="dark"]) .week-insights span,
+:root:not([data-theme="dark"]) .week-row,
+:root:not([data-theme="dark"]) .group-list button,
+:root:not([data-theme="dark"]) .group-detail,
+:root:not([data-theme="dark"]) .member-filters button,
+:root:not([data-theme="dark"]) .active-strip,
+:root:not([data-theme="dark"]) .bottom-nav,
+:root:not([data-theme="dark"]) .theme-toggle,
+:root:not([data-theme="dark"]) .timer-mode button,
+:root:not([data-theme="dark"]) .week-calendar-day,
+:root:not([data-theme="dark"]) .login-page,
+:root:not([data-theme="dark"]) .login-card,
+:root:not([data-theme="dark"]) select,
+:root:not([data-theme="dark"]) input,
+:root:not([data-theme="dark"]) textarea {
+  background: #fff;
+  border-color: #000;
+  box-shadow: none;
+}
+:root:not([data-theme="dark"]) .shell { background: #fff; }
+:root:not([data-theme="dark"]) .sidebar { background: #000; border-color: #000; color: #fff; }
+:root:not([data-theme="dark"]) .sidebar nav button,
+:root:not([data-theme="dark"]) .sidebar-logout { color: #fff; }
+:root:not([data-theme="dark"]) .sidebar nav button.active,
+:root:not([data-theme="dark"]) .sidebar nav button:hover:not(.active),
+:root:not([data-theme="dark"]) .sidebar-logout:hover { background: #000; border-color: #22a447; color: #22a447; }
+:root:not([data-theme="dark"]) .brand-mark { background: #22a447; color: #fff; box-shadow: none; }
+:root:not([data-theme="dark"]) .topbar { border-color: #000; }
+:root:not([data-theme="dark"]) .top-status,
+:root:not([data-theme="dark"]) .sync-control,
+:root:not([data-theme="dark"]) .sync-control select,
+:root:not([data-theme="dark"]) .bottom-nav button { background: #fff; color: #000; }
+:root:not([data-theme="dark"]) .content :where(*) { color: #000; border-color: #000; }
+:root:not([data-theme="dark"]) .content .timer-face,
+:root:not([data-theme="dark"]) .content .timer-face * { color: #fff; }
+:root:not([data-theme="dark"]) .content .primary,
+:root:not([data-theme="dark"]) .content .primary * { color: #fff; }
+:root:not([data-theme="dark"]) .timer-face { background: #000; border-color: #22a447; }
+:root:not([data-theme="dark"]) .timer-face::before,
+:root:not([data-theme="dark"]) .timer-face::after { border-color: #22a447; }
+:root:not([data-theme="dark"]) .timer-face.is-running::after { box-shadow: 0 0 0 2px #22a447; }
+:root:not([data-theme="dark"]) .primary { background: #22a447; border-color: #22a447; }
+:root:not([data-theme="dark"]) .primary:hover:not(:disabled) { background: #178437; }
+:root:not([data-theme="dark"]) .secondary { background: #fff; border-color: #000; color: #000; }
+:root:not([data-theme="dark"]) .secondary:hover:not(:disabled),
+:root:not([data-theme="dark"]) .text-button:hover:not(:disabled) { background: #fff; border-color: #22a447; }
+:root:not([data-theme="dark"]) .eyebrow,
+:root:not([data-theme="dark"]) .text-button,
+:root:not([data-theme="dark"]) .status-dot.live,
+:root:not([data-theme="dark"]) .member-indicator.live,
+:root:not([data-theme="dark"]) .daily-goal-message,
+:root:not([data-theme="dark"]) .daily-goal-preview-text,
+:root:not([data-theme="dark"]) .plan-vs-record-row small { color: #168236; }
+:root:not([data-theme="dark"]) .status-dot.live,
+:root:not([data-theme="dark"]) .member-indicator.live { background: #22a447; box-shadow: none; }
+:root:not([data-theme="dark"]) .status-dot,
+:root:not([data-theme="dark"]) .member-indicator { background: #000; box-shadow: none; }
+:root:not([data-theme="dark"]) .timer-mode button[aria-pressed="true"],
+:root:not([data-theme="dark"]) .group-list button.selected,
+:root:not([data-theme="dark"]) .member-filters button.selected,
+:root:not([data-theme="dark"]) .plan-list .plan-focus[aria-pressed="true"],
+:root:not([data-theme="dark"]) .trend-view-controls button[aria-pressed="true"],
+:root:not([data-theme="dark"]) .bottom-nav button.active { background: #fff; border-color: #22a447; color: #168236; }
+:root:not([data-theme="dark"]) .daily-goal-track,
+:root:not([data-theme="dark"]) .trend-subject-track,
+:root:not([data-theme="dark"]) .plan-vs-record-track,
+:root:not([data-theme="dark"]) .member-status-track,
+:root:not([data-theme="dark"]) .subject-track,
+:root:not([data-theme="dark"]) .week-track,
+:root:not([data-theme="dark"]) .plan-progress { background: #fff; border: 1px solid #000; }
+:root:not([data-theme="dark"]) .daily-goal-track span,
+:root:not([data-theme="dark"]) .plan-progress span,
+:root:not([data-theme="dark"]) .plan-vs-record-track span { background: #22a447; }
+:root:not([data-theme="dark"]) .member-status-track .studying { background: #22a447; }
+:root:not([data-theme="dark"]) .member-status-track .resting,
+:root:not([data-theme="dark"]) .member-status-track .unknown { background: #000; }
+:root:not([data-theme="dark"]) .week-calendar-day.level-1,
+:root:not([data-theme="dark"]) .week-calendar-day.level-2,
+:root:not([data-theme="dark"]) .week-calendar-day.level-3,
+:root:not([data-theme="dark"]) .week-calendar-day.unknown { background: #fff; color: #000; }
+:root:not([data-theme="dark"]) .week-calendar-day.level-4 { background: #22a447; border-color: #22a447; color: #fff; }
+:root:not([data-theme="dark"]) .week-calendar-day:hover { box-shadow: inset 0 0 0 2px #22a447; }
+:root:not([data-theme="dark"]) .caution,
+:root:not([data-theme="dark"]) .error,
+:root:not([data-theme="dark"]) .error-banner,
+:root:not([data-theme="dark"]) .remember-warning,
+:root:not([data-theme="dark"]) .login-notice { background: #fff; border-color: #000; color: #000; }
+:root:not([data-theme="dark"]) .caution,
+:root:not([data-theme="dark"]) .error,
+:root:not([data-theme="dark"]) .error-banner { border-left: 4px solid #22a447; }
+:root:not([data-theme="dark"]) .login-card { border: 1px solid #000; }
+:root:not([data-theme="dark"]) .login-card h1,
+:root:not([data-theme="dark"]) .login-card label,
+:root:not([data-theme="dark"]) .login-card p,
+:root:not([data-theme="dark"]) .login-card small { color: #000; }
+:root:not([data-theme="dark"]) .login-card input,
+:root:not([data-theme="dark"]) .login-card select { color: #000; }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #fff;
+  --muted: #fff;
+  --line: #fff;
+  --canvas: #000;
+  --forest: #fff;
+  --leaf: #22a447;
+  --surface: #000;
+  color: #fff;
+  background: #000;
+}
+:root[data-theme="dark"] ::selection { background: #22a447; color: #fff; }
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .shell,
+:root[data-theme="dark"] .content,
+:root[data-theme="dark"] .content main,
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .timer-card,
+:root[data-theme="dark"] .summary-card,
+:root[data-theme="dark"] .history-card,
+:root[data-theme="dark"] .group-card,
+:root[data-theme="dark"] .tool-card,
+:root[data-theme="dark"] .daily-goal,
+:root[data-theme="dark"] .live-session,
+:root[data-theme="dark"] .timer-help,
+:root[data-theme="dark"] .pomodoro-settings,
+:root[data-theme="dark"] .plan-template,
+:root[data-theme="dark"] .plan-vs-record,
+:root[data-theme="dark"] .trend-subjects,
+:root[data-theme="dark"] .week-comparison,
+:root[data-theme="dark"] .history-facts > div,
+:root[data-theme="dark"] .week-insights span,
+:root[data-theme="dark"] .week-row,
+:root[data-theme="dark"] .group-list button,
+:root[data-theme="dark"] .group-detail,
+:root[data-theme="dark"] .member-filters button,
+:root[data-theme="dark"] .active-strip,
+:root[data-theme="dark"] .bottom-nav,
+:root[data-theme="dark"] .theme-toggle,
+:root[data-theme="dark"] .timer-mode button,
+:root[data-theme="dark"] .week-calendar-day,
+:root[data-theme="dark"] .login-page,
+:root[data-theme="dark"] .login-card,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea {
+  background: #000;
+  border-color: #fff;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .shell { background: #000; }
+:root[data-theme="dark"] .sidebar { background: #000; border-color: #fff; color: #fff; }
+:root[data-theme="dark"] .sidebar nav button,
+:root[data-theme="dark"] .sidebar-logout { color: #fff; }
+:root[data-theme="dark"] .sidebar nav button.active,
+:root[data-theme="dark"] .sidebar nav button:hover:not(.active),
+:root[data-theme="dark"] .sidebar-logout:hover { background: #000; border-color: #22a447; color: #22a447; }
+:root[data-theme="dark"] .brand-mark { background: #22a447; color: #fff; box-shadow: none; }
+:root[data-theme="dark"] .topbar { border-color: #fff; }
+:root[data-theme="dark"] .top-status,
+:root[data-theme="dark"] .sync-control,
+:root[data-theme="dark"] .sync-control select,
+:root[data-theme="dark"] .bottom-nav button { background: #000; color: #fff; }
+:root[data-theme="dark"] .content :where(*) { color: #fff; border-color: #fff; }
+:root[data-theme="dark"] .content .timer-face,
+:root[data-theme="dark"] .content .timer-face * { color: #fff; }
+:root[data-theme="dark"] .content .primary,
+:root[data-theme="dark"] .content .primary * { color: #fff; }
+:root[data-theme="dark"] .timer-face { background: #000; border-color: #22a447; }
+:root[data-theme="dark"] .timer-face::before,
+:root[data-theme="dark"] .timer-face::after { border-color: #22a447; }
+:root[data-theme="dark"] .timer-face.is-running::after { box-shadow: 0 0 0 2px #22a447; }
+:root[data-theme="dark"] .primary { background: #22a447; border-color: #22a447; }
+:root[data-theme="dark"] .primary:hover:not(:disabled) { background: #178437; }
+:root[data-theme="dark"] .secondary { background: #000; border-color: #fff; color: #fff; }
+:root[data-theme="dark"] .secondary:hover:not(:disabled),
+:root[data-theme="dark"] .text-button:hover:not(:disabled) { background: #000; border-color: #22a447; }
+:root[data-theme="dark"] .eyebrow,
+:root[data-theme="dark"] .text-button,
+:root[data-theme="dark"] .status-dot.live,
+:root[data-theme="dark"] .member-indicator.live,
+:root[data-theme="dark"] .daily-goal-message,
+:root[data-theme="dark"] .daily-goal-preview-text,
+:root[data-theme="dark"] .plan-vs-record-row small { color: #22a447; }
+:root[data-theme="dark"] .status-dot.live,
+:root[data-theme="dark"] .member-indicator.live { background: #22a447; box-shadow: none; }
+:root[data-theme="dark"] .status-dot,
+:root[data-theme="dark"] .member-indicator { background: #fff; box-shadow: none; }
+:root[data-theme="dark"] .timer-mode button[aria-pressed="true"],
+:root[data-theme="dark"] .group-list button.selected,
+:root[data-theme="dark"] .member-filters button.selected,
+:root[data-theme="dark"] .plan-list .plan-focus[aria-pressed="true"],
+:root[data-theme="dark"] .trend-view-controls button[aria-pressed="true"],
+:root[data-theme="dark"] .bottom-nav button.active { background: #000; border-color: #22a447; color: #22a447; }
+:root[data-theme="dark"] .daily-goal-track,
+:root[data-theme="dark"] .trend-subject-track,
+:root[data-theme="dark"] .plan-vs-record-track,
+:root[data-theme="dark"] .member-status-track,
+:root[data-theme="dark"] .subject-track,
+:root[data-theme="dark"] .week-track,
+:root[data-theme="dark"] .plan-progress { background: #000; border: 1px solid #fff; }
+:root[data-theme="dark"] .daily-goal-track span,
+:root[data-theme="dark"] .plan-progress span,
+:root[data-theme="dark"] .plan-vs-record-track span { background: #22a447; }
+:root[data-theme="dark"] .member-status-track .studying { background: #22a447; }
+:root[data-theme="dark"] .member-status-track .resting,
+:root[data-theme="dark"] .member-status-track .unknown { background: #fff; }
+:root[data-theme="dark"] .week-calendar-day.level-1,
+:root[data-theme="dark"] .week-calendar-day.level-2,
+:root[data-theme="dark"] .week-calendar-day.level-3,
+:root[data-theme="dark"] .week-calendar-day.unknown { background: #000; color: #fff; }
+:root[data-theme="dark"] .week-calendar-day.level-4 { background: #22a447; border-color: #22a447; color: #fff; }
+:root[data-theme="dark"] .week-calendar-day:hover { box-shadow: inset 0 0 0 2px #22a447; }
+:root[data-theme="dark"] .caution,
+:root[data-theme="dark"] .error,
+:root[data-theme="dark"] .error-banner,
+:root[data-theme="dark"] .remember-warning,
+:root[data-theme="dark"] .login-notice { background: #000; border-color: #fff; color: #fff; }
+:root[data-theme="dark"] .caution,
+:root[data-theme="dark"] .error,
+:root[data-theme="dark"] .error-banner { border-left: 4px solid #22a447; }
+:root[data-theme="dark"] .login-card { border: 1px solid #fff; }
+:root[data-theme="dark"] .login-card h1,
+:root[data-theme="dark"] .login-card label,
+:root[data-theme="dark"] .login-card p,
+:root[data-theme="dark"] .login-card small { color: #fff; }
+:root[data-theme="dark"] .login-card .error,
+:root[data-theme="dark"] .login-card .login-notice { background: #000; border-color: #fff; color: #fff; }
+:root[data-theme="dark"] .login-card .error { border-left: 4px solid #22a447; }
+:root[data-theme="dark"] .login-card input,
+:root[data-theme="dark"] .login-card select { color: #fff; }
