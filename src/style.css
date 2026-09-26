@@ -2411,3 +2411,16 @@ input[type="search"] {
 :root[data-theme="dark"] .login-card .error { border-left: 4px solid #22a447; }
 :root[data-theme="dark"] .login-card input,
 :root[data-theme="dark"] .login-card select { color: #fff; }
+
+:root:not([data-theme="dark"]),
+:root:not([data-theme="dark"]) body,
+:root:not([data-theme="dark"]) #root,
+:root:not([data-theme="dark"]) .shell,
+:root:not([data-theme="dark"]) .content,
+:root:not([data-theme="dark"]) .content main { background: #fff !important; }
+:root[data-theme="dark"],
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] #root,
+:root[data-theme="dark"] .shell,
+:root[data-theme="dark"] .content,
+:root[data-theme="dark"] .content main { background: #000 !important; }

@@ -804,7 +804,7 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", darkMode ? "#101b18" : "#172b25");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", darkMode ? "#000000" : "#ffffff");
     try { localStorage.setItem(THEME_STORAGE_KEY, darkMode ? "dark" : "light"); }
     catch { /* Keep the choice in this page. */ }
   }, [darkMode]);
