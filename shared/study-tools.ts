@@ -85,7 +85,7 @@ export function summarizePlannedSubjects(items: PlanItem[], day: Day): PlannedSu
     const recorded = day.subjects.find((subject) => subject.title === title);
     return {
       title, plannedMs,
-      recordedMs: day.subjectTimesAvailable ? recorded?.studyMs ?? null : null,
+      recordedMs: day.subjectTimesAvailable ? (recorded ? recorded.studyMs : 0) : null,
       ...(recorded?.color ? { color: recorded.color } : {}),
     };
   }).sort((a, b) => b.plannedMs - a.plannedMs || a.title.localeCompare(b.title, "ko-KR"));

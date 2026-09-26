@@ -46,7 +46,10 @@ test("과목 계획은 전체 예상 시간과 검증된 오늘 완료 기록을
     title: "수학", plannedMs: 3_300_000, recordedMs: 3_600_000, color: "#123456",
   }]);
   assert.equal(summarizePlannedSubjects(items, { ...day, subjectTimesAvailable: false })[0].recordedMs, null);
-  assert.equal(summarizePlannedSubjects(items, { ...day, subjects: [] })[0].recordedMs, null);
+  assert.equal(summarizePlannedSubjects(items, { ...day, subjects: [] })[0].recordedMs, 0);
+  assert.equal(summarizePlannedSubjects(items, { ...day, subjects: [
+    { title: "수학", studyMs: null },
+  ] })[0].recordedMs, null);
   assert.equal(parsePlan(JSON.stringify(items)).length, 3);
   assert.deepEqual(parsePlan(JSON.stringify([{ ...items[0], subjectTitle: 123 }])), []);
 });
