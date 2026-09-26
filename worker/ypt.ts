@@ -151,22 +151,38 @@ export function subjectsFrom(info: Record<string, unknown>): Subject[] {
 }
 export function dayFrom(value: unknown, subjects: Subject[] = []): Day {
   const log = object(value);
+  const totalMs = number(log?.sm);
   if (
     !log ||
     typeof log.dt !== "string" ||
     !/^\d{4}-\d{2}-\d{2}$/.test(log.dt) ||
-    number(log.sm) === null
+    !Number.isFinite(Date.parse(`${log.dt}T00:00:00Z`)) ||
+    new Date(`${log.dt}T00:00:00Z`).toISOString().slice(0, 10) !== log.dt ||
+    totalMs === null
   )
     throw new YptError("INVALID_DATA");
   const times = new Map<string, number>();
+  const segments = Array.isArray(log.ls) ? log.ls : null;
+  let subjectTimesAvailable = segments !== null &&
+    (segments.length > 0 || totalMs === 0);
   let longestSegmentMs: number | null = null;
-  for (const entry of array(log.ls)) {
-    const name = typeof entry.sb === "string" ? entry.sb : title(entry);
-    const ms = number(entry.sm);
-    if (ms !== null)
-      longestSegmentMs = Math.max(longestSegmentMs ?? 0, ms);
-    if (name && ms !== null) times.set(name, (times.get(name) ?? 0) + ms);
+  for (const raw of segments ?? []) {
+    const entry = object(raw);
+    const name = entry
+      ? typeof entry.sb === "string" && entry.sb.trim()
+        ? entry.sb.trim() : title(entry)
+      : null;
+    const ms = number(entry?.sm);
+    if (!name || ms === null || !Number.isSafeInteger(ms)) {
+      subjectTimesAvailable = false;
+      continue;
+    }
+    longestSegmentMs = Math.max(longestSegmentMs ?? 0, ms);
+    const next = (times.get(name) ?? 0) + ms;
+    if (!Number.isSafeInteger(next)) subjectTimesAvailable = false;
+    else times.set(name, next);
   }
+  if (!subjectTimesAvailable) longestSegmentMs = null;
   // The API's subject sm field can be stale. The day log ls is the only
   // verified per-subject total in the previous live probe.
   const names = [
@@ -175,18 +191,14 @@ export function dayFrom(value: unknown, subjects: Subject[] = []): Day {
   const colors = new Map(subjects.filter((s) => s.color).map((s) => [s.title, s.color!]));
   return {
     date: log.dt,
-    totalMs: number(log.sm)!,
+    totalMs,
     longestSegmentMs,
     subjects: names.map((name) => ({
       title: name,
       ...(colors.has(name) ? { color: colors.get(name)! } : {}),
-      studyMs: times.has(name)
-        ? times.get(name)!
-        : Array.isArray(log.ls)
-          ? 0
-          : null,
+      studyMs: subjectTimesAvailable ? (times.get(name) ?? 0) : null,
     })),
-    subjectTimesAvailable: Array.isArray(log.ls),
+    subjectTimesAvailable,
   };
 }
 export function groupsFrom(reply: Record<string, unknown>): Group[] {
@@ -223,7 +235,7 @@ export function groupsFrom(reply: Record<string, unknown>): Group[] {
 }
 export function membersFrom(reply: Record<string, unknown>): Member[] {
   if (!Array.isArray(reply.ms)) throw new YptError("INVALID_DATA");
-  return array(reply.ms)
+  const parsed = array(reply.ms)
     .map((m) => {
       const log = object(m.dl);
       const studying = typeof log?.is === "boolean" ? log.is : null;
@@ -232,7 +244,7 @@ export function membersFrom(reply: Record<string, unknown>): Member[] {
         /(?:Z|[+-]\d{2}:?\d{2})$/.test(stamp) ? Date.parse(stamp) : NaN;
       return {
         id: number(m.ud),
-        nickname: typeof m.n === "string" ? m.n : "",
+        nickname: typeof m.n === "string" ? m.n.trim() : "",
         // im stayed true for idle members; dl.is matched the observed idle state.
         studying,
         studyMs: number(log?.sm),
@@ -245,6 +257,19 @@ export function membersFrom(reply: Record<string, unknown>): Member[] {
       (m): m is Member =>
         m.id !== null && Number.isSafeInteger(m.id) && !!m.nickname,
     );
+  const unique = new Map<number, Member>();
+  for (const member of parsed) {
+    const prior = unique.get(member.id);
+    if (!prior) {
+      unique.set(member.id, member);
+      continue;
+    }
+    prior.studying = prior.studying === member.studying ? prior.studying : null;
+    prior.studyMs = prior.studyMs === member.studyMs ? prior.studyMs : null;
+    prior.startedAt = prior.studying === true && prior.startedAt === member.startedAt
+      ? prior.startedAt : null;
+  }
+  return [...unique.values()];
 }
 export function remoteFrom(info: Record<string, unknown>): {
   status: "idle" | "running" | "unverified";

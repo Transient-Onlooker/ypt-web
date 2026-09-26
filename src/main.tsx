@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import { duration, formatDaySummary } from "../shared/format.ts";
+import { RequestGate } from "../shared/request-gate.ts";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
@@ -598,8 +599,8 @@ function App() {
   const [memberSort, setMemberSort] = useState<MemberSort>("time");
   const inFlight = useRef(false);
   const authEpoch = useRef(0);
-  const snapshotRequest = useRef(0);
-  const groupRequest = useRef(0);
+  const snapshotGate = useRef(new RequestGate());
+  const groupGate = useRef(new RequestGate());
   const memberRequest = useRef(0);
   const memberLoadingGroup = useRef<{ id: number; requestId: number } | null>(
     null,
@@ -645,13 +646,14 @@ function App() {
     window.scrollTo(0, 0);
   }, [tab]);
 
-  const loadSnapshot = useCallback(async () => {
-    const requestId = ++snapshotRequest.current;
+  const loadSnapshot = useCallback(async (force = false) => {
+    const requestId = snapshotGate.current.start(force);
+    if (requestId === null) return;
     const epoch = authEpoch.current;
     setRefreshingSnapshot(true);
     try {
       const result = await api<Snapshot>("/snapshot");
-      if (requestId !== snapshotRequest.current || epoch !== authEpoch.current)
+      if (!snapshotGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
         return;
       setSnapshot(result);
       setClockOffset(
@@ -667,10 +669,12 @@ function App() {
       setSnapshotCheckedAt(Date.now());
       setError("");
     } catch (cause) {
-      if (requestId !== snapshotRequest.current || epoch !== authEpoch.current)
+      if (!snapshotGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
         return;
       if ((cause as ApiError).status === 401) {
         authEpoch.current++;
+        snapshotGate.current.invalidate();
+        groupGate.current.invalidate();
         historyCache.current.clear();
         historyRequests.current.clear();
         forceHistoryDate.current = null;
@@ -709,7 +713,7 @@ function App() {
             : "상태를 확인하지 못했습니다.",
         );
     } finally {
-      if (requestId === snapshotRequest.current && epoch === authEpoch.current)
+      if (snapshotGate.current.finish(requestId) && epoch === authEpoch.current)
         setRefreshingSnapshot(false);
     }
   }, []);
@@ -804,12 +808,13 @@ function App() {
     };
   }, [tab, date, session?.authenticated, snapshot?.today.date, historyRefresh, getHistoryDay]);
   const loadGroups = useCallback(async () => {
-    const requestId = ++groupRequest.current;
+    const requestId = groupGate.current.start();
+    if (requestId === null) return;
     const epoch = authEpoch.current;
     setLoadingGroup(true);
     try {
       const result = await api<{ groups: Group[] }>("/groups");
-      if (requestId !== groupRequest.current || epoch !== authEpoch.current)
+      if (!groupGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
         return;
       setGroups(result.groups);
       setSelectedGroup((old) =>
@@ -819,13 +824,13 @@ function App() {
       );
       setGroupError("");
     } catch (cause) {
-      if (requestId !== groupRequest.current || epoch !== authEpoch.current)
+      if (!groupGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
         return;
       setGroupError(
         cause instanceof Error ? cause.message : "그룹을 가져오지 못했습니다.",
       );
     } finally {
-      if (requestId === groupRequest.current && epoch === authEpoch.current)
+      if (groupGate.current.finish(requestId) && epoch === authEpoch.current)
         setLoadingGroup(false);
     }
   }, []);
@@ -936,10 +941,10 @@ function App() {
             },
       );
       if (epoch !== authEpoch.current) return;
-      await loadSnapshot();
+      await loadSnapshot(true);
     } catch (cause) {
       if (epoch !== authEpoch.current) return;
-      await loadSnapshot();
+      await loadSnapshot(true);
       setError(
         cause instanceof Error
           ? cause.message
@@ -953,47 +958,52 @@ function App() {
   async function logout() {
     if (loggingOut || busy) return;
     setLoggingOut(true);
+    let clearLocalSession = false;
     try {
       await api("/logout", "POST", {});
-      authEpoch.current++;
-      historyCache.current.clear();
-      historyRequests.current.clear();
-      forceHistoryDate.current = null;
-      setTrend(null);
-      snapshotRequest.current++;
-      groupRequest.current++;
-      memberRequest.current++;
-      memberLoadingGroup.current = null;
-      lastMemberGroup.current = null;
-      csrf = "";
-      setSession({ authenticated: false });
-      setSnapshot(null);
-      setSnapshotCheckedAt(null);
-      setRefreshingSnapshot(false);
-      setGroups(null);
-      setMembers(null);
-      setLoadingGroup(false);
-      setLoadingMembers(false);
-      setLoadingDay(false);
-      setSelectedGroup(null);
-      setGroupCheckedAt(null);
-      setError("");
-      setGroupError("");
-      setMemberError("");
-      setMemberQuery("");
-      setMemberSort("time");
-      setHistoryError("");
-      setDay(null);
-      setSelectedSubject("");
-      setDate("");
-      setTab("study");
-      setLoginNotice("");
-      setRememberWarning("");
+      clearLocalSession = true;
     } catch (cause) {
-      setError(
+      if ((cause as ApiError).status === 401) clearLocalSession = true;
+      else setError(
         cause instanceof Error ? cause.message : "로그아웃하지 못했습니다.",
       );
     } finally {
+      if (clearLocalSession) {
+        authEpoch.current++;
+        historyCache.current.clear();
+        historyRequests.current.clear();
+        forceHistoryDate.current = null;
+        setTrend(null);
+        snapshotGate.current.invalidate();
+        groupGate.current.invalidate();
+        memberRequest.current++;
+        memberLoadingGroup.current = null;
+        lastMemberGroup.current = null;
+        csrf = "";
+        setSession({ authenticated: false });
+        setSnapshot(null);
+        setSnapshotCheckedAt(null);
+        setRefreshingSnapshot(false);
+        setGroups(null);
+        setMembers(null);
+        setLoadingGroup(false);
+        setLoadingMembers(false);
+        setLoadingDay(false);
+        setSelectedGroup(null);
+        setGroupCheckedAt(null);
+        setError("");
+        setGroupError("");
+        setMemberError("");
+        setMemberQuery("");
+        setMemberSort("time");
+        setHistoryError("");
+        setDay(null);
+        setSelectedSubject("");
+        setDate("");
+        setTab("study");
+        setLoginNotice("");
+        setRememberWarning("");
+      }
       setLoggingOut(false);
     }
   }
@@ -1024,6 +1034,8 @@ function App() {
         notice={loginNotice}
         onLogin={async (warning) => {
           authEpoch.current++;
+          snapshotGate.current.invalidate();
+          groupGate.current.invalidate();
           historyCache.current.clear();
           historyRequests.current.clear();
           forceHistoryDate.current = null;
@@ -1436,7 +1448,13 @@ function App() {
                     }} />
                 )}
                 {snapshot?.today && <SubjectBreakdown day={snapshot.today}
-                  empty="오늘 기록된 과목 시간이 없습니다." />}
+                  empty={snapshot.today.subjectTimesAvailable
+                    ? "오늘 기록된 과목 시간이 없습니다."
+                    : "오늘 과목별 시간을 확인할 수 없습니다."} />}
+                {snapshot?.today && !snapshot.today.subjectTimesAvailable &&
+                  snapshot.today.subjects.length > 0 && (
+                  <p className="card-note">오늘의 과목별 시간은 확인되지 않았습니다.</p>
+                )}
               </section>
             </div>
           )}

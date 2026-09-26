@@ -69,6 +69,22 @@ test("day totals use completed segment logs and preserve missing per-subject val
   );
   assert.equal(dayFrom({ dt: "2026-09-24", sm: 0, ls: [] }).longestSegmentMs, null);
   assert.throws(() => dayFrom({ dt: "2026-09-24", sm: "bad" }), YptError);
+  assert.throws(() => dayFrom({ dt: "2026-02-30", sm: 0, ls: [] }), YptError);
+});
+
+test("incomplete segment logs do not turn unknown subject times into zero", () => {
+  const day = dayFrom({
+    dt: "2026-09-24", sm: 20_000,
+    ls: [{ sb: "수학", sm: 10_000 }, { sb: "수학", sm: "broken" }],
+  }, [{ title: "수학", studyMs: 0 }, { title: "영어", studyMs: 0 }]);
+  assert.equal(day.totalMs, 20_000);
+  assert.equal(day.subjectTimesAvailable, false);
+  assert.equal(day.longestSegmentMs, null);
+  assert.deepEqual(day.subjects.map(({ studyMs }) => studyMs), [null, null]);
+  assert.equal(dayFrom({ dt: "2026-09-24", sm: 0, ls: [null] }).subjectTimesAvailable, false);
+  assert.equal(dayFrom({ dt: "2026-09-24", sm: 10_000, ls: [] }).subjectTimesAvailable, false);
+  assert.equal(dayFrom({ dt: "2026-09-24", sm: 10_000, ls: [{ sb: " ", sm: 10_000 }] }).subjectTimesAvailable, false);
+  assert.equal(dayFrom({ dt: "2026-09-24", sm: 10_000, ls: [{ sb: "수학", sm: 1.5 }] }).subjectTimesAvailable, false);
 });
 
 test("group arrays deduplicate and members keep unverified status distinct", () => {
@@ -127,6 +143,20 @@ test("member study status comes from the day log, not im", () => {
     { id: 1, nickname: "A", studying: false, studyMs: 0, startedAt: null },
     { id: 2, nickname: "B", studying: true, studyMs: 2000, startedAt },
   ]);
+});
+
+test("duplicate group member ids count once and conflicting values stay unverified", () => {
+  const members = membersFrom({ ms: [
+    { ud: 7, n: "A", dl: { is: true, sm: 20_000 } },
+    { ud: 7, n: "A", dl: { is: false, sm: 21_000 } },
+    { ud: 8, n: "B", dl: { is: false, sm: 0 } },
+    { ud: 8, n: "B", dl: { is: false, sm: 0 } },
+  ] });
+  assert.deepEqual(members, [
+    { id: 7, nickname: "A", studying: null, studyMs: null, startedAt: null },
+    { id: 8, nickname: "B", studying: false, studyMs: 0, startedAt: null },
+  ]);
+  assert.deepEqual(membersFrom({ ms: [{ ud: 9, n: "  " }] }), []);
 });
 
 test("upstream success requires s:true and never exposes upstream response in errors", async () => {

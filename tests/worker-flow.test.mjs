@@ -43,6 +43,8 @@ function upstream() {
   let nextStartTimestamp = null;
   let hideActiveStartTimeOnce = false;
   let expireAfterNextStart = false;
+  let nextReloadDay = null;
+  let nextGroupMembers = null;
   const reply = (data) =>
     new Response(JSON.stringify({ s: true, ...data }), {
       status: 200,
@@ -76,6 +78,8 @@ function upstream() {
     if (path === "/user/v2/reload/info") {
       const hideStartTime = hideActiveStartTimeOnce && state.active;
       if (hideStartTime) hideActiveStartTimeOnce = false;
+      const day = nextReloadDay ?? { dt: "2026-09-24", sm: state.total, ls: state.segments };
+      nextReloadDay = null;
       return reply({
         p: {
           is: state.active,
@@ -84,7 +88,7 @@ function upstream() {
         },
         ss: [{ tt: "수학", dl: false, sm: 0 }],
         coid: 82,
-        dl: { dt: "2026-09-24", sm: state.total, ls: state.segments },
+        dl: day,
       });
     }
     if (path === "/study/start") {
@@ -143,14 +147,16 @@ function upstream() {
         url.searchParams.get("countryID") !== "82"
       )
         throw new Error("wrong group member request");
-      return reply({
+      const members = nextGroupMembers ?? {
         ms: [
           { ud: 1, n: "멤버1", im: true, dl: { is: false, sm: 1000 } },
           { ud: 2, n: "멤버2", im: true, dl: { sm: 2000 } },
           { ud: 3, n: "멤버3", im: true, dl: { sm: 3000 } },
           { ud: 4, n: "멤버4", im: true, dl: { sm: 4000 } },
         ],
-      });
+      };
+      nextGroupMembers = null;
+      return reply(members);
     }
     if (path === "/logs/day")
       return reply({ dl: { dt: new URL(input).searchParams.get("date"), sm: 69_946, ls: [{ sb: "수학", sm: 69_946 }] } });
@@ -176,6 +182,12 @@ function upstream() {
     },
     expireAfterNextStart() {
       expireAfterNextStart = true;
+    },
+    reloadDayOnce(day) {
+      nextReloadDay = day;
+    },
+    groupMembersOnce(members) {
+      nextGroupMembers = { ms: members };
     },
   };
 }
@@ -426,6 +438,47 @@ test("timer auth expiry revokes both remembered and current-tab sessions", async
     env.DB.sqlite.close();
   } finally {
     globalThis.fetch = realFetch;
+  }
+});
+
+test("snapshot and group endpoints do not invent times or double-count members", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const env = {
+    DB: database(),
+    APP_ORIGIN: origin,
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    const login = await call(env, "/login", "POST", {
+      email: "a@example.test", password: "correct",
+    });
+    assert.equal(login.status, 200);
+    stub.reloadDayOnce({
+      dt: "2026-09-24", sm: 20_000,
+      ls: [{ sb: "수학", sm: 10_000 }, { sb: "수학", sm: "broken" }],
+    });
+    const snapshot = await call(env, "/snapshot", "GET", undefined, login.cookie);
+    assert.equal(snapshot.status, 200);
+    assert.equal(snapshot.data.today.totalMs, 20_000);
+    assert.equal(snapshot.data.today.subjectTimesAvailable, false);
+    assert.equal(snapshot.data.today.subjects[0].studyMs, null);
+
+    stub.groupMembersOnce([
+      { ud: 1, n: "A", dl: { is: true, sm: 20_000 } },
+      { ud: 1, n: "A", dl: { is: false, sm: 21_000 } },
+      { ud: 2, n: "B", dl: { is: false, sm: 0 } },
+    ]);
+    const group = await call(env, "/groups/7/members", "GET", undefined, login.cookie);
+    assert.equal(group.status, 200);
+    assert.equal(group.data.members.length, 2);
+    assert.equal(group.data.members[0].studying, null);
+    assert.equal(group.data.members[0].studyMs, null);
+  } finally {
+    globalThis.fetch = realFetch;
+    env.DB.sqlite.close();
   }
 });
 
