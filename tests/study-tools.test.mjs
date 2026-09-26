@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings, parsePlan, previousCalendarDate } from "../shared/study-tools.ts";
+import { bulkPlanCandidates, eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings, parsePlan, planTemplate, previousCalendarDate } from "../shared/study-tools.ts";
 
 test("카운트다운은 탭이 멈췄다가 돌아와도 종료 시각으로 계산한다", () => {
   const timer = { ...freshInterval("focus"), endsAt: 1_500_000 };
@@ -21,6 +21,15 @@ test("전날 미완료 계획만 중복 없이 오늘로 옮긴다", () => {
     .map((item) => item.text), ["국어"]);
   assert.equal(eligibleCarryOver(Array.from({ length: 12 }, (_, index) =>
     ({ ...previous[0], id: String(index), text: `과목 ${index}` })), previous).length, 0);
+  assert.deepEqual(planTemplate(previous).map((item) => item.done), [false, false, false]);
+  assert.equal(previous[0].done, true);
+});
+
+test("여러 할 일 입력은 중복과 길이 제한을 적용한다", () => {
+  const current = [{ id: "1", text: "영어", estimateMinutes: 25, done: false }];
+  assert.deepEqual(bulkPlanCandidates(" 영어 \n수학\n수학\n국어\n" + "가".repeat(81), current),
+    ["수학", "국어"]);
+  assert.equal(bulkPlanCandidates(Array.from({ length: 20 }, (_, i) => `일 ${i}`).join("\n"), current).length, 11);
 });
 
 test("손상되거나 범위를 벗어난 세션 저장값은 버린다", () => {

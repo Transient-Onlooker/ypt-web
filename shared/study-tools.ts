@@ -82,6 +82,24 @@ export function eligibleCarryOver(current: PlanItem[], previous: PlanItem[]): Pl
   return eligible;
 }
 
+export function planTemplate(items: PlanItem[]): PlanItem[] {
+  return items.slice(0, 12).map((item) => ({ ...item, done: false }));
+}
+
+export function bulkPlanCandidates(raw: string, current: PlanItem[]): string[] {
+  const seen = new Set(current.map((item) => item.text.trim().toLocaleLowerCase("ko-KR")));
+  const candidates: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (current.length + candidates.length >= 12) break;
+    const text = line.trim();
+    const key = text.toLocaleLowerCase("ko-KR");
+    if (!text || text.length > 80 || seen.has(key)) continue;
+    seen.add(key);
+    candidates.push(text);
+  }
+  return candidates;
+}
+
 export function parseInterval(raw: string | null): IntervalTimer {
   if (!raw) return freshInterval();
   try {

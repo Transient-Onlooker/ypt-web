@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings,
-  parsePlan, PLAN_ESTIMATES, previousCalendarDate,
+  bulkPlanCandidates, eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings,
+  parsePlan, PLAN_ESTIMATES, planTemplate, previousCalendarDate,
 } from "../shared/study-tools.ts";
 import type { IntervalPhase, IntervalSettings, IntervalTimer, PlanItem } from "../shared/study-tools.ts";
 
@@ -34,11 +34,14 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
   const planKey = `${STORAGE_PREFIX}plan-${date}`;
   const intervalKey = `${STORAGE_PREFIX}interval-${date}`;
   const taskKey = `${STORAGE_PREFIX}task-${date}`;
+  const templateKey = `${STORAGE_PREFIX}plan-template`;
   const [items, setItems] = useState<PlanItem[]>(() => parsePlan(stored(planKey)));
   const [previousItems] = useState<PlanItem[]>(() => parsePlan(stored(
     `${STORAGE_PREFIX}plan-${previousCalendarDate(date)}`)));
+  const [template, setTemplate] = useState<PlanItem[]>(() => parsePlan(stored(templateKey)));
   const [activeTaskId, setActiveTaskId] = useState(() => stored(taskKey) ?? "");
   const [draft, setDraft] = useState("");
+  const [bulkDraft, setBulkDraft] = useState("");
   const [estimate, setEstimate] = useState<number>(25);
   const [timer, setTimer] = useState<IntervalTimer>(() => parseInterval(stored(intervalKey)));
   const [settings, setSettings] = useState<IntervalSettings>(() => parseIntervalSettings(stored(`${STORAGE_PREFIX}settings`)));
@@ -50,6 +53,7 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
   const [notice, setNotice] = useState("");
 
   useEffect(() => save(planKey, items), [planKey, items]);
+  useEffect(() => save(templateKey, template), [templateKey, template]);
   useEffect(() => save(intervalKey, timer), [intervalKey, timer]);
   useEffect(() => save(`${STORAGE_PREFIX}settings`, settings), [settings]);
   useEffect(() => {
@@ -71,6 +75,7 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
   const completedMinutes = completed.reduce((sum, item) => sum + item.estimateMinutes, 0);
   const activeTask = items.find((item) => item.id === activeTaskId && !item.done);
   const carryOver = eligibleCarryOver(items, previousItems);
+  const templateToAdd = eligibleCarryOver(items, template);
   const remainingMs = intervalRemaining(timer, now);
   const active = timer.endsAt !== null && remainingMs > 0;
 
@@ -130,6 +135,42 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
           ({ ...item, id: crypto.randomUUID(), done: false }))])}>
         어제 미완료 {carryOver.length}개 이어가기
       </button>}
+      <details className="plan-template">
+        <summary>반복 계획</summary>
+        <div className="plan-template-actions">
+          <button className="secondary" type="button" disabled={items.length === 0}
+            onClick={() => { setTemplate(planTemplate(items)); setNotice("현재 계획을 반복 계획으로 저장했어요."); }}>
+            현재 계획 저장
+          </button>
+          <button className="secondary" type="button" disabled={templateToAdd.length === 0}
+            onClick={() => {
+              setItems((old) => [...old, ...eligibleCarryOver(old, template).map((item) =>
+                ({ ...item, id: crypto.randomUUID(), done: false }))]);
+              setNotice("반복 계획을 오늘로 가져왔어요.");
+            }}>불러오기{templateToAdd.length > 0 ? ` ${templateToAdd.length}개` : ""}</button>
+        </div>
+        <p>완료 표시를 지워 저장합니다. 같은 이름의 할 일은 중복으로 추가하지 않습니다. 로그아웃하면 이 탭의 반복 계획도 삭제됩니다.</p>
+      </details>
+      <details className="plan-template">
+        <summary>여러 할 일 빠른 입력</summary>
+        <label className="visually-hidden" htmlFor="plan-bulk">한 줄에 할 일 하나씩</label>
+        <textarea id="plan-bulk" rows={4} maxLength={1500} value={bulkDraft}
+          placeholder={"한 줄에 하나씩 적거나 붙여넣기\n예: 영어 단어 복습\n수학 문제 풀기"}
+          onChange={(event) => setBulkDraft(event.target.value)} />
+        <button className="secondary" type="button" disabled={!bulkDraft.trim() || items.length >= 12}
+          onClick={() => {
+            const candidates = bulkPlanCandidates(bulkDraft, items);
+            if (candidates.length === 0) {
+              setNotice("추가할 새 할 일이 없습니다. 중복이나 80자 제한을 확인해 주세요.");
+              return;
+            }
+            setItems((old) => [...old, ...bulkPlanCandidates(bulkDraft, old).map((text) =>
+              ({ id: crypto.randomUUID(), text, estimateMinutes: estimate, done: false }))]);
+            setBulkDraft("");
+            setNotice(`${candidates.length}개를 추가했어요.`);
+          }}>선택한 예상 시간으로 추가</button>
+        <p>위에서 고른 예상 시간을 모두 적용합니다. 중복은 건너뛰고 최대 12개까지 추가합니다.</p>
+      </details>
       {items.length > 0 ? <>
         <div className="plan-progress" role="progressbar" aria-label="완료한 계획" aria-valuenow={completed.length} aria-valuemin={0} aria-valuemax={items.length}>
           <span style={{ width: `${completed.length / items.length * 100}%` }} />

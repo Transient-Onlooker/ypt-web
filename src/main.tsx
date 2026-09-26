@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
-import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects } from "../shared/format.ts";
+import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, verifiedGoalStreak } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import { clearPersonalTools, StudyTools } from "./study-tools.tsx";
@@ -448,6 +448,9 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [view, setView] = useState<"bars" | "calendar">("bars");
+  const [copyNotice, setCopyNotice] = useState("");
+  const [copying, setCopying] = useState(false);
   const requestId = useRef(0);
   const loadingRef = useRef(false);
   useEffect(() => () => { requestId.current++; }, []);
@@ -458,6 +461,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
     const currentRequest = ++requestId.current;
     setLoading(true);
     setError("");
+    setCopyNotice("");
     try {
       const rows: TrendDay[] = [];
       for (let offset = 1; offset < rangeDays; offset += 2) {
@@ -502,6 +506,24 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
   const subjectCsv = days ? formatTrendSubjectsCsv(days, rangeDays) : null;
   const goalDays = goalMinutes > 0 ? known.filter((row) =>
     (row.totalMs ?? 0) >= goalMinutes * 60_000).length : 0;
+  const goalStreak = days && goalMinutes > 0 ? verifiedGoalStreak(days, goalMinutes) : null;
+  const review = days ? formatTrendReview(days, rangeDays, goalMinutes) : null;
+  const calendarLead = days
+    ? (new Date(`${days[0].date}T00:00:00Z`).getUTCDay() + 6) % 7 : 0;
+
+  async function copyReview() {
+    if (!review || copying) return;
+    setCopying(true);
+    setCopyNotice("");
+    try {
+      await navigator.clipboard.writeText(review);
+      setCopyNotice("기간 요약을 복사했어요.");
+    } catch {
+      setCopyNotice("복사하지 못했습니다. 브라우저의 클립보드 권한을 확인해 주세요.");
+    } finally {
+      setCopying(false);
+    }
+  }
   return (
     <div className="history-trend">
       <div className="card-head">
@@ -536,6 +558,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
               <span>가장 많이 한 날 <strong>{bestDay.date.slice(5).replace("-", ".")} · {duration(bestDay.totalMs)}</strong></span>
             )}
             {goalMinutes > 0 && <span>현재 하루 목표 달성 <strong>{goalDays}/{known.length}일</strong></span>}
+            {goalStreak !== null && goalStreak > 0 && <span>현재 목표 연속 <strong>{goalStreak}일</strong></span>}
           </div>
           {goalMinutes > 0 && <p className="card-note">현재 설정한 하루 목표를 이 기간에 적용한 값입니다. 과거에 설정했던 목표는 알 수 없습니다.</p>}
           {rangeDays === 14 && (
@@ -553,6 +576,11 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
           )}
           <CsvButton filename={`ypt-${rangeDays}days-${today.date}.csv`}
             csv={formatTrendCsv(days)} label={`${rangeDays}일 기록 CSV 저장`} />
+          <div className="trend-review-action">
+            <button className="text-button" type="button" disabled={!review || copying}
+              onClick={() => void copyReview()}>{copying ? "복사 중…" : "기간 요약 복사"}</button>
+            {copyNotice && <small role="status">{copyNotice}</small>}
+          </div>
           <div className="trend-subjects">
             <div className="card-head"><span>기간 과목별 공부</span>
               {subjectCsv && <CsvButton filename={`ypt-${rangeDays}days-subjects-${today.date}.csv`}
@@ -571,18 +599,38 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
                 </div>)}</div>}
             <p className="card-note">과목 이름이 바뀌었다면 기간 내에서는 서로 다른 과목명으로 집계합니다. 진행 중인 세션은 제외합니다.</p>
           </div>
-          <div className="week-list">
-            {days.map((row) => (
-              <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
-                aria-label={`${row.date} 기록 보기, ${row.totalMs === null ? "시간 확인 불가" : duration(row.totalMs)}`}>
-                <span>{shortDayLabel(row.date)}</span>
-                <span className="week-track" aria-hidden="true">
-                  {row.totalMs !== null && <span style={{ width: `${row.totalMs / maxMs * 100}%` }} />}
-                </span>
-                <strong>{row.totalMs === null ? "확인 불가" : duration(row.totalMs)}</strong>
-              </button>
-            ))}
+          <div className="trend-view-controls" role="group" aria-label="최근 기록 표시 방식">
+            <button type="button" aria-pressed={view === "bars"} onClick={() => setView("bars")}>막대</button>
+            <button type="button" aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>달력</button>
           </div>
+          {view === "bars" ? <div className="week-list">
+            {days.map((row) => <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
+              aria-label={`${row.date} 기록 보기, ${row.totalMs === null ? "시간 확인 불가" : duration(row.totalMs)}`}>
+              <span>{shortDayLabel(row.date)}</span>
+              <span className="week-track" aria-hidden="true">
+                {row.totalMs !== null && <span style={{ width: `${row.totalMs / maxMs * 100}%` }} />}
+              </span>
+              <strong>{row.totalMs === null ? "확인 불가" : duration(row.totalMs)}</strong>
+            </button>)}
+          </div> : <>
+            <div className="week-calendar" aria-label={`${rangeDays}일 공부 달력`}>
+              {["월", "화", "수", "목", "금", "토", "일"].map((name) =>
+                <span className="week-calendar-head" key={name}>{name}</span>)}
+              {Array.from({ length: calendarLead }, (_, index) =>
+                <span className="week-calendar-blank" key={`blank-${index}`} aria-hidden="true" />)}
+              {days.map((row) => {
+                const level = row.totalMs === null ? "unknown" : row.totalMs === 0
+                  ? "level-0" : `level-${Math.max(1, Math.ceil(row.totalMs / maxMs * 4))}`;
+                return <button type="button" className={`week-calendar-day ${level}`} key={row.date}
+                  onClick={() => onSelect(row.date)}
+                  aria-label={`${row.date} 기록 보기, ${row.totalMs === null ? "시간 확인 불가" : duration(row.totalMs)}`}>
+                  <strong>{Number(row.date.slice(-2))}</strong>
+                  <small>{row.totalMs === null ? "?" : row.totalMs === 0 ? "—" : "●"}</small>
+                </button>;
+              })}
+            </div>
+            <p className="card-note">진한 칸일수록 완료 공부시간이 깁니다. ?는 확인 불가, —는 0시간입니다. 날짜를 누르면 상세 기록으로 이동합니다.</p>
+          </>}
         </>
       )}
       {error && <p className="card-note" role="status">{error}</p>}

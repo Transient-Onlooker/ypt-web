@@ -45,6 +45,11 @@ export function duration(ms: number | null | undefined) {
   return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+function summaryLabel(value: string) {
+  const flattened = value.replace(/\s+/g, " ").trim();
+  return /^[=+\-@]/.test(flattened) ? `'${flattened}` : flattened;
+}
+
 export function formatDaySummary(day: Day) {
   const lines = [`YPT Web · 오늘의 공부 (${day.date})`, `완료 기록 ${duration(day.totalMs)}`];
   if (!day.subjectTimesAvailable) {
@@ -56,7 +61,7 @@ export function formatDaySummary(day: Day) {
         a.title.localeCompare(b.title, "ko-KR"));
     if (!subjects.length) lines.push("완료된 과목 기록 없음");
     else subjects.forEach((subject) =>
-      lines.push(`${subject.title.replace(/\s+/g, " ").trim()} ${duration(subject.studyMs)}`));
+      lines.push(`${summaryLabel(subject.title)} ${duration(subject.studyMs)}`));
   }
   return lines.join("\n");
 }
@@ -139,4 +144,54 @@ export function compareVerifiedWeeks(days: TrendDay[]) {
   const earlier = sorted.slice(0, 7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
   const recent = sorted.slice(7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
   return { earlier, recent, difference: recent - earlier };
+}
+
+export function verifiedGoalStreak(days: TrendDay[], goalMinutes: number): number | null {
+  if (!Number.isInteger(goalMinutes) || goalMinutes <= 0 || days.length === 0) return null;
+  const sorted = [...days].sort((a, b) => b.date.localeCompare(a.date));
+  if (sorted[0].totalMs === null) return null;
+  let streak = 0;
+  let newerDate: string | null = null;
+  for (const day of sorted) {
+    if (newerDate !== null &&
+      Date.parse(`${newerDate}T00:00:00Z`) - Date.parse(`${day.date}T00:00:00Z`) !== 86_400_000) break;
+    if (day.totalMs === null || day.totalMs < goalMinutes * 60_000) break;
+    streak++;
+    newerDate = day.date;
+  }
+  return streak;
+}
+
+export function formatTrendReview(days: TrendDay[], rangeDays: 7 | 14, goalMinutes: number): string | null {
+  if (days.length !== rangeDays) return null;
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.some((day, index) => index > 0 &&
+    Date.parse(`${day.date}T00:00:00Z`) - Date.parse(`${sorted[index - 1].date}T00:00:00Z`) !== 86_400_000)) return null;
+  const known = sorted.filter((day) => day.totalMs !== null);
+  const total = known.reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
+  const studyDays = known.filter((day) => (day.totalMs ?? 0) > 0).length;
+  const lines = [
+    `YPT Web · 최근 ${rangeDays}일 공부 요약 (${sorted[0].date} ~ ${sorted.at(-1)?.date})`,
+    `확인된 ${known.length}/${rangeDays}일 · 완료 공부시간 ${duration(total)}`,
+    `공부한 날 ${studyDays}/${known.length}일`,
+  ];
+  const unknown = sorted.filter((day) => day.totalMs === null);
+  if (unknown.length) lines.push(`미확인 날짜: ${unknown.map((day) => day.date).join(", ")}`);
+  if (goalMinutes > 0) {
+    const goalDays = known.filter((day) => (day.totalMs ?? 0) >= goalMinutes * 60_000).length;
+    lines.push(`현재 하루 목표 ${goalMinutes}분 달성 ${goalDays}/${known.length}일 (과거 목표 설정은 알 수 없음)`);
+  }
+  if (rangeDays === 14) {
+    const comparison = compareVerifiedWeeks(sorted);
+    lines.push(comparison
+      ? `이전 7일 ${duration(comparison.earlier)} → 최근 7일 ${duration(comparison.recent)}`
+      : "앞뒤 7일 비교 미확인");
+  }
+  const subjects = summarizeTrendSubjects(sorted, rangeDays);
+  if (subjects === null) lines.push("과목별 기간 시간 미확인");
+  else if (subjects.length === 0) lines.push("완료된 과목 기록 없음");
+  else subjects.slice(0, 3).forEach((subject) =>
+    lines.push(`${summaryLabel(subject.title)} ${duration(subject.totalMs)}`));
+  lines.push("진행 중인 세션 제외");
+  return lines.join("\n");
 }
