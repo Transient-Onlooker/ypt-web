@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
+import { duration, formatDaySummary } from "../shared/format.ts";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
@@ -132,11 +133,6 @@ async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
   if (CROSS_ORIGIN_API && path === "/logout") rememberSessionToken("");
   return result as T;
 }
-function duration(ms: number | null | undefined) {
-  if (ms == null) return "확인 중";
-  const seconds = Math.max(0, Math.floor(ms / 1000));
-  return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-}
 function goalLabel(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
@@ -236,6 +232,104 @@ function shiftDate(date: string, days: number) {
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
+}
+function YesterdayCompare({ today, cached, loadDay, onOpen }: {
+  today: Day;
+  cached: Day | null;
+  loadDay: (date: string, force?: boolean) => Promise<Day>;
+  onOpen: (date: string) => void;
+}) {
+  const yesterdayDate = shiftDate(today.date, -1);
+  const [yesterday, setYesterday] = useState<Day | null>(cached);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const requestId = useRef(0);
+  useEffect(() => () => { requestId.current++; }, []);
+
+  async function load() {
+    if (loading) return;
+    const currentRequest = ++requestId.current;
+    setLoading(true);
+    setError("");
+    try {
+      const result = await loadDay(yesterdayDate, yesterday !== null);
+      if (currentRequest === requestId.current) setYesterday(result);
+    } catch (cause) {
+      if (currentRequest === requestId.current)
+        setError(cause instanceof Error ? cause.message : "어제 기록을 확인하지 못했습니다.");
+    } finally {
+      if (currentRequest === requestId.current) setLoading(false);
+    }
+  }
+
+  const difference = yesterday ? today.totalMs - yesterday.totalMs : 0;
+  return (
+    <div className="yesterday-compare">
+      <div className="card-head">
+        <span>어제와 비교</span>
+        <button className="text-button" disabled={loading} onClick={() => void load()}>
+          {loading ? "확인 중…" : yesterday ? "다시 확인" : "어제 기록 보기"}
+        </button>
+      </div>
+      {error && (
+        <p className="error" role="alert">
+          {error}{yesterday && " 이전 비교가 표시될 수 있습니다."}
+        </p>
+      )}
+      {yesterday ? (
+        <>
+          <div className="comparison-times">
+            <span>어제 · {yesterdayDate.slice(5).replace("-", ".")}
+              <strong>{duration(yesterday.totalMs)}</strong></span>
+            <span>오늘 · {today.date.slice(5).replace("-", ".")}
+              <strong>{duration(today.totalMs)}</strong></span>
+          </div>
+          <p className="comparison-message">
+            {difference > 0
+              ? `오늘 완료 기록이 어제보다 ${duration(difference)} 많아요.`
+              : difference < 0
+                ? `어제 완료 기록까지 ${duration(-difference)} 남았어요.`
+                : "어제와 오늘의 완료 기록이 같아요."}
+          </p>
+          <button className="text-button" onClick={() => onOpen(yesterdayDate)}>
+            어제 상세 기록 보기 →
+          </button>
+        </>
+      ) : !loading && !error ? (
+        <p className="card-note">누르면 어제의 완료 기록을 조회해 오늘과 비교합니다.</p>
+      ) : null}
+    </div>
+  );
+}
+function CopyDayButton({ day }: { day: Day }) {
+  const [notice, setNotice] = useState("");
+  const [copying, setCopying] = useState(false);
+  async function copy() {
+    if (copying) return;
+    setCopying(true);
+    setNotice("");
+    if (!navigator.clipboard?.writeText) {
+      setNotice("이 브라우저에서 복사를 지원하지 않습니다.");
+      setCopying(false);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(formatDaySummary(day));
+      setNotice("복사했어요");
+    } catch {
+      setNotice("복사하지 못했습니다. 브라우저 권한을 확인해 주세요.");
+    } finally {
+      setCopying(false);
+    }
+  }
+  return (
+    <div className="copy-day-action">
+      <button className="text-button" disabled={copying} onClick={() => void copy()}>
+        {copying ? "복사 중…" : "요약 복사"}
+      </button>
+      {notice && <span role="status">{notice}</span>}
+    </div>
+  );
 }
 type TrendDay = { date: string; totalMs: number | null };
 function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
@@ -974,6 +1068,10 @@ function App() {
   const displayedDay = date === snapshot?.today.date
     ? snapshot.today
     : day?.date === date ? day : null;
+  const yesterdayDate = snapshot?.today ? shiftDate(snapshot.today.date, -1) : null;
+  const yesterdayCache = yesterdayDate ? historyCache.current.get(yesterdayDate) : null;
+  const cachedYesterday = yesterdayCache && Date.now() - yesterdayCache.checkedAt < HISTORY_CACHE_MS
+    ? yesterdayCache.day : null;
   const selectedGroupDetails = groups?.find((group) => group.id === selectedGroup);
   const shownMembers = selectedGroup !== null && lastMemberGroup.current === selectedGroup
     ? members : null;
@@ -1294,7 +1392,12 @@ function App() {
                 )}
               </section>
               <section className="summary-card">
-                <div className="card-head">오늘의 공부</div>
+                <div className="card-head">
+                  <span>오늘의 공부</span>
+                  {snapshot?.today && <CopyDayButton
+                    key={`${snapshot.today.date}:${snapshot.today.totalMs}`}
+                    day={snapshot.today} />}
+                </div>
                 <div className="summary-date">
                   {snapshot?.today.date ?? "—"}
                 </div>
@@ -1322,6 +1425,15 @@ function App() {
                     <strong>{duration(liveMs)}</strong>
                     <small>완료된 기록과 별도로 표시합니다.</small>
                   </div>
+                )}
+                {snapshot?.capabilities.history && snapshot.today && (
+                  <YesterdayCompare key={snapshot.today.date} today={snapshot.today}
+                    cached={cachedYesterday}
+                    loadDay={getHistoryDay}
+                    onOpen={(selectedDate) => {
+                      setDate(selectedDate);
+                      setTab("history");
+                    }} />
                 )}
                 {snapshot?.today && <SubjectBreakdown day={snapshot.today}
                   empty="오늘 기록된 과목 시간이 없습니다." />}

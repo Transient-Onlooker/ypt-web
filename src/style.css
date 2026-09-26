@@ -386,6 +386,17 @@ input[type="search"] {
   background: #e5f1e2;
   border-color: #d4e7cf;
 }
+.copy-day-action {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+.copy-day-action span {
+  max-width: 200px;
+  color: #416a4d;
+  font-size: 12px;
+  line-height: 1.4;
+}
 .summary-date {
   color: #607661;
   font-size: 15px;
@@ -522,6 +533,46 @@ input[type="search"] {
   display: block;
   height: 100%;
   border-radius: inherit;
+}
+.yesterday-compare {
+  margin: 25px 0 20px;
+  padding-top: 17px;
+  border-top: 1px solid #cbdcc8;
+}
+.yesterday-compare .card-note {
+  margin-top: 8px;
+}
+.yesterday-compare .error {
+  margin: 10px 0;
+}
+.comparison-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 13px;
+}
+.comparison-times span {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #cbdcc8;
+  border-radius: 10px;
+  background: #f7fcf5;
+  color: #5b7260;
+  font-size: 12px;
+}
+.comparison-times strong {
+  color: #1c4f31;
+  font-size: clamp(14px, 3vw, 20px);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.comparison-message {
+  margin: 12px 0 0;
+  color: #335f40;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .history-card {
   max-width: 780px;
