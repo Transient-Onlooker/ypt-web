@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
-import { duration, formatDaySummary } from "../shared/format.ts";
+import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak } from "../shared/format.ts";
+import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import "./style.css";
 
@@ -15,7 +16,7 @@ function NavIcon({ tab }: { tab: Tab }) {
   };
   return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[tab]}</svg>;
 }
-type MemberSort = "time" | "name";
+type MemberSort = "time" | "name" | "status";
 type MemberFilter = "all" | "studying" | "resting" | "unknown";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
@@ -154,13 +155,15 @@ function focusMilestone(ms: number) {
   if (ms >= 25 * 60_000) return "✦ 현재 타이머 25분 돌파";
   return null;
 }
-function DailyGoal({ minutes, onChange, recordedMs }: {
+function DailyGoal({ minutes, onChange, recordedMs, liveMs }: {
   minutes: number;
   onChange: (minutes: number) => void;
   recordedMs: number;
+  liveMs: number;
 }) {
   const goalMs = minutes * 60_000;
   const progress = goalMs ? Math.min(100, Math.floor(recordedMs / goalMs * 100)) : 0;
+  const previewProgress = goalMs ? Math.min(100, Math.floor((recordedMs + liveMs) / goalMs * 100)) : 0;
   const milestone = progress >= 100 ? "🎉 오늘의 목표 달성!"
     : progress >= 75 ? "✦ 거의 다 왔어요"
     : progress >= 50 ? "✦ 절반을 넘었어요"
@@ -188,8 +191,13 @@ function DailyGoal({ minutes, onChange, recordedMs }: {
           <div className="daily-goal-track" role="progressbar"
             aria-label="오늘 기록된 공부시간 목표 달성률"
             aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-            <span style={{ width: `${progress}%` }} />
+            {liveMs > 0 && <span className="daily-goal-preview" aria-hidden="true"
+              style={{ left: `${progress}%`, width: `${previewProgress - progress}%` }} />}
+            <span className="daily-goal-recorded" style={{ width: `${progress}%` }} />
           </div>
+          {liveMs > 0 && <p className="daily-goal-preview-text">
+            진행 중인 {duration(liveMs)}까지 포함하면 약 {previewProgress}% · 임시 합계 {duration(recordedMs + liveMs)}
+          </p>}
           <p className="daily-goal-message">{milestone}</p>
           {progress < 100 && (
             <p className="daily-goal-detail">기록 기준 남은 시간 {duration(goalMs - recordedMs)}</p>
@@ -242,6 +250,10 @@ function shiftDate(date: string, days: number) {
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
+}
+function shortDayLabel(date: string) {
+  const weekday = "일월화수목금토"[new Date(`${date}T00:00:00Z`).getUTCDay()];
+  return `${date.slice(5).replace("-", ".")} · ${weekday}`;
 }
 function YesterdayCompare({ today, cached, loadDay, onOpen }: {
   today: Day;
@@ -341,7 +353,29 @@ function CopyDayButton({ day }: { day: Day }) {
     </div>
   );
 }
-type TrendDay = { date: string; totalMs: number | null };
+function CsvButton({ filename, csv, label }: { filename: string; csv: string; label: string }) {
+  const [notice, setNotice] = useState("");
+  function download() {
+    setNotice("");
+    try {
+      const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setNotice("CSV 저장을 시작했어요");
+    } catch {
+      setNotice("CSV를 저장하지 못했습니다. 브라우저 설정을 확인해 주세요.");
+    }
+  }
+  return <span className="csv-action">
+    <button className="text-button" type="button" onClick={download}>{label}</button>
+    {notice && <small role="status">{notice}</small>}
+  </span>;
+}
 function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
   today: Day;
   previous: TrendDay[] | null;
@@ -396,6 +430,7 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
   const studyDays = known.filter((row) => (row.totalMs ?? 0) > 0).length;
   const bestDay = known.reduce<TrendDay | null>((best, row) =>
     !best || (row.totalMs ?? 0) > (best.totalMs ?? 0) ? row : best, null);
+  const streak = days ? longestVerifiedStreak(days) : 0;
   return (
     <div className="history-trend">
       <div className="card-head">
@@ -411,15 +446,18 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
           <div className="week-insights">
             <span>공부한 날 <strong>{studyDays}/{known.length}일</strong></span>
             <span>확인된 날 평균 <strong>{duration(knownTotal / Math.max(1, known.length))}</strong></span>
+            <span>확인된 최장 연속 <strong>{streak}일</strong></span>
             {studyDays > 0 && bestDay && (
               <span>가장 많이 한 날 <strong>{bestDay.date.slice(5).replace("-", ".")} · {duration(bestDay.totalMs)}</strong></span>
             )}
           </div>
+          <CsvButton filename={`ypt-week-${today.date}.csv`}
+            csv={formatTrendCsv(days)} label="7일 기록 CSV 저장" />
           <div className="week-list">
             {days.map((row) => (
               <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
                 aria-label={`${row.date} 기록 보기, ${row.totalMs === null ? "시간 확인 불가" : duration(row.totalMs)}`}>
-                <span>{row.date.slice(5).replace("-", ".")}</span>
+                <span>{shortDayLabel(row.date)}</span>
                 <span className="week-track" aria-hidden="true">
                   {row.totalMs !== null && <span style={{ width: `${row.totalMs / maxMs * 100}%` }} />}
                 </span>
@@ -1100,6 +1138,11 @@ function App() {
   const selectedGroupDetails = groups?.find((group) => group.id === selectedGroup);
   const shownMembers = selectedGroup !== null && lastMemberGroup.current === selectedGroup
     ? members : null;
+  const memberCounts = shownMembers ? {
+    studying: shownMembers.filter((member) => member.studying === true).length,
+    resting: shownMembers.filter((member) => member.studying === false).length,
+    unknown: shownMembers.filter((member) => member.studying === null).length,
+  } : null;
   const pendingRecoveryWait =
     timer !== undefined &&
     (timer.state === "starting" || timer.state === "stopping") &&
@@ -1122,6 +1165,11 @@ function App() {
     .sort((a, b) => {
       const nameOrder = a.nickname.localeCompare(b.nickname, "ko-KR");
       if (memberSort === "name") return nameOrder;
+      if (memberSort === "status") {
+        const rank = (value: boolean | null) => value === true ? 0 : value === false ? 1 : 2;
+        const statusOrder = rank(a.studying) - rank(b.studying);
+        if (statusOrder) return statusOrder;
+      }
       const timeOrder = (b.studyMs ?? -1) - (a.studyMs ?? -1);
       return timeOrder || nameOrder;
     });
@@ -1434,6 +1482,7 @@ function App() {
                 <p className="summary-label">기록된 총 공부시간</p>
                 {snapshot?.today && (
                   <DailyGoal minutes={goalMinutes} recordedMs={snapshot.today.totalMs}
+                    liveMs={running && !statusStale && !remoteUnverified ? liveMs : 0}
                     onChange={(minutes) => {
                       if (!GOAL_MINUTES.some((value) => value === minutes)) return;
                       setGoalMinutes(minutes);
@@ -1494,6 +1543,11 @@ function App() {
                   >
                     ← 이전
                   </button>
+                  <button className="secondary"
+                    disabled={!snapshot?.capabilities.history || date === shiftDate(snapshot.today.date, -1)}
+                    onClick={() => setDate(shiftDate(snapshot!.today.date, -1))}>
+                    어제
+                  </button>
                   <button
                     className="secondary"
                     disabled={!snapshot || date === snapshot.today.date}
@@ -1513,19 +1567,24 @@ function App() {
               </div>
               <div className="history-toolbar">
                 <span>열품타의 공부 날짜 기준 기록</span>
-                <button
-                  className="text-button"
-                  disabled={loadingDay || !date}
-                  onClick={() => {
-                    if (date === snapshot?.today.date) void loadSnapshot();
-                    else {
-                      forceHistoryDate.current = date;
-                      setHistoryRefresh((old) => old + 1);
-                    }
-                  }}
-                >
-                  새로고침
-                </button>
+                <div className="history-toolbar-actions">
+                  {displayedDay && <CsvButton key={displayedDay.date}
+                    filename={`ypt-day-${displayedDay.date}.csv`}
+                    csv={formatDayCsv(displayedDay)} label="CSV 저장" />}
+                  <button
+                    className="text-button"
+                    disabled={loadingDay || !date}
+                    onClick={() => {
+                      if (date === snapshot?.today.date) void loadSnapshot();
+                      else {
+                        forceHistoryDate.current = date;
+                        setHistoryRefresh((old) => old + 1);
+                      }
+                    }}
+                  >
+                    새로고침
+                  </button>
+                </div>
               </div>
               {!snapshot?.capabilities.history && (
                 <p className="card-note">
@@ -1673,22 +1732,28 @@ function App() {
                 )}
                 {shownMembers && (
                   <p className="member-summary">
-                    공부 중 {shownMembers.filter((member) => member.studying === true).length}명
+                    공부 중 {memberCounts?.studying}명
                     {" · "}조회된 멤버 {shownMembers.length}명
-                    {shownMembers.some((member) => member.studying === null) &&
-                      ` · 상태 미확인 ${shownMembers.filter((member) => member.studying === null).length}명`}
+                    {Boolean(memberCounts?.unknown) &&
+                      ` · 상태 미확인 ${memberCounts?.unknown}명`}
                     {(memberQuery.trim() || memberFilter !== "all") &&
                       ` · 표시 ${visibleMembers?.length ?? 0}명`}
                   </p>
                 )}
                 {shownMembers && shownMembers.length > 0 && (
                   <div className="member-tools">
+                    <div className="member-status-track" role="img"
+                      aria-label={`공부 중 ${memberCounts?.studying}명, 쉬는 중 ${memberCounts?.resting}명, 상태 미확인 ${memberCounts?.unknown}명`}>
+                      <span className="studying" style={{ width: `${(memberCounts?.studying ?? 0) / shownMembers.length * 100}%` }} />
+                      <span className="resting" style={{ width: `${(memberCounts?.resting ?? 0) / shownMembers.length * 100}%` }} />
+                      <span className="unknown" style={{ width: `${(memberCounts?.unknown ?? 0) / shownMembers.length * 100}%` }} />
+                    </div>
                     <div className="member-filters" role="group" aria-label="공부 상태 필터">
                       {([
                         ["all", "전체", shownMembers.length],
-                        ["studying", "공부 중", shownMembers.filter((member) => member.studying === true).length],
-                        ["resting", "쉬는 중", shownMembers.filter((member) => member.studying === false).length],
-                        ["unknown", "미확인", shownMembers.filter((member) => member.studying === null).length],
+                        ["studying", "공부 중", memberCounts?.studying ?? 0],
+                        ["resting", "쉬는 중", memberCounts?.resting ?? 0],
+                        ["unknown", "미확인", memberCounts?.unknown ?? 0],
                       ] as const).map(([filter, label, count]) => (
                         <button key={filter} type="button"
                           className={memberFilter === filter ? "selected" : ""}
@@ -1719,6 +1784,7 @@ function App() {
                           }
                         >
                           <option value="time">시간 많은 순</option>
+                          <option value="status">공부 중 우선</option>
                           <option value="name">이름순</option>
                         </select>
                       </div>

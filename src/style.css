@@ -1475,12 +1475,45 @@ input[type="search"] {
   margin-bottom: 22px;
 }
 .daily-goal-track {
+  position: relative;
   height: 12px;
   background: #e8eedf;
 }
-.daily-goal-track span {
+.daily-goal-track .daily-goal-recorded {
+  position: absolute;
+  left: 0;
+  top: 0;
   background: linear-gradient(90deg, #267d50, #a9d354);
 }
+.daily-goal-track .daily-goal-preview {
+  position: absolute;
+  top: 0;
+  background: repeating-linear-gradient(115deg, #95c662 0 7px, #c7dfa0 7px 14px);
+}
+.daily-goal-preview-text {
+  margin: 10px 0 0;
+  color: #3d6847;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.history-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.csv-action {
+  display: inline-grid;
+  justify-items: start;
+}
+.csv-action small {
+  color: #3a7450;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.history-trend > .csv-action { margin: -6px 0 13px; }
+.week-row { grid-template-columns: 70px minmax(0, 1fr) 84px; }
 .subject-row,
 .yesterday-compare,
 .history-trend {
@@ -1514,6 +1547,19 @@ input[type="search"] {
 .member-row {
   padding: 17px 0;
 }
+.member-status-track {
+  display: flex;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  margin-top: 15px;
+  border-radius: 999px;
+  background: #e7ece7;
+}
+.member-status-track span { display: block; height: 100%; }
+.member-status-track .studying { background: #3cb676; }
+.member-status-track .resting { background: #a5b8a4; }
+.member-status-track .unknown { background: #f2c57f; }
 .member-filters {
   display: flex;
   flex-wrap: wrap;
@@ -1622,4 +1668,8 @@ input[type="search"] {
   .sync-control { padding: 5px 5px 5px 13px; }
   .timer-actions > button { flex-basis: 100%; }
   .summary-time { font-size: clamp(38px, 11vw, 53px); }
+  .date-actions button { padding: 7px 4px; font-size: 12px; }
+  .history-toolbar { align-items: flex-start; flex-wrap: wrap; }
+  .history-toolbar-actions { width: 100%; justify-content: flex-start; }
+  .week-row { grid-template-columns: 63px minmax(0, 1fr) 78px; gap: 7px; }
 }
