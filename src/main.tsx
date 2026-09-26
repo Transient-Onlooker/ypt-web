@@ -9,6 +9,7 @@ type MemberSort = "time" | "name";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
+const HISTORY_CACHE_MS = 5 * 60_000;
 const SYNC_STORAGE_KEY = "ypt-web-sync-seconds";
 const REMEMBERED_EMAIL_KEY = "ypt-web-remembered-email";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -165,8 +166,13 @@ function shiftDate(date: string, days: number) {
   return value.toISOString().slice(0, 10);
 }
 type TrendDay = { date: string; totalMs: number | null };
-function HistoryTrend({ today, onSelect }: { today: Day; onSelect: (date: string) => void }) {
-  const [previous, setPrevious] = useState<TrendDay[] | null>(null);
+function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
+  today: Day;
+  previous: TrendDay[] | null;
+  onLoaded: (days: TrendDay[]) => void;
+  onSelect: (date: string) => void;
+  loadDay: (date: string, force?: boolean) => Promise<Day>;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const requestId = useRef(0);
@@ -183,9 +189,7 @@ function HistoryTrend({ today, onSelect }: { today: Day; onSelect: (date: string
       const rows: TrendDay[] = [];
       for (let offset = 1; offset <= 6; offset += 2) {
         const dates = [offset, offset + 1].map((days) => shiftDate(today.date, -days));
-        const results = await Promise.allSettled(dates.map((value) =>
-          api<Day>(`/history?date=${encodeURIComponent(value)}`),
-        ));
+        const results = await Promise.allSettled(dates.map((date) => loadDay(date, previous !== null)));
         if (currentRequest !== requestId.current) return;
         results.forEach((result, index) => {
           rows.push({
@@ -196,7 +200,7 @@ function HistoryTrend({ today, onSelect }: { today: Day; onSelect: (date: string
         });
       }
       if (currentRequest !== requestId.current) return;
-      setPrevious(rows);
+      onLoaded(rows);
       if (rows.some((row) => row.totalMs === null))
         setError("일부 날짜를 확인하지 못했습니다. 다시 불러오면 전체 기간을 확인합니다.");
     } catch {
@@ -404,6 +408,7 @@ function App() {
   const [loadingDay, setLoadingDay] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [trend, setTrend] = useState<{ todayDate: string; days: TrendDay[] } | null>(null);
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -422,8 +427,40 @@ function App() {
   const memberLoadingGroup = useRef<{ id: number; requestId: number } | null>(
     null,
   );
+  const lastMemberGroup = useRef<number | null>(null);
   const previousTimerKey = useRef<string | null>(null);
   const previousTab = useRef<Tab>("study");
+  const historyCache = useRef(new Map<string, { day: Day; checkedAt: number }>());
+  const historyRequests = useRef(new Map<string, Promise<Day>>());
+  const forceHistoryDate = useRef<string | null>(null);
+
+  const getHistoryDay = useCallback((requestedDate: string, force = false) => {
+    const pending = historyRequests.current.get(requestedDate);
+    if (pending) return pending;
+    const cached = historyCache.current.get(requestedDate);
+    if (!force && cached && Date.now() - cached.checkedAt < HISTORY_CACHE_MS)
+      return Promise.resolve(cached.day);
+    const epoch = authEpoch.current;
+    const request = api<Day>(`/history?date=${encodeURIComponent(requestedDate)}`)
+      .then((result) => {
+        if (result.date !== requestedDate)
+          throw new Error("요청한 날짜의 기록을 확인할 수 없습니다.");
+        if (epoch === authEpoch.current) {
+          if (historyCache.current.size >= 50) {
+            const oldest = historyCache.current.keys().next().value;
+            if (oldest) historyCache.current.delete(oldest);
+          }
+          historyCache.current.set(requestedDate, { day: result, checkedAt: Date.now() });
+        }
+        return result;
+      })
+      .finally(() => {
+        if (historyRequests.current.get(requestedDate) === request)
+          historyRequests.current.delete(requestedDate);
+      });
+    historyRequests.current.set(requestedDate, request);
+    return request;
+  }, []);
 
   useEffect(() => {
     if (previousTab.current === tab) return;
@@ -457,6 +494,10 @@ function App() {
         return;
       if ((cause as ApiError).status === 401) {
         authEpoch.current++;
+        historyCache.current.clear();
+        historyRequests.current.clear();
+        forceHistoryDate.current = null;
+        setTrend(null);
         setRefreshingSnapshot(false);
         setSnapshot(null);
         setSnapshotCheckedAt(null);
@@ -468,6 +509,7 @@ function App() {
         setLoadingMembers(false);
         setLoadingDay(false);
         memberLoadingGroup.current = null;
+        lastMemberGroup.current = null;
         setDay(null);
         setDate("");
         setSelectedSubject("");
@@ -550,11 +592,19 @@ function App() {
       setHistoryError("");
       return;
     }
+    const force = forceHistoryDate.current === date;
+    if (force) forceHistoryDate.current = null;
+    const cached = historyCache.current.get(date);
+    if (!force && cached && Date.now() - cached.checkedAt < HISTORY_CACHE_MS) {
+      setDay(cached.day);
+      setLoadingDay(false);
+      setHistoryError("");
+      return;
+    }
     let active = true;
     setLoadingDay(true);
-    setDay(null);
     setHistoryError("");
-    api<Day>(`/history?date=${encodeURIComponent(date)}`)
+    getHistoryDay(date, force)
       .then((result) => {
         if (active) {
           setDay(result);
@@ -575,7 +625,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [tab, date, session?.authenticated, snapshot?.today.date, historyRefresh]);
+  }, [tab, date, session?.authenticated, snapshot?.today.date, historyRefresh, getHistoryDay]);
   const loadGroups = useCallback(async () => {
     const requestId = ++groupRequest.current;
     const epoch = authEpoch.current;
@@ -649,13 +699,17 @@ function App() {
     };
   }, [tab, session?.authenticated, loadGroups]);
   useEffect(() => {
-    if (tab !== "groups" || selectedGroup === null || !session?.authenticated)
-      return;
-    memberRequest.current++;
-    setMembers(null);
-    setGroupCheckedAt(null);
-    setMemberError("");
-    setMemberQuery("");
+    if (tab !== "groups" || !session?.authenticated) return;
+    if (lastMemberGroup.current !== selectedGroup) {
+      lastMemberGroup.current = selectedGroup;
+      memberRequest.current++;
+      memberLoadingGroup.current = null;
+      setMembers(null);
+      setGroupCheckedAt(null);
+      setMemberError("");
+      setMemberQuery("");
+    }
+    if (selectedGroup === null) return;
     void loadMembers(selectedGroup);
   }, [tab, selectedGroup, session?.authenticated, loadMembers]);
   useEffect(() => {
@@ -725,10 +779,15 @@ function App() {
     try {
       await api("/logout", "POST", {});
       authEpoch.current++;
+      historyCache.current.clear();
+      historyRequests.current.clear();
+      forceHistoryDate.current = null;
+      setTrend(null);
       snapshotRequest.current++;
       groupRequest.current++;
       memberRequest.current++;
       memberLoadingGroup.current = null;
+      lastMemberGroup.current = null;
       csrf = "";
       setSession({ authenticated: false });
       setSnapshot(null);
@@ -788,6 +847,10 @@ function App() {
         notice={loginNotice}
         onLogin={async (warning) => {
           authEpoch.current++;
+          historyCache.current.clear();
+          historyRequests.current.clear();
+          forceHistoryDate.current = null;
+          setTrend(null);
           setSession({ authenticated: true, csrf });
           setError("");
           setLoginNotice("");
@@ -825,15 +888,19 @@ function App() {
       status = "요청 처리 중";
     else status = "상태 확인 필요";
   }
-  const displayedDay = date === snapshot?.today.date ? snapshot.today : day;
+  const displayedDay = date === snapshot?.today.date
+    ? snapshot.today
+    : day?.date === date ? day : null;
   const selectedGroupDetails = groups?.find((group) => group.id === selectedGroup);
+  const shownMembers = selectedGroup !== null && lastMemberGroup.current === selectedGroup
+    ? members : null;
   const pendingRecoveryWait =
     timer !== undefined &&
     (timer.state === "starting" || timer.state === "stopping") &&
     now - timer.updatedAt < PENDING_RECOVERY_MS;
   const statusStale =
     snapshotCheckedAt !== null && now - snapshotCheckedAt > 45_000;
-  const visibleMembers = members
+  const visibleMembers = shownMembers
     ?.filter((member) =>
       member.nickname
         .toLocaleLowerCase("ko-KR")
@@ -1203,10 +1270,13 @@ function App() {
                 <span>열품타의 공부 날짜 기준 기록</span>
                 <button
                   className="text-button"
-                  disabled={loadingDay}
+                  disabled={loadingDay || !date}
                   onClick={() => {
                     if (date === snapshot?.today.date) void loadSnapshot();
-                    else setHistoryRefresh((old) => old + 1);
+                    else {
+                      forceHistoryDate.current = date;
+                      setHistoryRefresh((old) => old + 1);
+                    }
                   }}
                 >
                   새로고침
@@ -1218,11 +1288,16 @@ function App() {
                 </p>
               )}
               {historyError && (
-                <p className="error" role="alert">{historyError}</p>
+                <p className="error" role="alert">
+                  {historyError}{displayedDay && " 이전 기록이 표시될 수 있습니다."}
+                </p>
               )}
-              {loadingDay ? (
-                <p>기록을 가져오는 중…</p>
-              ) : displayedDay ? (
+              {loadingDay && (
+                <p className="card-note" role="status">
+                  {displayedDay ? "새 기록을 확인하는 중…" : "기록을 가져오는 중…"}
+                </p>
+              )}
+              {displayedDay ? (
                 <>
                   <div className="history-total">
                     <span>{displayedDay.date} 총 공부시간</span>
@@ -1251,11 +1326,14 @@ function App() {
                     </p>
                   )}
                 </>
-              ) : (
+              ) : !loadingDay && (
                 <p className="empty">해당 날짜의 기록을 확인할 수 없습니다.</p>
               )}
               {snapshot?.capabilities.history && snapshot.today && (
                 <HistoryTrend key={snapshot.today.date} today={snapshot.today}
+                  previous={trend?.todayDate === snapshot.today.date ? trend.days : null}
+                  onLoaded={(days) => setTrend({ todayDate: snapshot.today.date, days })}
+                  loadDay={getHistoryDay}
                   onSelect={(selectedDate) => {
                     setDate(selectedDate);
                     document.getElementById("history-top")?.scrollIntoView();
@@ -1293,16 +1371,13 @@ function App() {
                             void loadMembers(group.id);
                             return;
                           }
-                          memberRequest.current++;
                           setSelectedGroup(group.id);
-                          setMembers(null);
-                          setGroupCheckedAt(null);
                         }}
                       >
                         {group.title}
                         <span>
-                          {selectedGroup === group.id && members
-                            ? `현재 ${members.length}명${group.capacity === null ? "" : ` / 정원 ${group.capacity}명`}`
+                          {selectedGroup === group.id && shownMembers
+                            ? `현재 ${shownMembers.length}명${group.capacity === null ? "" : ` / 정원 ${group.capacity}명`}`
                             : group.capacity === null
                               ? ""
                               : `정원 ${group.capacity}명`}
@@ -1351,17 +1426,17 @@ function App() {
                     )}
                   </div>
                 )}
-                {members && (
+                {shownMembers && (
                   <p className="member-summary">
-                    공부 중 {members.filter((member) => member.studying === true).length}명
-                    {" · "}조회된 멤버 {members.length}명
-                    {members.some((member) => member.studying === null) &&
-                      ` · 상태 미확인 ${members.filter((member) => member.studying === null).length}명`}
+                    공부 중 {shownMembers.filter((member) => member.studying === true).length}명
+                    {" · "}조회된 멤버 {shownMembers.length}명
+                    {shownMembers.some((member) => member.studying === null) &&
+                      ` · 상태 미확인 ${shownMembers.filter((member) => member.studying === null).length}명`}
                     {memberQuery.trim() &&
                       ` · 검색 결과 ${visibleMembers?.length ?? 0}명`}
                   </p>
                 )}
-                {members && members.length > 0 && (
+                {shownMembers && shownMembers.length > 0 && (
                   <div className="member-controls">
                     <div>
                       <label htmlFor="member-search">멤버 검색</label>
@@ -1390,7 +1465,7 @@ function App() {
                 )}
                 {memberError && (
                   <p className="error" role="alert">
-                    {memberError}{members && " 이전 현황이 표시될 수 있습니다."}
+                    {memberError}{shownMembers && " 이전 현황이 표시될 수 있습니다."}
                   </p>
                 )}
                 {groupCheckedAt && (
@@ -1435,9 +1510,9 @@ function App() {
                   <p className="empty">
                     {selectedGroup === null
                       ? "그룹을 선택해 주세요."
-                      : members?.length && memberQuery.trim()
+                      : shownMembers?.length && memberQuery.trim()
                         ? "검색 결과가 없습니다."
-                      : members
+                      : shownMembers
                         ? "표시할 멤버가 없습니다."
                         : loadingMembers
                           ? "멤버를 가져오는 중…"
