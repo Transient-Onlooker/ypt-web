@@ -164,6 +164,85 @@ function shiftDate(date: string, days: number) {
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
+type TrendDay = { date: string; totalMs: number | null };
+function HistoryTrend({ today, onSelect }: { today: Day; onSelect: (date: string) => void }) {
+  const [previous, setPrevious] = useState<TrendDay[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const requestId = useRef(0);
+  const loadingRef = useRef(false);
+  useEffect(() => () => { requestId.current++; }, []);
+
+  async function load() {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    const currentRequest = ++requestId.current;
+    setLoading(true);
+    setError("");
+    try {
+      const rows: TrendDay[] = [];
+      for (let offset = 1; offset <= 6; offset += 2) {
+        const dates = [offset, offset + 1].map((days) => shiftDate(today.date, -days));
+        const results = await Promise.allSettled(dates.map((value) =>
+          api<Day>(`/history?date=${encodeURIComponent(value)}`),
+        ));
+        if (currentRequest !== requestId.current) return;
+        results.forEach((result, index) => {
+          rows.push({
+            date: dates[index],
+            totalMs: result.status === "fulfilled" && result.value.date === dates[index]
+              ? result.value.totalMs : null,
+          });
+        });
+      }
+      if (currentRequest !== requestId.current) return;
+      setPrevious(rows);
+      if (rows.some((row) => row.totalMs === null))
+        setError("일부 날짜를 확인하지 못했습니다. 다시 불러오면 전체 기간을 확인합니다.");
+    } catch {
+      if (currentRequest === requestId.current)
+        setError("7일 기록을 확인하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      loadingRef.current = false;
+      if (currentRequest === requestId.current) setLoading(false);
+    }
+  }
+
+  const days = previous && [...previous, { date: today.date, totalMs: today.totalMs }]
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const known = days?.filter((row) => row.totalMs !== null) ?? [];
+  const maxMs = Math.max(1, ...known.map((row) => row.totalMs ?? 0));
+  const knownTotal = known.reduce((sum, row) => sum + (row.totalMs ?? 0), 0);
+  return (
+    <div className="history-trend">
+      <div className="card-head">
+        <span>최근 7일</span>
+        <button className="text-button" disabled={loading} onClick={() => void load()}>
+          {loading ? "확인 중…" : previous ? "다시 불러오기" : "7일 기록 불러오기"}
+        </button>
+      </div>
+      <p className="card-note">누르면 오늘을 포함한 7일의 완료 기록을 확인합니다. 자동으로 추가 요청하지 않습니다.</p>
+      {days && (
+        <>
+          <p className="week-total">확인된 {known.length}일 합계 <strong>{duration(knownTotal)}</strong></p>
+          <div className="week-list">
+            {days.map((row) => (
+              <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
+                aria-label={`${row.date} 기록 보기, ${row.totalMs === null ? "시간 확인 불가" : duration(row.totalMs)}`}>
+                <span>{row.date.slice(5).replace("-", ".")}</span>
+                <span className="week-track" aria-hidden="true">
+                  {row.totalMs !== null && <span style={{ width: `${row.totalMs / maxMs * 100}%` }} />}
+                </span>
+                <strong>{row.totalMs === null ? "확인 불가" : duration(row.totalMs)}</strong>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {error && <p className="card-note" role="status">{error}</p>}
+    </div>
+  );
+}
 function Login({
   onLogin,
   notice,
@@ -1166,6 +1245,10 @@ function App() {
                 </>
               ) : (
                 <p className="empty">해당 날짜의 기록을 확인할 수 없습니다.</p>
+              )}
+              {snapshot?.capabilities.history && snapshot.today && (
+                <HistoryTrend key={snapshot.today.date} today={snapshot.today}
+                  onSelect={setDate} />
               )}
             </section>
           )}

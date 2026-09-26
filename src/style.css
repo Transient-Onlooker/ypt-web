@@ -489,6 +489,68 @@ input[type="search"] {
   font-variant-numeric: tabular-nums;
   color: #1b4430;
 }
+.history-trend {
+  margin-top: 36px;
+  padding-top: 22px;
+  border-top: 1px solid #d2e2d1;
+}
+.history-trend .card-note {
+  margin: 8px 0 14px;
+}
+.week-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 15px 0;
+  color: #526c57;
+  font-size: 14px;
+}
+.week-total strong {
+  color: #1b4430;
+  font-variant-numeric: tabular-nums;
+}
+.week-list {
+  display: grid;
+  gap: 7px;
+}
+.week-row {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 84px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #dce8dc;
+  border-radius: 9px;
+  background: #f8fbf7;
+  color: #31533b;
+  text-align: left;
+  font-size: 13px;
+}
+.week-row:hover,
+.week-row:focus-visible {
+  border-color: #8fbea0;
+  background: #edf6ed;
+}
+.week-row strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.week-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e4ece3;
+}
+.week-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #28784a;
+}
 .group-grid {
   display: grid;
   grid-template-columns: minmax(250px, 0.8fr) minmax(300px, 1.2fr);
