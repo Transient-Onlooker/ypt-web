@@ -72,10 +72,9 @@ try {
       profile.email_verified !== true)
     throw new Error("GOOGLE_USERINFO_REJECTED");
   process.stdout.write("Google UserInfo verified. Profile details are hidden.\n");
-  process.stdout.write(
+  const choice = (await rl.question(
     "YPT exchange can create a new account for this Google identity. Type SEND to continue: ",
-  );
-  const choice = (await rl.question("")).trim();
+  )).trim();
   if (choice !== "SEND") {
     process.stdout.write("Cancelled before contacting YPT.\n");
   } else {

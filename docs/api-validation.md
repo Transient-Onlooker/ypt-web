@@ -36,9 +36,9 @@
 ## 15초 재시작과 소셜 로그인 조사 — 2026-09-26
 
 - 사용자는 열품타 앱이 15초 이내 재시작을 끊긴 공부로 취급하지 않는다고 설명했습니다. 이 규칙의 API 응답은 아직 실제 계정으로 비교하지 않았습니다. 웹은 임의로 시간을 합치지 않고 재시작 뒤 `p.st`와 완료 기록 `dl.sm`·`dl.ls`를 따릅니다. 모의 응답에서 이전 시작 시각이 유지되면 웹도 같은 시각을 표시하는 테스트를 추가했습니다.
-- 공개 참고 클라이언트 [`deveworld/ypt_client`의 `lib/ypt_api.dart`](https://github.com/deveworld/ypt_client/blob/bf05d2d10626f996a7e8f3eb3e7e85eb26bfdd0e/lib/ypt_api.dart)는 `/user/social/sign-up-jwt`에 `accessToken`, `providerId`, `email`, `loginProvider` 등을 보내는 경로를 구현합니다. 같은 저장소의 `lib/social_auth.dart`에는 카카오·네이버 OAuth 흐름이 있지만 구글 인증 흐름은 없습니다. 이 내용은 참고 코드 조사 결과이며, 우리 웹의 OAuth 토큰으로 열품타 로그인에 성공한 실제 검증은 아닙니다. 제공자별 OAuth 등록·토큰 검증·기존 계정 연결 방식이 확인되기 전에는 소셜 로그인 버튼을 배포하지 않습니다.
+- 공개 참고 클라이언트 [`deveworld/ypt_client`의 `lib/ypt_api.dart`](https://github.com/deveworld/ypt_client/blob/bf05d2d10626f996a7e8f3eb3e7e85eb26bfdd0e/lib/ypt_api.dart)는 `/user/social/sign-up-jwt`에 `accessToken`, `providerId`, `email`, `loginProvider` 등을 보내는 경로를 구현합니다. 같은 저장소의 `lib/social_auth.dart`에는 카카오·네이버 OAuth 흐름이 있지만 구글 인증 흐름은 없습니다. 이는 참고 코드 조사 결과입니다. 아래 실제 계정 검증과 구분하며, 웹용 OAuth 클라이언트와 기존 계정 일치 여부가 확인되기 전에는 소셜 로그인 버튼을 배포하지 않습니다.
 - 실제 API에 개인정보·인증정보 없이 빈 JSON을 한 번 보내자 HTTP 200과 `accessToken is required` 메시지가 반환돼 경로와 최소 필수 필드를 확인했습니다. 유효하지 않은 임의 문자열을 `accessToken`으로 보낸 다음 요청은 HTTP 500을 반환했습니다. 두 요청 모두 소셜 로그인 성공이나 제공자 검증 방식의 증거가 아닙니다. 추가 무효 토큰 요청은 하지 않았습니다.
-- 구글 소셜 로그인 성공 여부를 실제 계정 정보 없이 확인할 수 있도록 [로컬 검증 도구](google-social-probe.md)를 준비했습니다. Google UserInfo 확인 뒤에도 열품타 전송은 사용자가 터미널에서 `SEND`를 입력할 때만 수행합니다. 유효한 구글 토큰으로 열품타 응답을 받은 결과는 아직 없습니다.
+- [로컬 검증 도구](google-social-probe.md)에서 사용자가 자신의 구글 본계정 Access token을 로컬 터미널에 입력해 실행했습니다. Google UserInfo 확인 후 `SEND`를 입력한 결과 `YPT exchange: HTTP 200, success=true`, 이어서 `YPT authenticated reload: HTTP 200, verified=true`가 표시됐다고 보고했습니다. 토큰·JWT·프로필·이메일은 채팅이나 파일에 받지 않았습니다. 이는 구글 OAuth 토큰으로 열품타 JWT를 발급받아 재조회할 수 있다는 실제 계정 검증입니다. 웹 서비스용 Google OAuth 클라이언트의 토큰으로도 동일하게 동작하는지, 조회된 계정의 과목·기록이 기존 앱 본계정과 일치하는지는 아직 검증하지 않았습니다.
 
 ## 코드 변경 후 회귀 검증
 
