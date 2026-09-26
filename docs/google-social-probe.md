@@ -1,0 +1,12 @@
+# 구글 계정 → 열품타 로그인 로컬 검증
+
+이 절차는 구글 OAuth 토큰이 열품타의 `/user/social/sign-up-jwt`에서 받아들여지는지 조사합니다. 참고 클라이언트의 요청 형식은 확인했지만 구글 계정으로 성공한 응답은 아직 없습니다. 운영 웹에는 구글 로그인 버튼을 추가하지 않았습니다.
+
+열품타의 소셜 경로는 새 제공자 ID를 받으면 **새 계정을 만들 수 있습니다**. 기존 열품타 이메일 계정과 구글 이메일이 같아도 연결된다고 가정하지 마세요. 이미 열품타 앱에서 구글로 로그인한 계정으로 시험하는 것이 안전합니다.
+
+1. 로컬 터미널에서 저장소로 이동하고 Node.js 22 이상을 준비합니다. `node scripts/probe-google-social.mjs --help`로 안내를 볼 수 있습니다.
+2. 본인이 브라우저에서 [Google OAuth 2.0 Playground](https://developers.google.com/oauthplayground/)를 엽니다. Step 1의 직접 입력 칸에 `openid email profile`을 넣어 승인하고, Step 2에서 인증 코드를 토큰으로 교환합니다. **Access token**을 사용합니다. Refresh token이나 ID token은 사용하지 않습니다.
+3. 로컬 터미널에서 `node scripts/probe-google-social.mjs`를 실행하고 숨김 입력란에 Access token을 붙여 넣습니다. 토큰을 명령 인수·환경변수·채팅·파일에 넣지 마세요.
+4. 도구가 Google UserInfo를 확인한 뒤 열품타로 전송하기 전에 멈춥니다. 새 열품타 계정 생성 가능성을 감수하고 진행할 때만 `SEND`를 입력합니다. 다른 입력은 전송 없이 취소합니다.
+
+도구는 열품타 응답의 HTTP 상태, 성공 여부, 숫자 오류 코드만 출력합니다. 성공 시 받은 JWT는 메모리에서만 사용해 읽기 전용 `reload/info`를 한 번 확인합니다. Google 프로필, 토큰, 열품타 JWT, 전체 API 응답은 저장하거나 출력하지 않습니다. 실패한 응답만으로 구글 로그인이 불가능하다고 단정하지 않습니다. Google OAuth Playground의 기본 클라이언트로 발급한 토큰이 열품타 공식 앱의 토큰과 같은 방식으로 허용되는지는 검증 대상입니다.
