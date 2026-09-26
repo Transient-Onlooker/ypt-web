@@ -740,6 +740,7 @@ function App() {
     else status = "상태 확인 필요";
   }
   const displayedDay = date === snapshot?.today.date ? snapshot.today : day;
+  const selectedGroupDetails = groups?.find((group) => group.id === selectedGroup);
   const pendingRecoveryWait =
     timer !== undefined &&
     (timer.state === "starting" || timer.state === "stopping") &&
@@ -1140,6 +1141,21 @@ function App() {
                     <span>{displayedDay.date} 총 공부시간</span>
                     <strong>{duration(displayedDay.totalMs)}</strong>
                   </div>
+                  <div className="history-facts">
+                    {displayedDay.subjectTimesAvailable && (
+                      <div>
+                        <span>기록된 과목</span>
+                        <strong>{displayedDay.subjects.filter((subject) =>
+                          subject.studyMs !== null && subject.studyMs > 0).length}개</strong>
+                      </div>
+                    )}
+                    {displayedDay.longestSegmentMs !== null && (
+                      <div>
+                        <span>가장 긴 기록 구간</span>
+                        <strong>{duration(displayedDay.longestSegmentMs)}</strong>
+                      </div>
+                    )}
+                  </div>
                   <SubjectBreakdown day={displayedDay}
                     empty="이 날짜에 기록된 과목 시간이 없습니다." />
                   {!displayedDay.subjectTimesAvailable && (
@@ -1221,6 +1237,24 @@ function App() {
                     </button>
                   )}
                 </div>
+                {selectedGroupDetails && (
+                  <div className="group-detail">
+                    <strong>{selectedGroupDetails.title}</strong>
+                    {selectedGroupDetails.slogan && (
+                      <p>{selectedGroupDetails.slogan}</p>
+                    )}
+                    {(selectedGroupDetails.category || selectedGroupDetails.owner) && (
+                      <div className="group-detail-meta">
+                        {selectedGroupDetails.category && (
+                          <span>분류 {selectedGroupDetails.category}</span>
+                        )}
+                        {selectedGroupDetails.owner && (
+                          <span>방장 {selectedGroupDetails.owner}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {members && (
                   <p className="member-summary">
                     공부 중 {members.filter((member) => member.studying === true).length}명

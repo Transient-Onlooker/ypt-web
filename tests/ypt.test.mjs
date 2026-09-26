@@ -58,6 +58,7 @@ test("day totals use completed segment logs and preserve missing per-subject val
     ],
   );
   assert.equal(day.totalMs, 31_980);
+  assert.equal(day.longestSegmentMs, 19_076);
   assert.deepEqual(day.subjects, [
     { title: "국어", studyMs: 31_980 },
     { title: "수학", studyMs: 0 },
@@ -66,6 +67,7 @@ test("day totals use completed segment logs and preserve missing per-subject val
     dayFrom({ dt: "2026-09-24", sm: 0 }).subjectTimesAvailable,
     false,
   );
+  assert.equal(dayFrom({ dt: "2026-09-24", sm: 0, ls: [] }).longestSegmentMs, null);
   assert.throws(() => dayFrom({ dt: "2026-09-24", sm: "bad" }), YptError);
 });
 
@@ -94,6 +96,13 @@ test("group arrays deduplicate and members keep unverified status distinct", () 
       { id: 5, title: "B", capacity: null },
     ],
   );
+  assert.deepEqual(groupsFrom({ gs: [
+    { id: 7, t: "공부방", mc: 50, c: "HS11", on: "방장", sn: "함께 공부해요" },
+    { id: 8, t: "다른 방", c: 42, on: "", sn: " ", mc: 10 },
+  ] }), [
+    { id: 7, title: "공부방", capacity: 50, category: "HS11", owner: "방장", slogan: "함께 공부해요" },
+    { id: 8, title: "다른 방", capacity: 10 },
+  ]);
   assert.deepEqual(
     membersFrom({
       ms: [

@@ -159,9 +159,12 @@ export function dayFrom(value: unknown, subjects: Subject[] = []): Day {
   )
     throw new YptError("INVALID_DATA");
   const times = new Map<string, number>();
+  let longestSegmentMs: number | null = null;
   for (const entry of array(log.ls)) {
     const name = typeof entry.sb === "string" ? entry.sb : title(entry);
     const ms = number(entry.sm);
+    if (ms !== null)
+      longestSegmentMs = Math.max(longestSegmentMs ?? 0, ms);
     if (name && ms !== null) times.set(name, (times.get(name) ?? 0) + ms);
   }
   // The API's subject sm field can be stale. The day log ls is the only
@@ -173,6 +176,7 @@ export function dayFrom(value: unknown, subjects: Subject[] = []): Day {
   return {
     date: log.dt,
     totalMs: number(log.sm)!,
+    longestSegmentMs,
     subjects: names.map((name) => ({
       title: name,
       ...(colors.has(name) ? { color: colors.get(name)! } : {}),
@@ -189,13 +193,24 @@ export function groupsFrom(reply: Record<string, unknown>): Group[] {
   if (!["gs", "ms", "cs", "ps"].some((key) => Array.isArray(reply[key])))
     throw new YptError("INVALID_DATA");
   const seen = new Set<number>();
+  const optionalText = (value: unknown, max: number) =>
+    typeof value === "string" && value.trim() && value.length <= max
+      ? value.trim() : null;
   return ["gs", "ms", "cs", "ps"]
     .flatMap((key) => array(reply[key]))
-    .map((g) => ({
-      id: number(g.id),
-      title: typeof g.t === "string" ? g.t : "",
-      capacity: number(g.mc),
-    }))
+    .map((g) => {
+      const category = optionalText(g.c, 100);
+      const owner = optionalText(g.on, 100);
+      const slogan = optionalText(g.sn, 500);
+      return {
+        id: number(g.id),
+        title: typeof g.t === "string" ? g.t : "",
+        capacity: number(g.mc),
+        ...(category ? { category } : {}),
+        ...(owner ? { owner } : {}),
+        ...(slogan ? { slogan } : {}),
+      };
+    })
     .filter(
       (g): g is Group =>
         g.id !== null &&

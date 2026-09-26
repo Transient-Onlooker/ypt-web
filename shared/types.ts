@@ -19,8 +19,16 @@ export type Day = {
   totalMs: number;
   subjects: Subject[];
   subjectTimesAvailable: boolean;
+  longestSegmentMs: number | null;
 };
-export type Group = { id: number; title: string; capacity: number | null };
+export type Group = {
+  id: number;
+  title: string;
+  capacity: number | null;
+  category?: string;
+  owner?: string;
+  slogan?: string;
+};
 export type Member = {
   id: number;
   nickname: string;

@@ -466,6 +466,29 @@ input[type="search"] {
   letter-spacing: -0.05em;
   color: #1b4430;
 }
+.history-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: -8px 0 24px;
+}
+.history-facts > div {
+  display: grid;
+  gap: 5px;
+  min-width: 145px;
+  padding: 12px 14px;
+  border: 1px solid #d8e8d8;
+  border-radius: 12px;
+  background: #f5faf4;
+}
+.history-facts span {
+  color: #617864;
+  font-size: 12px;
+}
+.history-facts strong {
+  font-variant-numeric: tabular-nums;
+  color: #1b4430;
+}
 .group-grid {
   display: grid;
   grid-template-columns: minmax(250px, 0.8fr) minmax(300px, 1.2fr);
@@ -495,6 +518,31 @@ input[type="search"] {
 .group-list span {
   color: #64806a;
   font-size: 14px;
+}
+.group-detail {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #dce8dc;
+  border-radius: 12px;
+  background: #f8fbf7;
+  overflow-wrap: anywhere;
+}
+.group-detail > strong {
+  color: #203b2a;
+}
+.group-detail p {
+  margin: 8px 0 0;
+  color: #49634f;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.group-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 9px;
+  color: #627967;
+  font-size: 13px;
 }
 .member-list {
   margin-top: 14px;
