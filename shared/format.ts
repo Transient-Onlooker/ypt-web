@@ -1,6 +1,43 @@
-import type { Day } from "./types.ts";
+import type { Day, Subject } from "./types.ts";
 
-export type TrendDay = { date: string; totalMs: number | null };
+export type TrendDay = {
+  date: string;
+  totalMs: number | null;
+  subjectTimesAvailable?: boolean;
+  subjects?: Subject[];
+};
+
+export type TrendSubject = {
+  title: string;
+  color?: string;
+  totalMs: number;
+  earlierMs: number;
+  recentMs: number;
+};
+
+export function summarizeTrendSubjects(days: TrendDay[], rangeDays: 7 | 14): TrendSubject[] | null {
+  if (days.length !== rangeDays || days.some((day) => day.totalMs === null ||
+    day.subjectTimesAvailable !== true || !Array.isArray(day.subjects) ||
+    day.subjects.some((subject) => subject.studyMs === null ||
+      !Number.isFinite(subject.studyMs) || subject.studyMs < 0))) return null;
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.some((day, index) => index > 0 &&
+    Date.parse(`${day.date}T00:00:00Z`) - Date.parse(`${sorted[index - 1].date}T00:00:00Z`) !== 86_400_000)) return null;
+  const byTitle = new Map<string, TrendSubject>();
+  sorted.forEach((day, index) => day.subjects?.forEach((subject) => {
+    const existing = byTitle.get(subject.title) ?? {
+      title: subject.title, color: subject.color, totalMs: 0, earlierMs: 0, recentMs: 0,
+    };
+    if (subject.color) existing.color = subject.color;
+    existing.totalMs += subject.studyMs ?? 0;
+    if (rangeDays === 14 && index < 7) existing.earlierMs += subject.studyMs ?? 0;
+    else existing.recentMs += subject.studyMs ?? 0;
+    byTitle.set(subject.title, existing);
+  }));
+  return [...byTitle.values()]
+    .filter((subject) => subject.totalMs > 0)
+    .sort((a, b) => b.totalMs - a.totalMs || a.title.localeCompare(b.title, "ko-KR"));
+}
 
 export function duration(ms: number | null | undefined) {
   if (ms == null) return "확인 중";
@@ -59,6 +96,22 @@ export function formatTrendCsv(days: TrendDay[]) {
     ...days.map((day) => [day.date,
       day.totalMs === null ? "" : duration(day.totalMs),
       day.totalMs === null ? "미확인" : "확인"]),
+  ];
+  return rows.map(csvRow).join("\r\n") + "\r\n";
+}
+
+export function formatTrendSubjectsCsv(days: TrendDay[], rangeDays: 7 | 14): string | null {
+  const subjects = summarizeTrendSubjects(days, rangeDays);
+  if (subjects === null) return null;
+  const titles = subjects.map((subject) => subject.title);
+  const rows = [
+    ["날짜", "완료 총시간", ...titles],
+    ...[...days].sort((a, b) => a.date.localeCompare(b.date)).map((day) => {
+      const times = new Map<string, number>();
+      day.subjects?.forEach((subject) =>
+        times.set(subject.title, (times.get(subject.title) ?? 0) + (subject.studyMs ?? 0)));
+      return [day.date, duration(day.totalMs), ...titles.map((title) => duration(times.get(title) ?? 0))];
+    }),
   ];
   return rows.map(csvRow).join("\r\n") + "\r\n";
 }

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
-import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak, compareVerifiedWeeks } from "../shared/format.ts";
+import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import { clearPersonalTools, StudyTools } from "./study-tools.tsx";
@@ -436,9 +436,10 @@ function CsvButton({ filename, csv, label }: { filename: string; csv: string; la
     {notice && <small role="status">{notice}</small>}
   </span>;
 }
-function HistoryTrend({ today, rangeDays, onRangeChange, previous, onLoaded, onSelect, loadDay }: {
+function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, onLoaded, onSelect, loadDay }: {
   today: Day;
   rangeDays: TrendRange;
+  goalMinutes: number;
   onRangeChange: (range: TrendRange) => void;
   previous: TrendDay[] | null;
   onLoaded: (days: TrendDay[]) => void;
@@ -466,11 +467,11 @@ function HistoryTrend({ today, rangeDays, onRangeChange, previous, onLoaded, onS
         const results = await Promise.allSettled(dates.map((date) => loadDay(date, previous !== null)));
         if (currentRequest !== requestId.current) return;
         results.forEach((result, index) => {
-          rows.push({
-            date: dates[index],
-            totalMs: result.status === "fulfilled" && result.value.date === dates[index]
-              ? result.value.totalMs : null,
-          });
+          const verified = result.status === "fulfilled" && result.value.date === dates[index]
+            ? result.value : null;
+          rows.push({ date: dates[index], totalMs: verified?.totalMs ?? null,
+            subjectTimesAvailable: verified?.subjectTimesAvailable,
+            subjects: verified?.subjects });
         });
       }
       if (currentRequest !== requestId.current) return;
@@ -486,7 +487,8 @@ function HistoryTrend({ today, rangeDays, onRangeChange, previous, onLoaded, onS
     }
   }
 
-  const days = previous && [...previous, { date: today.date, totalMs: today.totalMs }]
+  const days = previous && [...previous, { date: today.date, totalMs: today.totalMs,
+    subjectTimesAvailable: today.subjectTimesAvailable, subjects: today.subjects }]
     .sort((a, b) => a.date.localeCompare(b.date));
   const known = days?.filter((row) => row.totalMs !== null) ?? [];
   const maxMs = Math.max(1, ...known.map((row) => row.totalMs ?? 0));
@@ -496,6 +498,10 @@ function HistoryTrend({ today, rangeDays, onRangeChange, previous, onLoaded, onS
     !best || (row.totalMs ?? 0) > (best.totalMs ?? 0) ? row : best, null);
   const streak = days ? longestVerifiedStreak(days) : 0;
   const weekComparison = rangeDays === 14 && days ? compareVerifiedWeeks(days) : null;
+  const subjectSummary = days ? summarizeTrendSubjects(days, rangeDays) : null;
+  const subjectCsv = days ? formatTrendSubjectsCsv(days, rangeDays) : null;
+  const goalDays = goalMinutes > 0 ? known.filter((row) =>
+    (row.totalMs ?? 0) >= goalMinutes * 60_000).length : 0;
   return (
     <div className="history-trend">
       <div className="card-head">
@@ -529,7 +535,9 @@ function HistoryTrend({ today, rangeDays, onRangeChange, previous, onLoaded, onS
             {studyDays > 0 && bestDay && (
               <span>가장 많이 한 날 <strong>{bestDay.date.slice(5).replace("-", ".")} · {duration(bestDay.totalMs)}</strong></span>
             )}
+            {goalMinutes > 0 && <span>현재 하루 목표 달성 <strong>{goalDays}/{known.length}일</strong></span>}
           </div>
+          {goalMinutes > 0 && <p className="card-note">현재 설정한 하루 목표를 이 기간에 적용한 값입니다. 과거에 설정했던 목표는 알 수 없습니다.</p>}
           {rangeDays === 14 && (
             <p className="week-comparison">
               {weekComparison
@@ -545,6 +553,24 @@ function HistoryTrend({ today, rangeDays, onRangeChange, previous, onLoaded, onS
           )}
           <CsvButton filename={`ypt-${rangeDays}days-${today.date}.csv`}
             csv={formatTrendCsv(days)} label={`${rangeDays}일 기록 CSV 저장`} />
+          <div className="trend-subjects">
+            <div className="card-head"><span>기간 과목별 공부</span>
+              {subjectCsv && <CsvButton filename={`ypt-${rangeDays}days-subjects-${today.date}.csv`}
+                csv={subjectCsv} label="과목별 CSV 저장" />}
+            </div>
+            {subjectSummary === null ? <p className="card-note">모든 날짜의 과목 시간이 확인되면 과목별 누적 시간을 보여줍니다.</p>
+              : subjectSummary.length === 0 ? <p className="card-note">이 기간에 완료된 과목 공부가 없습니다.</p>
+              : <div className="trend-subject-list">{subjectSummary.map((subject) => <div className="trend-subject-row" key={subject.title}>
+                  <div className="trend-subject-label">
+                    <span className="subject-color" style={{ backgroundColor: subject.color || "#8aa494" }} aria-hidden="true" />
+                    <span>{subject.title}</span>
+                    <strong>{duration(subject.totalMs)}</strong>
+                  </div>
+                  <div className="trend-subject-track" aria-hidden="true"><span style={{ width: `${subject.totalMs / subjectSummary[0].totalMs * 100}%`, backgroundColor: subject.color || "#5b9a72" }} /></div>
+                  {rangeDays === 14 && <small>이전 7일 {duration(subject.earlierMs)} → 최근 7일 {duration(subject.recentMs)}</small>}
+                </div>)}</div>}
+            <p className="card-note">과목 이름이 바뀌었다면 기간 내에서는 서로 다른 과목명으로 집계합니다. 진행 중인 세션은 제외합니다.</p>
+          </div>
           <div className="week-list">
             {days.map((row) => (
               <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
@@ -1818,7 +1844,7 @@ function App() {
               )}
               {snapshot?.capabilities.history && snapshot.today && (
                 <HistoryTrend key={`${snapshot.today.date}:${trendRange}`} today={snapshot.today}
-                  rangeDays={trendRange} onRangeChange={setTrendRange}
+                  rangeDays={trendRange} goalMinutes={goalMinutes} onRangeChange={setTrendRange}
                   previous={trends[trendRange]?.todayDate === snapshot.today.date
                     ? trends[trendRange]?.days ?? null : null}
                   onLoaded={(days) => setTrends((old) => ({

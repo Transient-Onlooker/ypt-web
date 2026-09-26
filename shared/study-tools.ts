@@ -62,6 +62,26 @@ export function parsePlan(raw: string | null): PlanItem[] {
   }
 }
 
+export function previousCalendarDate(date: string): string {
+  const timestamp = Date.parse(`${date}T12:00:00Z`);
+  return Number.isFinite(timestamp)
+    ? new Date(timestamp - 86_400_000).toISOString().slice(0, 10) : "";
+}
+
+export function eligibleCarryOver(current: PlanItem[], previous: PlanItem[]): PlanItem[] {
+  const seen = new Set(current.map((item) => item.text.trim().toLocaleLowerCase("ko-KR")));
+  const eligible: PlanItem[] = [];
+  for (const item of previous) {
+    if (current.length + eligible.length >= 12) break;
+    if (item.done) continue;
+    const key = item.text.trim().toLocaleLowerCase("ko-KR");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    eligible.push(item);
+  }
+  return eligible;
+}
+
 export function parseInterval(raw: string | null): IntervalTimer {
   if (!raw) return freshInterval();
   try {

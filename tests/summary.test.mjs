@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak, compareVerifiedWeeks } from "../shared/format.ts";
+import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects } from "../shared/format.ts";
 
 test("copied summary includes completed time and only verified subject times", () => {
   const result = formatDaySummary({
@@ -85,4 +85,38 @@ test("two-week comparison requires every day to be verified", () => {
     totalMs: 1_000,
   }));
   assert.equal(compareVerifiedWeeks(withGap), null);
+});
+
+test("period subject totals use only complete verified days and compare the two weeks", () => {
+  const days = Array.from({ length: 14 }, (_, index) => ({
+    date: `2026-09-${String(index + 1).padStart(2, "0")}`,
+    totalMs: index < 7 ? 3_600_000 : 7_200_000,
+    subjectTimesAvailable: true,
+    subjects: [{ title: "수학", studyMs: index < 7 ? 3_600_000 : 7_200_000, color: "#123456" }],
+  }));
+  assert.deepEqual(summarizeTrendSubjects(days, 14), [{
+    title: "수학", color: "#123456", totalMs: 75_600_000,
+    earlierMs: 25_200_000, recentMs: 50_400_000,
+  }]);
+  assert.match(formatTrendSubjectsCsv(days, 14), /"날짜","완료 총시간","수학"/);
+  days[3].subjectTimesAvailable = false;
+  assert.equal(summarizeTrendSubjects(days, 14), null);
+  assert.equal(formatTrendSubjectsCsv(days, 14), null);
+  days[3].subjectTimesAvailable = true;
+  days[3].subjects[0].studyMs = null;
+  assert.equal(summarizeTrendSubjects(days, 14), null);
+});
+
+test("subject period CSV escapes an unsafe name and keeps verified absent subjects at zero", () => {
+  const days = Array.from({ length: 7 }, (_, index) => ({
+    date: `2026-09-${String(index + 1).padStart(2, "0")}`,
+    totalMs: index === 0 ? 1_000 : 0,
+    subjectTimesAvailable: true,
+    subjects: index === 0 ? [{ title: '=test("x")', studyMs: 1_000 }] : [],
+  }));
+  const csv = formatTrendSubjectsCsv(days, 7);
+  assert.match(csv, /"'=test\(""x""\)"/);
+  assert.match(csv, /"2026-09-02","00:00:00","00:00:00"/);
+  days[1].totalMs = null;
+  assert.equal(formatTrendSubjectsCsv(days, 7), null);
 });

@@ -1851,6 +1851,7 @@ input[type="search"] {
   color: var(--ink);
 }
 .plan-form button { min-height: 48px; padding: 8px 18px; }
+.plan-carry { margin-top: 8px; text-align: left; }
 .plan-progress {
   height: 9px;
   margin-top: 20px;
@@ -1933,4 +1934,27 @@ input[type="search"] {
 @media (max-width: 480px) {
   .plan-form { grid-template-columns: minmax(0, 1fr) 89px; }
   .plan-form button { grid-column: 1 / -1; }
+}
+
+.trend-subjects {
+  margin: 25px 0 22px;
+  padding: 18px;
+  border: 1px solid #dae7d7;
+  border-radius: 17px;
+  background: #f8fbf6;
+}
+.trend-subjects .card-head { display: flex; flex-wrap: wrap; gap: 8px; }
+.trend-subject-list { display: grid; gap: 15px; margin-top: 13px; }
+.trend-subject-row { display: grid; gap: 6px; }
+.trend-subject-label { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.trend-subject-label .subject-color { flex: none; }
+.trend-subject-label > span:nth-child(2) { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.trend-subject-label strong { flex: none; color: #245b37; font-variant-numeric: tabular-nums; }
+.trend-subject-track { height: 8px; overflow: hidden; border-radius: 99px; background: #e8eedf; }
+.trend-subject-track span { display: block; height: 100%; border-radius: inherit; }
+.trend-subject-row small { color: #5b7260; }
+.trend-subjects .card-note:last-child { margin-bottom: 0; }
+@media (max-width: 480px) {
+  .trend-subjects { padding: 14px; }
+  .trend-subject-label { flex-wrap: wrap; }
 }

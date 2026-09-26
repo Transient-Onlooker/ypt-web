@@ -1,12 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { freshInterval, intervalRemaining, parseInterval, parseIntervalSettings, parsePlan } from "../shared/study-tools.ts";
+import { eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings, parsePlan, previousCalendarDate } from "../shared/study-tools.ts";
 
 test("카운트다운은 탭이 멈췄다가 돌아와도 종료 시각으로 계산한다", () => {
   const timer = { ...freshInterval("focus"), endsAt: 1_500_000 };
   assert.equal(intervalRemaining(timer, 100_000), 1_400_000);
   assert.equal(intervalRemaining(timer, 1_500_000), 0);
   assert.equal(intervalRemaining(timer, 1_700_000), 0);
+});
+
+test("전날 미완료 계획만 중복 없이 오늘로 옮긴다", () => {
+  const previous = [
+    { id: "1", text: "수학", estimateMinutes: 25, done: true },
+    { id: "2", text: "영어", estimateMinutes: 45, done: false },
+    { id: "3", text: "국어", estimateMinutes: 30, done: false },
+  ];
+  assert.equal(previousCalendarDate("2026-03-01"), "2026-02-28");
+  assert.deepEqual(eligibleCarryOver([], previous).map((item) => item.text), ["영어", "국어"]);
+  assert.deepEqual(eligibleCarryOver([{ ...previous[1], text: " 영어 " }], previous)
+    .map((item) => item.text), ["국어"]);
+  assert.equal(eligibleCarryOver(Array.from({ length: 12 }, (_, index) =>
+    ({ ...previous[0], id: String(index), text: `과목 ${index}` })), previous).length, 0);
 });
 
 test("손상되거나 범위를 벗어난 세션 저장값은 버린다", () => {

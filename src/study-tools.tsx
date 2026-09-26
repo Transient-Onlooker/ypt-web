@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  freshInterval, intervalRemaining, parseInterval, parseIntervalSettings,
-  parsePlan, PLAN_ESTIMATES,
+  eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings,
+  parsePlan, PLAN_ESTIMATES, previousCalendarDate,
 } from "../shared/study-tools.ts";
 import type { IntervalPhase, IntervalSettings, IntervalTimer, PlanItem } from "../shared/study-tools.ts";
 
@@ -35,6 +35,8 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
   const intervalKey = `${STORAGE_PREFIX}interval-${date}`;
   const taskKey = `${STORAGE_PREFIX}task-${date}`;
   const [items, setItems] = useState<PlanItem[]>(() => parsePlan(stored(planKey)));
+  const [previousItems] = useState<PlanItem[]>(() => parsePlan(stored(
+    `${STORAGE_PREFIX}plan-${previousCalendarDate(date)}`)));
   const [activeTaskId, setActiveTaskId] = useState(() => stored(taskKey) ?? "");
   const [draft, setDraft] = useState("");
   const [estimate, setEstimate] = useState<number>(25);
@@ -68,6 +70,7 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
   const plannedMinutes = items.reduce((sum, item) => sum + item.estimateMinutes, 0);
   const completedMinutes = completed.reduce((sum, item) => sum + item.estimateMinutes, 0);
   const activeTask = items.find((item) => item.id === activeTaskId && !item.done);
+  const carryOver = eligibleCarryOver(items, previousItems);
   const remainingMs = intervalRemaining(timer, now);
   const active = timer.endsAt !== null && remainingMs > 0;
 
@@ -122,6 +125,11 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
         </select>
         <button className="secondary" type="submit" disabled={!draft.trim() || items.length >= 12}>추가</button>
       </form>
+      {carryOver.length > 0 && <button className="text-button plan-carry" type="button"
+        onClick={() => setItems((old) => [...old, ...eligibleCarryOver(old, previousItems).map((item) =>
+          ({ ...item, id: crypto.randomUUID(), done: false }))])}>
+        어제 미완료 {carryOver.length}개 이어가기
+      </button>}
       {items.length > 0 ? <>
         <div className="plan-progress" role="progressbar" aria-label="완료한 계획" aria-valuenow={completed.length} aria-valuemin={0} aria-valuemax={items.length}>
           <span style={{ width: `${completed.length / items.length * 100}%` }} />
