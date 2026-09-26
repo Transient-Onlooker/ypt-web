@@ -5,6 +5,7 @@ import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, longestVerifiedStreak, compareVerifiedWeeks } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
+import { clearPersonalTools, StudyTools } from "./study-tools.tsx";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
@@ -873,6 +874,7 @@ function App() {
       if (!snapshotGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
         return;
       if ((cause as ApiError).status === 401) {
+        clearPersonalTools();
         authEpoch.current++;
         snapshotGate.current.invalidate();
         groupGate.current.invalidate();
@@ -927,6 +929,7 @@ function App() {
       .then((result) => {
         if (!active) return;
         csrf = result.csrf ?? "";
+        if (!result.authenticated) clearPersonalTools();
         setSessionLoadError(false);
         setSession(result);
         if (result.authenticated) void loadSnapshot();
@@ -1174,6 +1177,7 @@ function App() {
       );
     } finally {
       if (clearLocalSession) {
+        clearPersonalTools();
         authEpoch.current++;
         historyCache.current.clear();
         historyRequests.current.clear();
@@ -1241,6 +1245,7 @@ function App() {
       <Login
         notice={loginNotice}
         onLogin={async (warning) => {
+          clearPersonalTools();
           authEpoch.current++;
           snapshotGate.current.invalidate();
           groupGate.current.invalidate();
@@ -1468,6 +1473,7 @@ function App() {
             </div>
           )}
           {tab === "study" && (
+            <>
             <div className="study-grid">
               <section className="timer-card">
                 <div className="card-head">
@@ -1696,6 +1702,8 @@ function App() {
                 )}
               </section>
             </div>
+            {snapshot?.today && <StudyTools key={snapshot.today.date} date={snapshot.today.date} now={now} />}
+            </>
           )}
           {tab === "history" && (
             <section className="history-card" id="history-top">
