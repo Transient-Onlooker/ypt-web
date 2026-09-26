@@ -6,6 +6,9 @@ import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSu
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import { clearPersonalTools, StudyTools } from "./study-tools.tsx";
+import { freshPomodoro, nextPomodoro, parsePomodoro, pausePomodoro, pomodoroRemaining, runPomodoro, shouldAdvancePomodoro } from "../shared/pomodoro.ts";
+import type { Pomodoro } from "../shared/pomodoro.ts";
+import { parseIntervalSettings } from "../shared/study-tools.ts";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
@@ -27,6 +30,10 @@ const GOAL_MINUTES = [0, 30, 60, 90, 120, 180, 240, 360, 480, 600, 720] as const
 const HISTORY_CACHE_MS = 5 * 60_000;
 const SYNC_STORAGE_KEY = "ypt-web-sync-seconds";
 const GOAL_STORAGE_KEY = "ypt-web-daily-goal-minutes";
+const THEME_STORAGE_KEY = "ypt-web-theme";
+const POMODORO_MODE_KEY = "ypt-web-pomodoro-mode";
+const POMODORO_KEY = "ypt-web-personal-tools-pomodoro";
+const POMODORO_SETTINGS_KEY = "ypt-web-personal-tools-settings";
 const REMEMBERED_EMAIL_KEY = "ypt-web-remembered-email";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const CROSS_ORIGIN_API = API_BASE_URL !== "" &&
@@ -154,6 +161,10 @@ function goalLabel(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return hours && rest ? `${hours}시간 ${rest}분` : hours ? `${hours}시간` : `${rest}분`;
+}
+function countdown(ms: number) {
+  const seconds = Math.ceil(ms / 1000);
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 function DailyGoal({ minutes, onChange, recordedMs, liveMs }: {
   minutes: number;
@@ -308,74 +319,6 @@ function shiftDate(date: string, days: number) {
 function shortDayLabel(date: string) {
   const weekday = "일월화수목금토"[new Date(`${date}T00:00:00Z`).getUTCDay()];
   return `${date.slice(5).replace("-", ".")} · ${weekday}`;
-}
-function YesterdayCompare({ today, cached, loadDay, onOpen }: {
-  today: Day;
-  cached: Day | null;
-  loadDay: (date: string, force?: boolean) => Promise<Day>;
-  onOpen: (date: string) => void;
-}) {
-  const yesterdayDate = shiftDate(today.date, -1);
-  const [yesterday, setYesterday] = useState<Day | null>(cached);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const requestId = useRef(0);
-  useEffect(() => () => { requestId.current++; }, []);
-
-  async function load() {
-    if (loading) return;
-    const currentRequest = ++requestId.current;
-    setLoading(true);
-    setError("");
-    try {
-      const result = await loadDay(yesterdayDate, yesterday !== null);
-      if (currentRequest === requestId.current) setYesterday(result);
-    } catch (cause) {
-      if (currentRequest === requestId.current)
-        setError(cause instanceof Error ? cause.message : "어제 기록을 확인하지 못했습니다.");
-    } finally {
-      if (currentRequest === requestId.current) setLoading(false);
-    }
-  }
-
-  const difference = yesterday ? today.totalMs - yesterday.totalMs : 0;
-  return (
-    <div className="yesterday-compare">
-      <div className="card-head">
-        <span>어제와 비교</span>
-        <button className="text-button" disabled={loading} onClick={() => void load()}>
-          {loading ? "확인 중…" : yesterday ? "다시 확인" : "어제 기록 보기"}
-        </button>
-      </div>
-      {error && (
-        <p className="error" role="alert">
-          {error}{yesterday && " 이전 비교가 표시될 수 있습니다."}
-        </p>
-      )}
-      {yesterday ? (
-        <>
-          <div className="comparison-times">
-            <span>어제 · {yesterdayDate.slice(5).replace("-", ".")}
-              <strong>{duration(yesterday.totalMs)}</strong></span>
-            <span>오늘 · {today.date.slice(5).replace("-", ".")}
-              <strong>{duration(today.totalMs)}</strong></span>
-          </div>
-          <p className="comparison-message">
-            {difference > 0
-              ? `오늘 완료 기록이 어제보다 ${duration(difference)} 많아요.`
-              : difference < 0
-                ? `어제 완료 기록까지 ${duration(-difference)} 남았어요.`
-                : "어제와 오늘의 완료 기록이 같아요."}
-          </p>
-          <button className="text-button" onClick={() => onOpen(yesterdayDate)}>
-            어제 상세 기록 보기 →
-          </button>
-        </>
-      ) : !loading && !error ? (
-        <p className="card-note">누르면 어제의 완료 기록을 조회해 오늘과 비교합니다.</p>
-      ) : null}
-    </div>
-  );
 }
 function CopyDayButton({ day }: { day: Day }) {
   const [notice, setNotice] = useState("");
@@ -631,12 +574,21 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
     </div>
   );
 }
+function ThemeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
+  return <button className="theme-toggle" type="button" onClick={onToggle}
+    aria-label={dark ? "라이트 모드로 변경" : "다크 모드로 변경"}
+    aria-pressed={dark}>{dark ? "☀ 밝게" : "☾ 어둡게"}</button>;
+}
 function Login({
   onLogin,
   notice,
+  darkMode,
+  onToggleTheme,
 }: {
   onLogin: (rememberWarning: string) => Promise<void>;
   notice: string;
+  darkMode: boolean;
+  onToggleTheme: () => void;
 }) {
   const [initialEmail] = useState(savedEmail);
   const [keepEmail, setKeepEmail] = useState(Boolean(initialEmail));
@@ -699,6 +651,7 @@ function Login({
   return (
     <div className="login-page">
       <div className="login-card">
+        <div className="login-theme"><ThemeToggle dark={darkMode} onToggle={onToggleTheme} /></div>
         <div className="brand-mark" aria-hidden="true">
           Y
         </div>
@@ -782,6 +735,27 @@ function App() {
   const [tab, setTab] = useState<Tab>("study");
   const [syncSeconds, setSyncSeconds] = useState(savedSyncSeconds);
   const [goalMinutes, setGoalMinutes] = useState(savedGoalMinutes);
+  const [darkMode, setDarkMode] = useState(() => {
+    try { return localStorage.getItem(THEME_STORAGE_KEY) === "dark"; }
+    catch { return false; }
+  });
+  const [pomodoroMode, setPomodoroMode] = useState(() => {
+    try { return localStorage.getItem(POMODORO_MODE_KEY) === "pomodoro"; }
+    catch { return false; }
+  });
+  const [pomodoroSettings, setPomodoroSettings] = useState(() => {
+    try { return parseIntervalSettings(sessionStorage.getItem(POMODORO_SETTINGS_KEY)); }
+    catch { return parseIntervalSettings(null); }
+  });
+  const [pomodoroDraft, setPomodoroDraft] = useState(() => ({
+    focus: String(pomodoroSettings.focus), short: String(pomodoroSettings.short),
+  }));
+  const [pomodoro, setPomodoro] = useState<Pomodoro>(() => {
+    try { return parsePomodoro(sessionStorage.getItem(POMODORO_KEY)); }
+    catch { return freshPomodoro(); }
+  });
+  const [pomodoroError, setPomodoroError] = useState("");
+  const [focusTask, setFocusTask] = useState("");
   const [keepScreenOn, setKeepScreenOn] = useState(false);
   const [screenAwake, setScreenAwake] = useState(false);
   const [wakeError, setWakeError] = useState("");
@@ -810,6 +784,8 @@ function App() {
   const [memberSort, setMemberSort] = useState<MemberSort>("time");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
   const inFlight = useRef(false);
+  const pomodoroAction = useRef(false);
+  const lastVisibleAt = useRef(0);
   const authEpoch = useRef(0);
   const snapshotGate = useRef(new RequestGate());
   const groupGate = useRef(new RequestGate());
@@ -825,6 +801,31 @@ function App() {
   const forceHistoryDate = useRef<string | null>(null);
   const wakeRunning = (snapshot?.timer.state === "running" && snapshot.timer.startedAt !== null) ||
     (snapshot?.timer.state === "idle" && snapshot.remoteStatus === "running" && snapshot.remoteStartedAt !== null);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", darkMode ? "#101b18" : "#172b25");
+    try { localStorage.setItem(THEME_STORAGE_KEY, darkMode ? "dark" : "light"); }
+    catch { /* Keep the choice in this page. */ }
+  }, [darkMode]);
+  useEffect(() => {
+    try { localStorage.setItem(POMODORO_MODE_KEY, pomodoroMode ? "pomodoro" : "normal"); }
+    catch { /* Keep the choice in this page. */ }
+  }, [pomodoroMode]);
+  useEffect(() => {
+    if (["running", "paused", "transition"].includes(pomodoro.status) && !pomodoroMode)
+      setPomodoroMode(true);
+  }, [pomodoro.status, pomodoroMode]);
+  useEffect(() => {
+    if (!session?.authenticated) return;
+    try { sessionStorage.setItem(POMODORO_KEY, JSON.stringify(pomodoro)); }
+    catch { /* Keep the cycle in this page. */ }
+  }, [pomodoro, session?.authenticated]);
+  useEffect(() => {
+    if (!session?.authenticated) return;
+    try { sessionStorage.setItem(POMODORO_SETTINGS_KEY, JSON.stringify(pomodoroSettings)); }
+    catch { /* Keep the setting in this page. */ }
+  }, [pomodoroSettings, session?.authenticated]);
 
   useEffect(() => {
     if (snapshot && !wakeRunning) setKeepScreenOn(false);
@@ -938,11 +939,17 @@ function App() {
       setNow(Date.now());
       setSnapshotCheckedAt(Date.now());
       setError("");
+      return result;
     } catch (cause) {
       if (!snapshotGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
         return;
       if ((cause as ApiError).status === 401) {
         clearPersonalTools();
+        setPomodoro(freshPomodoro());
+        setPomodoroSettings(parseIntervalSettings(null));
+        setPomodoroDraft({ focus: "25", short: "5" });
+        setPomodoroError("");
+        setFocusTask("");
         authEpoch.current++;
         snapshotGate.current.invalidate();
         groupGate.current.invalidate();
@@ -990,6 +997,7 @@ function App() {
       if (snapshotGate.current.finish(requestId) && epoch === authEpoch.current)
         setRefreshingSnapshot(false);
     }
+    return null;
   }, []);
   useEffect(() => {
     let active = true;
@@ -997,7 +1005,12 @@ function App() {
       .then((result) => {
         if (!active) return;
         csrf = result.csrf ?? "";
-        if (!result.authenticated) clearPersonalTools();
+        if (!result.authenticated) {
+          clearPersonalTools();
+          setPomodoro(freshPomodoro());
+          setPomodoroSettings(parseIntervalSettings(null));
+          setPomodoroDraft({ focus: "25", short: "5" });
+        }
         setSessionLoadError(false);
         setSession(result);
         if (result.authenticated) void loadSnapshot();
@@ -1031,7 +1044,10 @@ function App() {
   useEffect(() => {
     if (!session?.authenticated) return;
     const onVisible = () => {
-      if (document.visibilityState === "visible") void loadSnapshot();
+      if (document.visibilityState === "visible") {
+        lastVisibleAt.current = Date.now();
+        void loadSnapshot();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     const interval = setInterval(onVisible, syncSeconds * 1000);
@@ -1198,8 +1214,8 @@ function App() {
   }, [snapshot?.timer.state, snapshot?.timer.startedAt, tab, selectedGroup, session?.authenticated, loadMembers]);
   async function change(
     action: "start" | "pause" | "resume" | "stop" | "resolve",
-  ) {
-    if (!snapshot || inFlight.current) return;
+  ): Promise<Snapshot | null> {
+    if (!snapshot || inFlight.current) return null;
     const epoch = authEpoch.current;
     inFlight.current = true;
     setBusy(true);
@@ -1216,21 +1232,53 @@ function App() {
               subject: selectedSubject,
             },
       );
-      if (epoch !== authEpoch.current) return;
-      await loadSnapshot(true);
+      if (epoch !== authEpoch.current) return null;
+      return await loadSnapshot(true) ?? null;
     } catch (cause) {
-      if (epoch !== authEpoch.current) return;
+      if (epoch !== authEpoch.current) return null;
       await loadSnapshot(true);
       setError(
         cause instanceof Error
           ? cause.message
           : "타이머 결과를 확인하지 못했습니다.",
       );
+      return null;
     } finally {
       inFlight.current = false;
       setBusy(false);
     }
   }
+  async function pomodoroMutation(action: "start" | "pause" | "resume" | "stop", next: (timer: Pomodoro, now: number) => Pomodoro) {
+    if (pomodoroAction.current || busy) return;
+    pomodoroAction.current = true;
+    const current = pomodoro;
+    setPomodoro({ ...current, remainingMs: pomodoroRemaining(current, Date.now()), endsAt: null, status: "transition" });
+    const result = await change(action);
+    const expected = action === "start" || action === "resume" ? "running" : action === "pause" ? "paused" : "idle";
+    if (result?.timer.state === expected && result.remoteStatus !== "unverified") {
+      setPomodoro(next(current, Date.now()));
+      setPomodoroError("");
+    } else {
+      setPomodoro((old) => ({ ...old, status: "halted" }));
+      setPomodoroError("열품타 상태를 확실히 확인하지 못해 자동 전환을 멈췄습니다. 앱과 웹 상태를 확인한 뒤 뽀모도로를 초기화해 주세요.");
+    }
+    pomodoroAction.current = false;
+  }
+  useEffect(() => {
+    if (!session?.authenticated || !pomodoroMode || !snapshot || pomodoro.status === "idle" ||
+      pomodoro.status === "transition" || pomodoro.status === "halted" || pomodoroAction.current) return;
+    const expected = pomodoro.phase === "focus" && pomodoro.status === "running" ? "running" : "paused";
+    if (snapshot.timer.state !== expected || snapshot.remoteStatus === "unverified") {
+      setPomodoro((old) => ({ ...old, status: "halted", remainingMs: pomodoroRemaining(old, Date.now()), endsAt: null }));
+      setPomodoroError("열품타 타이머 상태가 바뀌어 뽀모도로 자동 전환을 멈췄습니다. 상태를 확인하고 초기화해 주세요.");
+      return;
+    }
+    if (!shouldAdvancePomodoro(pomodoro, now, document.visibilityState === "visible",
+      snapshotCheckedAt, lastVisibleAt.current) || busy) return;
+    const action = pomodoro.phase === "focus" ? "pause" : "resume";
+    void pomodoroMutation(action, (current, finishedAt) =>
+      nextPomodoro(current, finishedAt, pomodoroSettings.focus, pomodoroSettings.short));
+  }, [now, pomodoro, snapshot, snapshotCheckedAt, busy, session?.authenticated, pomodoroMode, pomodoroSettings]);
   async function logout() {
     if (loggingOut || busy) return;
     setLoggingOut(true);
@@ -1279,6 +1327,11 @@ function App() {
         setHistoryError("");
         setDay(null);
         setSelectedSubject("");
+        setPomodoro(freshPomodoro());
+        setPomodoroSettings(parseIntervalSettings(null));
+        setPomodoroDraft({ focus: "25", short: "5" });
+        setPomodoroError("");
+        setFocusTask("");
         setDate("");
         setTab("study");
         setLoginNotice("");
@@ -1312,8 +1365,12 @@ function App() {
     return (
       <Login
         notice={loginNotice}
+        darkMode={darkMode}
+        onToggleTheme={() => setDarkMode((old) => !old)}
         onLogin={async (warning) => {
           clearPersonalTools();
+          setPomodoro(freshPomodoro(pomodoroSettings.focus));
+          setPomodoroError("");
           authEpoch.current++;
           snapshotGate.current.invalidate();
           groupGate.current.invalidate();
@@ -1339,6 +1396,7 @@ function App() {
   const appOnly = timer?.state === "idle" && remoteActive;
   const running =
     (timer?.state === "running" && timer.startedAt !== null) || appOnly;
+  const pomodoroActive = pomodoroMode && ["running", "paused", "transition"].includes(pomodoro.status);
   const liveMs = running
     ? Math.max(
         0,
@@ -1362,10 +1420,6 @@ function App() {
   const displayedDay = date === snapshot?.today.date
     ? snapshot.today
     : day?.date === date ? day : null;
-  const yesterdayDate = snapshot?.today ? shiftDate(snapshot.today.date, -1) : null;
-  const yesterdayCache = yesterdayDate ? historyCache.current.get(yesterdayDate) : null;
-  const cachedYesterday = yesterdayCache && Date.now() - yesterdayCache.checkedAt < HISTORY_CACHE_MS
-    ? yesterdayCache.day : null;
   const selectedGroupDetails = groups?.find((group) => group.id === selectedGroup);
   const shownMembers = selectedGroup !== null && lastMemberGroup.current === selectedGroup
     ? members : null;
@@ -1458,7 +1512,8 @@ function App() {
                 {timer?.subject || snapshot?.remoteSubject}
               </span>
             )}
-            {running && <strong>{duration(liveMs)}</strong>}
+            {pomodoroActive ? <strong>{pomodoro.phase === "focus" ? "집중" : "휴식"} {countdown(pomodoroRemaining(pomodoro, now))}</strong>
+              : running && <strong>{duration(liveMs)}</strong>}
           </div>
           <button
             className="desktop-logout"
@@ -1475,16 +1530,16 @@ function App() {
               <button onClick={() => setRememberWarning("")} aria-label="안내 닫기">×</button>
             </div>
           )}
-          {tab !== "study" && running && (
+          {tab !== "study" && (running || pomodoroActive) && (
             <div className="active-strip">
               <div>
                 <span className="active-strip-label">
-                  {status}
+                  {pomodoroActive ? pomodoro.phase === "focus" ? "뽀모도로 집중" : "뽀모도로 휴식" : status}
                   {timer?.subject || snapshot?.remoteSubject
                     ? ` · ${timer?.subject || snapshot?.remoteSubject}`
                     : ""}
                 </span>
-                <strong>{duration(liveMs)}</strong>
+                <strong>{pomodoroActive ? countdown(pomodoroRemaining(pomodoro, now)) : duration(liveMs)}</strong>
               </div>
               <button className="secondary" onClick={() => setTab("study")}
               >
@@ -1508,7 +1563,9 @@ function App() {
                 {tab === "study" ? "오늘의 집중을 이어가세요." : tab === "history" ? "쌓인 시간을 한눈에 확인하세요." : "함께 공부하는 사람들을 만나보세요."}
               </p>
             </div>
-            <label className="sync-control" htmlFor="sync-seconds" title="타이머 상태와 선택한 그룹 멤버의 서버 조회 주기입니다. 화면의 시간 표시는 매초 갱신됩니다.">
+            <div className="page-controls">
+              <ThemeToggle dark={darkMode} onToggle={() => setDarkMode((old) => !old)} />
+              <label className="sync-control" htmlFor="sync-seconds" title="타이머 상태와 선택한 그룹 멤버의 서버 조회 주기입니다. 화면의 시간 표시는 매초 갱신됩니다.">
               자동 동기화
               <select
                 id="sync-seconds"
@@ -1528,7 +1585,8 @@ function App() {
                   <option key={seconds} value={seconds}>{seconds}초</option>
                 ))}
               </select>
-            </label>
+              </label>
+            </div>
           </div>
           {error && (
             <div className="error-banner" role="alert">
@@ -1552,23 +1610,37 @@ function App() {
                     {refreshingSnapshot ? "확인 중…" : "상태 새로고침"}
                   </button>
                 </div>
+                <div className="timer-mode" role="group" aria-label="타이머 방식">
+                  <button type="button" aria-pressed={!pomodoroMode} disabled={pomodoroActive}
+                    onClick={() => setPomodoroMode(false)}>일반 타이머</button>
+                  <button type="button" aria-pressed={pomodoroMode} disabled={pomodoroActive}
+                    onClick={() => setPomodoroMode(true)}>뽀모도로</button>
+                </div>
                 <div className={`timer-face ${running ? "is-running" : ""}`}>
                   <div className="timer-face-inner">
-                    <span className="timer-face-kicker">나의 집중 시간</span>
+                    <span className="timer-face-kicker">{pomodoroActive
+                      ? pomodoro.phase === "focus" ? `집중 ${pomodoro.rounds + 1}회차` : `휴식 ${pomodoro.rounds}회차`
+                      : "나의 집중 시간"}</span>
                     <div className="timer-display" aria-live="off">
-                      {running
+                      {pomodoroActive
+                        ? countdown(pomodoroRemaining(pomodoro, now))
+                        : running
                         ? duration(liveMs)
                         : timer?.state === "paused"
                           ? "--:--:--"
                           : "00:00:00"}
                     </div>
                     <div className="timer-caption">
-                      {status}
+                      {pomodoroActive ? pomodoro.status === "transition" ? "열품타 상태 확인 중…"
+                        : pomodoro.phase === "break" ? pomodoro.status === "paused" ? "휴식 잠시 멈춤 · 열품타 일시정지" : "휴식 중 · 열품타 일시정지"
+                        : pomodoro.status === "paused" ? "집중 일시정지" : "열품타 공부 중" : status}
                       {timer?.subject ? ` · ${timer.subject}` : ""}
                     </div>
+                    {pomodoroActive && pomodoro.phase === "focus" && focusTask &&
+                      <span className="pomodoro-task">{focusTask}</span>}
                   </div>
                 </div>
-                {timer?.state === "idle" && !appOnly && (
+                {timer?.state === "idle" && !appOnly && !pomodoroActive && (
                   <div className="form-area">
                     <label htmlFor="subject">과목</label>
                     <div className="subject-select">
@@ -1596,16 +1668,36 @@ function App() {
                   </div>
                 )}
                 <div className="timer-actions">
-                  {timer?.state === "idle" && !appOnly && (
+                  {timer?.state === "idle" && !appOnly && !pomodoroActive && (
                     <button
                       className="primary"
                       disabled={busy || !selectedSubject || remoteUnverified}
-                      onClick={() => void change("start")}
+                      onClick={() => pomodoroMode
+                        ? void pomodoroMutation("start", (_old, at) => runPomodoro(freshPomodoro(pomodoroSettings.focus), at))
+                        : void change("start")}
                     >
-                      공부 시작
+                      {pomodoroMode ? "뽀모도로 시작" : "공부 시작"}
                     </button>
                   )}
-                  {timer?.state === "running" && (
+                  {pomodoroActive && pomodoro.status !== "transition" && <>
+                    <button className="primary" type="button" disabled={busy || remoteUnverified}
+                      onClick={() => {
+                        if (pomodoro.phase === "break") {
+                          setPomodoro((old) => old.status === "running"
+                            ? pausePomodoro(old, Date.now()) : runPomodoro(old, Date.now()));
+                        } else {
+                          void pomodoroMutation(pomodoro.status === "running" ? "pause" : "resume",
+                            (old, at) => old.status === "running" ? pausePomodoro(old, at) : runPomodoro(old, at));
+                        }
+                      }}>
+                      {pomodoro.status === "running" ? "잠시 멈춤" : "계속"}
+                    </button>
+                    <button className="secondary" type="button" disabled={busy}
+                      onClick={() => void pomodoroMutation("stop", () => freshPomodoro(pomodoroSettings.focus))}>
+                      공부 끝내기
+                    </button>
+                  </>}
+                  {!pomodoroActive && timer?.state === "running" && (
                     <>
                       <button
                         className="primary"
@@ -1623,7 +1715,7 @@ function App() {
                       </button>
                     </>
                   )}
-                  {timer?.state === "paused" && (
+                  {!pomodoroActive && timer?.state === "paused" && (
                     <>
                       <button
                         className="primary"
@@ -1656,6 +1748,40 @@ function App() {
                       </button>
                     )}
                 </div>
+                {pomodoroMode && <>
+                  <p className="pomodoro-note" role="status">{pomodoroError || (pomodoro.status === "halted"
+                    ? "이전 전환 결과를 확인할 수 없어 자동화를 멈췄습니다. 앱과 웹 상태를 확인한 뒤 초기화해 주세요."
+                    : pomodoroActive
+                      ? pomodoro.phase === "focus" ? "집중 종료 시 열품타를 일시정지합니다." : "휴식 종료 시 열품타를 재개합니다."
+                      : "집중과 휴식이 열품타 공부 타이머에 연결됩니다.")}</p>
+                  {pomodoro.status === "halted" && <button className="secondary pomodoro-reset" type="button"
+                    onClick={() => { setPomodoro(freshPomodoro(pomodoroSettings.focus)); setPomodoroError(""); }}>
+                    뽀모도로 초기화
+                  </button>}
+                  <details className="pomodoro-settings">
+                    <summary>집중·휴식 길이</summary>
+                    <form onSubmit={(event) => {
+                      event.preventDefault();
+                      const focus = Number(pomodoroDraft.focus);
+                      const short = Number(pomodoroDraft.short);
+                      if (!Number.isInteger(focus) || focus < 5 || focus > 180 ||
+                        !Number.isInteger(short) || short < 1 || short > 60) {
+                        setPomodoroError("집중은 5~180분, 휴식은 1~60분으로 입력해 주세요.");
+                        return;
+                      }
+                      setPomodoroSettings((old) => ({ ...old, focus, short }));
+                      if (pomodoro.status === "idle") setPomodoro(freshPomodoro(focus));
+                      setPomodoroError("");
+                    }}>
+                      <label>집중 <input type="number" inputMode="numeric" min="5" max="180" value={pomodoroDraft.focus}
+                        onChange={(event) => setPomodoroDraft((old) => ({ ...old, focus: event.target.value }))} /> 분</label>
+                      <label>휴식 <input type="number" inputMode="numeric" min="1" max="60" value={pomodoroDraft.short}
+                        onChange={(event) => setPomodoroDraft((old) => ({ ...old, short: event.target.value }))} /> 분</label>
+                      <button className="secondary" type="submit">적용</button>
+                    </form>
+                    <p>진행 중 변경한 길이는 다음 구간부터 적용됩니다. 자동 전환은 웹 화면이 보일 때만 실행됩니다. 화면을 닫아도 열품타 타이머는 자동 종료되지 않습니다.</p>
+                  </details>
+                </>}
                 {wakeRunning && <div className="screen-awake-control">
                   <button className="secondary" type="button"
                     disabled={!window.isSecureContext || !("wakeLock" in navigator)}
@@ -1746,15 +1872,6 @@ function App() {
                     <small>완료된 기록과 별도로 표시합니다.</small>
                   </div>
                 )}
-                {snapshot?.capabilities.history && snapshot.today && (
-                  <YesterdayCompare key={snapshot.today.date} today={snapshot.today}
-                    cached={cachedYesterday}
-                    loadDay={getHistoryDay}
-                    onOpen={(selectedDate) => {
-                      setDate(selectedDate);
-                      setTab("history");
-                    }} />
-                )}
                 {snapshot?.today && <SubjectBreakdown day={snapshot.today}
                   empty={snapshot.today.subjectTimesAvailable
                     ? "오늘 기록된 과목 시간이 없습니다."
@@ -1766,7 +1883,7 @@ function App() {
               </section>
             </div>
             {snapshot?.today && <StudyTools key={snapshot.today.date} date={snapshot.today.date}
-              now={now} today={snapshot.today} subjects={snapshot.subjects} />}
+              today={snapshot.today} subjects={snapshot.subjects} onFocusTaskChange={setFocusTask} />}
             </>
           )}
           {tab === "history" && (
@@ -2051,7 +2168,6 @@ function App() {
                   <p className="checked-time">
                     마지막 확인{" "}
                     {new Date(groupCheckedAt).toLocaleTimeString("ko-KR")}
-                    {" · "}화면이 보일 때 {syncSeconds}초마다 자동 확인
                   </p>
                 )}
                 {visibleMembers?.length ? (
