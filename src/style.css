@@ -286,16 +286,6 @@ h1 {
   color: #4f6959;
   margin: 12px 0 40px;
 }
-.focus-milestone {
-  width: fit-content;
-  margin: -24px 0 26px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #edf7d8;
-  color: #345b20;
-  font-size: 13px;
-  font-weight: 700;
-}
 .form-area {
   display: grid;
   gap: 9px;
@@ -1366,11 +1356,6 @@ h1 {
   color: #d8ebda;
   font-size: 14px;
   overflow-wrap: anywhere;
-}
-.focus-milestone {
-  margin: 16px auto 0;
-  background: #d9f28f;
-  color: #173427;
 }
 .form-area {
   margin-bottom: 15px;

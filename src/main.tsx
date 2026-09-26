@@ -155,12 +155,6 @@ function goalLabel(minutes: number) {
   const rest = minutes % 60;
   return hours && rest ? `${hours}시간 ${rest}분` : hours ? `${hours}시간` : `${rest}분`;
 }
-function focusMilestone(ms: number) {
-  if (ms >= 90 * 60_000) return "🎉 현재 타이머 90분 돌파";
-  if (ms >= 50 * 60_000) return "✦ 현재 타이머 50분 돌파";
-  if (ms >= 25 * 60_000) return "✦ 현재 타이머 25분 돌파";
-  return null;
-}
 function DailyGoal({ minutes, onChange, recordedMs, liveMs }: {
   minutes: number;
   onChange: (minutes: number) => void;
@@ -1386,8 +1380,6 @@ function App() {
     now - timer.updatedAt < PENDING_RECOVERY_MS;
   const statusStale =
     snapshotCheckedAt !== null && now - snapshotCheckedAt > 45_000;
-  const focusMessage = running && !statusStale && !remoteUnverified
-    ? focusMilestone(liveMs) : null;
   const visibleMembers = shownMembers
     ?.filter((member) => {
       const matchesName = member.nickname
@@ -1574,9 +1566,6 @@ function App() {
                       {status}
                       {timer?.subject ? ` · ${timer.subject}` : ""}
                     </div>
-                    {focusMessage && (
-                      <p className="focus-milestone">{focusMessage}</p>
-                    )}
                   </div>
                 </div>
                 {timer?.state === "idle" && !appOnly && (
