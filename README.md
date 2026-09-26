@@ -1,6 +1,6 @@
 # YPT Web
 
-현재 버전: **v0.8.0 · 최근 7일 기록**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
+현재 버전: **v0.8.1 · 모바일 사용성 개선**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 웹 클라이언트입니다. 별도 서비스 가입이나 허용 목록은 없습니다. 화면은 React·Vite로 만들고 GitHub Pages에서 제공하며, Cloudflare Worker가 열품타 API를 중계하고 D1에 웹 세션과 타이머 상태를 보관합니다.
 
@@ -11,6 +11,8 @@
 3. **기록**에서 날짜별 총시간과 과목별 시간을, **그룹**에서 가입 그룹과 멤버의 공부 상태를 확인합니다.
 
 앱에서 시작한 타이머도 웹에 동기화됩니다. 화면을 닫아도 공부가 자동 종료되지 않습니다. 화면의 **자동 동기화**에서 확인 주기를 10·15·30·60·120초로 바꿀 수 있으며 기본값은 15초입니다.
+
+휴대폰에서는 상단에 타이머 상태가 고정되고 아래 탭으로 공부·기록·그룹을 전환합니다. 탭을 바꾸면 화면 맨 위로 이동하며, 기록의 7일 그래프에서 날짜를 누르면 해당 날짜의 상세 기록으로 이동합니다.
 
 ## 로컬 실행
 

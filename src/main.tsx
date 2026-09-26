@@ -423,6 +423,13 @@ function App() {
     null,
   );
   const previousTimerKey = useRef<string | null>(null);
+  const previousTab = useRef<Tab>("study");
+
+  useEffect(() => {
+    if (previousTab.current === tab) return;
+    previousTab.current = tab;
+    window.scrollTo(0, 0);
+  }, [tab]);
 
   const loadSnapshot = useCallback(async () => {
     const requestId = ++snapshotRequest.current;
@@ -840,6 +847,7 @@ function App() {
     });
   return (
     <div className="shell">
+      <a className="skip-link" href="#main-content">본문으로 이동</a>
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">Y</div>
@@ -880,7 +888,7 @@ function App() {
         <header className="topbar">
           <div className="mobile-brand">YPT WEB</div>
           <div
-            className="top-status"
+            className={`top-status ${statusStale ? "stale" : ""}`}
             title={statusStale ? "최근 상태 확인이 지연되고 있습니다." : undefined}
           >
             <span
@@ -903,7 +911,7 @@ function App() {
             로그아웃
           </button>
         </header>
-        <main>
+        <main id="main-content" tabIndex={-1}>
           {rememberWarning && (
             <div className="remember-warning" role="status">
               {rememberWarning}
@@ -1154,7 +1162,7 @@ function App() {
             </div>
           )}
           {tab === "history" && (
-            <section className="history-card">
+            <section className="history-card" id="history-top">
               <div className="history-picker">
                 <label htmlFor="date">날짜</label>
                 <input
@@ -1248,7 +1256,10 @@ function App() {
               )}
               {snapshot?.capabilities.history && snapshot.today && (
                 <HistoryTrend key={snapshot.today.date} today={snapshot.today}
-                  onSelect={setDate} />
+                  onSelect={(selectedDate) => {
+                    setDate(selectedDate);
+                    document.getElementById("history-top")?.scrollIntoView();
+                  }} />
               )}
             </section>
           )}
@@ -1301,7 +1312,9 @@ function App() {
                   </div>
                 ) : (
                   <p className="empty">
-                    {loadingGroup
+                    {groupError
+                      ? "그룹 목록을 확인할 수 없습니다. 새로고침해 주세요."
+                      : loadingGroup || groups === null
                       ? "그룹을 가져오는 중…"
                       : "가입한 그룹이 없습니다."}
                   </p>
@@ -1384,7 +1397,7 @@ function App() {
                   <p className="checked-time">
                     마지막 확인{" "}
                     {new Date(groupCheckedAt).toLocaleTimeString("ko-KR")}
-                    {" · "}화면이 보일 때 15초마다 자동 확인
+                    {" · "}화면이 보일 때 {syncSeconds}초마다 자동 확인
                   </p>
                 )}
                 {visibleMembers?.length ? (
