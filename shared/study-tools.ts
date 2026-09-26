@@ -1,8 +1,18 @@
+import type { Day } from "./types.ts";
+
 export type PlanItem = {
   id: string;
   text: string;
   estimateMinutes: number;
   done: boolean;
+  subjectTitle?: string;
+};
+
+export type PlannedSubject = {
+  title: string;
+  plannedMs: number;
+  recordedMs: number | null;
+  color?: string;
 };
 
 export type IntervalPhase = "focus" | "short" | "long";
@@ -54,12 +64,31 @@ export function parsePlan(raw: string | null): PlanItem[] {
       typeof item.id === "string" && item.id.length <= 80 &&
       typeof item.text === "string" && item.text.length > 0 && item.text.length <= 80 &&
       PLAN_ESTIMATES.some((minutes) => minutes === item.estimateMinutes) &&
+      (item.subjectTitle === undefined ||
+        typeof item.subjectTitle === "string" && item.subjectTitle.length > 0 && item.subjectTitle.length <= 200) &&
       typeof item.done === "boolean")) return [];
     const ids = new Set(value.map((item: PlanItem) => item.id));
     return ids.size === value.length ? value as PlanItem[] : [];
   } catch {
     return [];
   }
+}
+
+export function summarizePlannedSubjects(items: PlanItem[], day: Day): PlannedSubject[] {
+  const planned = new Map<string, number>();
+  for (const item of items) {
+    if (!item.subjectTitle) continue;
+    planned.set(item.subjectTitle,
+      (planned.get(item.subjectTitle) ?? 0) + item.estimateMinutes * 60_000);
+  }
+  return [...planned.entries()].map(([title, plannedMs]) => {
+    const recorded = day.subjects.find((subject) => subject.title === title);
+    return {
+      title, plannedMs,
+      recordedMs: day.subjectTimesAvailable ? recorded?.studyMs ?? null : null,
+      ...(recorded?.color ? { color: recorded.color } : {}),
+    };
+  }).sort((a, b) => b.plannedMs - a.plannedMs || a.title.localeCompare(b.title, "ko-KR"));
 }
 
 export function previousCalendarDate(date: string): string {

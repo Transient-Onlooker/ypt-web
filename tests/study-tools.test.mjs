@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bulkPlanCandidates, eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings, parsePlan, planTemplate, previousCalendarDate } from "../shared/study-tools.ts";
+import { bulkPlanCandidates, eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings, parsePlan, planTemplate, previousCalendarDate, summarizePlannedSubjects } from "../shared/study-tools.ts";
 
 test("카운트다운은 탭이 멈췄다가 돌아와도 종료 시각으로 계산한다", () => {
   const timer = { ...freshInterval("focus"), endsAt: 1_500_000 };
@@ -30,6 +30,25 @@ test("여러 할 일 입력은 중복과 길이 제한을 적용한다", () => {
   assert.deepEqual(bulkPlanCandidates(" 영어 \n수학\n수학\n국어\n" + "가".repeat(81), current),
     ["수학", "국어"]);
   assert.equal(bulkPlanCandidates(Array.from({ length: 20 }, (_, i) => `일 ${i}`).join("\n"), current).length, 11);
+});
+
+test("과목 계획은 전체 예상 시간과 검증된 오늘 완료 기록을 구분한다", () => {
+  const items = [
+    { id: "1", text: "수학 1", estimateMinutes: 25, done: true, subjectTitle: "수학" },
+    { id: "2", text: "수학 2", estimateMinutes: 30, done: false, subjectTitle: "수학" },
+    { id: "3", text: "연결 없음", estimateMinutes: 60, done: false },
+  ];
+  const day = { date: "2026-09-26", totalMs: 3_600_000,
+    subjectTimesAvailable: true, longestSegmentMs: null,
+    subjects: [{ title: "수학", studyMs: 3_600_000, color: "#123456" }],
+  };
+  assert.deepEqual(summarizePlannedSubjects(items, day), [{
+    title: "수학", plannedMs: 3_300_000, recordedMs: 3_600_000, color: "#123456",
+  }]);
+  assert.equal(summarizePlannedSubjects(items, { ...day, subjectTimesAvailable: false })[0].recordedMs, null);
+  assert.equal(summarizePlannedSubjects(items, { ...day, subjects: [] })[0].recordedMs, null);
+  assert.equal(parsePlan(JSON.stringify(items)).length, 3);
+  assert.deepEqual(parsePlan(JSON.stringify([{ ...items[0], subjectTitle: 123 }])), []);
 });
 
 test("손상되거나 범위를 벗어난 세션 저장값은 버린다", () => {

@@ -1776,7 +1776,8 @@ function App() {
                 )}
               </section>
             </div>
-            {snapshot?.today && <StudyTools key={snapshot.today.date} date={snapshot.today.date} now={now} />}
+            {snapshot?.today && <StudyTools key={snapshot.today.date} date={snapshot.today.date}
+              now={now} today={snapshot.today} subjects={snapshot.subjects} />}
             </>
           )}
           {tab === "history" && (

@@ -9,7 +9,7 @@
 | [Forest](https://forestapp.cc/) | 연속 공부일, 집중 패턴, 태그, 일일 목표 | 검증된 날짜 기록으로 연속 공부일·목표 진행을 기존 버전에서 제공. 임의 태그와 앱 미션은 YPT 기록에 쓰지 않음 |
 | [Toggl Track](https://toggl.com/features/time-reporting) | 기간별 보고·필터, 내보내기, 목표 대비 시간 | 7·14일 기록·CSV·하루 목표에 적용. v0.16.0에서 과목별 기간 합계·CSV·현재 목표 달성일 추가. 미확인 날짜를 0시간으로 합산하지 않음 |
 | [Freedom](https://freedom.to/features) | 앱·사이트 차단, 기기 간 동기화, 집중 예약 | 현재 웹 페이지에는 다른 휴대폰 앱을 차단할 권한이 없음. 차단 기능을 흉내 내거나 열품타 타이머를 자동 조작하지 않음 |
-| [Clockify 보고서](https://clockify.me/features/reports) | 주간 보고, 계획 시간과 실제 기록의 구분, 내보내기 | v0.17.0에서 기존 조회 기간의 완료 기록 회고를 복사. 미확인 날짜를 표기하고 계획 예상 시간과 실측 기록은 분리 |
+| [Clockify 보고서](https://clockify.me/features/reports) | 주간 보고, 계획 시간과 실제 기록의 구분, 내보내기 | v0.17.0에서 기존 조회 기간의 완료 기록 회고를 복사. v0.18.0에서 연결한 과목별 예상 시간과 검증된 완료 기록을 별도 값으로 비교 |
 | [Todoist 생산성](https://www.todoist.com/help/todoist/features/use-the-productivity-view-in-todoist-6S63uAa9), [프로젝트 템플릿](https://www.todoist.com/help/articles/208821185-Project-templates), [여러 할 일 입력](https://www.todoist.com/help/todoist/features/add-or-manage-multiple-tasks-in-todoist-PcPoskdUp) | 목표 연속 달성, 작업 목록 재사용, 여러 작업 일괄 입력 | v0.17.0에서 현재 하루 목표의 확인된 연속 달성, 이 탭의 반복 계획, 여러 줄 빠른 입력 적용. 작업 데이터는 열품타와 동기화하지 않음 |
 
-다음 후보는 실제 기록과 계획의 비교, 접근성 높은 구간 종료 알림입니다. 여러 기기 계획 동기화는 별도 저장 설계와 계정 간 분리 검증이 필요합니다. 그룹 채팅·랭킹·과목 편집 등 새로운 열품타 API 기능은 [API 검증 기록](api-validation.md)에 근거가 생기기 전까지 추가하지 않습니다.
+다음 후보는 접근성 높은 구간 종료 알림과 계획을 여러 기기에 안전하게 동기화하는 방법입니다. 여러 기기 계획 동기화는 별도 저장 설계와 계정 간 분리 검증이 필요합니다. 그룹 채팅·랭킹·과목 편집 등 새로운 열품타 API 기능은 [API 검증 기록](api-validation.md)에 근거가 생기기 전까지 추가하지 않습니다.

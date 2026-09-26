@@ -2026,3 +2026,28 @@ input[type="search"] {
 }
 .plan-template > button { min-height: 44px; margin-top: 8px; font-size: 13px; }
 .plan-template textarea:focus-visible { outline: 3px solid #58c891; outline-offset: 2px; }
+.plan-form { grid-template-columns: 96px minmax(0, 1fr) auto; }
+.plan-form #plan-text { grid-column: 1 / -1; }
+.plan-form .plan-subject-select { grid-column: auto; }
+.plan-subject-name { display: block; color: #5f7966; font-size: 11px; font-weight: 600; }
+.plan-vs-record {
+  display: grid;
+  gap: 14px;
+  margin-top: 21px;
+  padding: 17px;
+  border: 1px solid #d9e8d2;
+  border-radius: 15px;
+  background: #f8fbf6;
+}
+.plan-vs-record h3 { margin: 0; color: #234b35; font-size: 14px; }
+.plan-vs-record-row { display: grid; gap: 5px; }
+.plan-vs-record-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.plan-vs-record-label strong { overflow-wrap: anywhere; }
+.plan-vs-record-row p, .plan-vs-record > p { margin: 0; color: #526a59; font-size: 12px; line-height: 1.5; }
+.plan-vs-record-row small { color: #2b6543; font-size: 12px; font-weight: 700; }
+.plan-vs-record-track { height: 8px; overflow: hidden; border-radius: 99px; background: #e8eedf; }
+.plan-vs-record-track span { display: block; height: 100%; border-radius: inherit; background: #368f54; }
+@media (max-width: 480px) {
+  .plan-form { grid-template-columns: 89px minmax(0, 1fr); }
+  .plan-form button { grid-column: 1 / -1; }
+}

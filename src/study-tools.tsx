@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   bulkPlanCandidates, eligibleCarryOver, freshInterval, intervalRemaining, parseInterval, parseIntervalSettings,
-  parsePlan, PLAN_ESTIMATES, planTemplate, previousCalendarDate,
+  parsePlan, PLAN_ESTIMATES, planTemplate, previousCalendarDate, summarizePlannedSubjects,
 } from "../shared/study-tools.ts";
 import type { IntervalPhase, IntervalSettings, IntervalTimer, PlanItem } from "../shared/study-tools.ts";
+import type { Day, Subject } from "../shared/types.ts";
+import { duration } from "../shared/format.ts";
 
 const STORAGE_PREFIX = "ypt-web-personal-tools-";
 const phaseNames: Record<IntervalPhase, string> = { focus: "집중", short: "짧은 휴식", long: "긴 휴식" };
@@ -30,7 +32,9 @@ function clock(ms: number): string {
   return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-export function StudyTools({ date, now }: { date: string; now: number }) {
+export function StudyTools({ date, now, today, subjects }: {
+  date: string; now: number; today: Day; subjects: Subject[];
+}) {
   const planKey = `${STORAGE_PREFIX}plan-${date}`;
   const intervalKey = `${STORAGE_PREFIX}interval-${date}`;
   const taskKey = `${STORAGE_PREFIX}task-${date}`;
@@ -43,6 +47,7 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
   const [draft, setDraft] = useState("");
   const [bulkDraft, setBulkDraft] = useState("");
   const [estimate, setEstimate] = useState<number>(25);
+  const [selectedPlanSubject, setSelectedPlanSubject] = useState("");
   const [timer, setTimer] = useState<IntervalTimer>(() => parseInterval(stored(intervalKey)));
   const [settings, setSettings] = useState<IntervalSettings>(() => parseIntervalSettings(stored(`${STORAGE_PREFIX}settings`)));
   const [settingsDraft, setSettingsDraft] = useState<Record<IntervalPhase, string>>(() => {
@@ -54,6 +59,10 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
 
   useEffect(() => save(planKey, items), [planKey, items]);
   useEffect(() => save(templateKey, template), [templateKey, template]);
+  useEffect(() => {
+    if (selectedPlanSubject && !subjects.some((subject) => subject.title === selectedPlanSubject))
+      setSelectedPlanSubject("");
+  }, [subjects, selectedPlanSubject]);
   useEffect(() => save(intervalKey, timer), [intervalKey, timer]);
   useEffect(() => save(`${STORAGE_PREFIX}settings`, settings), [settings]);
   useEffect(() => {
@@ -76,6 +85,7 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
   const activeTask = items.find((item) => item.id === activeTaskId && !item.done);
   const carryOver = eligibleCarryOver(items, previousItems);
   const templateToAdd = eligibleCarryOver(items, template);
+  const plannedSubjects = summarizePlannedSubjects(items, today);
   const remainingMs = intervalRemaining(timer, now);
   const active = timer.endsAt !== null && remainingMs > 0;
 
@@ -84,7 +94,9 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
     const text = draft.trim();
     if (!text) return;
     if (items.length >= 12) { setNotice("할 일은 오늘 최대 12개까지 적을 수 있어요."); return; }
-    setItems((old) => [...old, { id: crypto.randomUUID(), text, estimateMinutes: estimate, done: false }]);
+    setItems((old) => [...old, { id: crypto.randomUUID(), text, estimateMinutes: estimate, done: false,
+      ...(subjects.some((subject) => subject.title === selectedPlanSubject)
+        ? { subjectTitle: selectedPlanSubject } : {}) }]);
     setDraft("");
     setNotice("");
   }
@@ -128,6 +140,12 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
         <select id="plan-estimate" value={estimate} onChange={(event) => setEstimate(Number(event.target.value))}>
           {PLAN_ESTIMATES.map((minutes) => <option value={minutes} key={minutes}>{minutes}분</option>)}
         </select>
+        <label className="visually-hidden" htmlFor="plan-subject">과목 연결</label>
+        <select className="plan-subject-select" id="plan-subject" value={selectedPlanSubject}
+          onChange={(event) => setSelectedPlanSubject(event.target.value)}>
+          <option value="">과목 연결 안 함</option>
+          {subjects.map((subject) => <option key={subject.title} value={subject.title}>{subject.title}</option>)}
+        </select>
         <button className="secondary" type="submit" disabled={!draft.trim() || items.length >= 12}>추가</button>
       </form>
       {carryOver.length > 0 && <button className="text-button plan-carry" type="button"
@@ -165,11 +183,13 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
               return;
             }
             setItems((old) => [...old, ...bulkPlanCandidates(bulkDraft, old).map((text) =>
-              ({ id: crypto.randomUUID(), text, estimateMinutes: estimate, done: false }))]);
+              ({ id: crypto.randomUUID(), text, estimateMinutes: estimate, done: false,
+                ...(subjects.some((subject) => subject.title === selectedPlanSubject)
+                  ? { subjectTitle: selectedPlanSubject } : {}) }))]);
             setBulkDraft("");
             setNotice(`${candidates.length}개를 추가했어요.`);
           }}>선택한 예상 시간으로 추가</button>
-        <p>위에서 고른 예상 시간을 모두 적용합니다. 중복은 건너뛰고 최대 12개까지 추가합니다.</p>
+        <p>위에서 고른 예상 시간과 과목을 모두 적용합니다. 중복은 건너뛰고 최대 12개까지 추가합니다.</p>
       </details>
       {items.length > 0 ? <>
         <div className="plan-progress" role="progressbar" aria-label="완료한 계획" aria-valuenow={completed.length} aria-valuemin={0} aria-valuemax={items.length}>
@@ -180,7 +200,7 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
           {items.map((item) => <li key={item.id} className={item.done ? "is-done" : ""}>
             <label><input type="checkbox" checked={item.done} onChange={() => setItems((old) => old.map((candidate) =>
               candidate.id === item.id ? { ...candidate, done: !candidate.done } : candidate))} />
-              <span>{item.text}</span></label>
+              <span>{item.text}{item.subjectTitle && <small className="plan-subject-name"> · {item.subjectTitle}</small>}</span></label>
             <small>{item.estimateMinutes}분</small>
             {!item.done && <button className="text-button plan-focus" type="button"
               aria-pressed={activeTaskId === item.id}
@@ -195,6 +215,23 @@ export function StudyTools({ date, now }: { date: string; now: number }) {
           onClick={() => setItems((old) => old.filter((item) => !item.done))}>완료 항목 지우기</button>}
       </> : <p className="tool-empty">아직 계획이 없어요. 작은 일부터 하나 적어보세요.</p>}
       {notice && <p className="tool-notice" role="status">{notice}</p>}
+      {plannedSubjects.length > 0 && <div className="plan-vs-record">
+        <h3>과목 계획과 완료 기록</h3>
+        {plannedSubjects.map((subject) => <div className="plan-vs-record-row" key={subject.title}>
+          <div className="plan-vs-record-label">
+            <span className="subject-color" style={{ backgroundColor: subject.color || "#8aa494" }} aria-hidden="true" />
+            <strong>{subject.title}</strong>
+          </div>
+          <p>계획 {subject.plannedMs / 60_000}분 · 완료 기록 {subject.recordedMs === null ? "미확인" : duration(subject.recordedMs)}</p>
+          {subject.recordedMs !== null && <small>계획 대비 {Math.floor(subject.recordedMs / subject.plannedMs * 100)}%</small>}
+          {subject.recordedMs !== null && <div className="plan-vs-record-track" role="progressbar"
+            aria-label={`${subject.title} 계획 대비 완료 기록`} aria-valuemin={0} aria-valuemax={100}
+            aria-valuenow={Math.min(100, Math.floor(subject.recordedMs / subject.plannedMs * 100))}>
+            <span style={{ width: `${Math.min(100, subject.recordedMs / subject.plannedMs * 100)}%` }} />
+          </div>}
+        </div>)}
+        <p>완료 기록은 해당 과목 전체 시간이며, 위 할 일만 따로 측정한 값은 아닙니다. 진행 중인 시간은 제외합니다.</p>
+      </div>}
       <p className="tool-footnote">예상 시간은 직접 적은 계획이며 열품타 공부시간에 합산되지 않습니다.</p>
     </section>
 
