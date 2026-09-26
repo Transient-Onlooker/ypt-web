@@ -7,6 +7,14 @@ import { RequestGate } from "../shared/request-gate.ts";
 import "./style.css";
 
 type Tab = "study" | "history" | "groups";
+function NavIcon({ tab }: { tab: Tab }) {
+  const paths = {
+    study: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.7 1.8" /></>,
+    history: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M8 14h3M8 17h6" /></>,
+    groups: <><circle cx="9" cy="9" r="2.5" /><path d="M3.5 19v-1.2a5.5 5.5 0 0 1 11 0V19zM16 7a2.5 2.5 0 0 1 0 5M17 14a4 4 0 0 1 3.5 4V19h-3" /></>,
+  };
+  return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[tab]}</svg>;
+}
 type MemberSort = "time" | "name";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
@@ -1121,21 +1129,21 @@ function App() {
             aria-current={tab === "study" ? "page" : undefined}
             onClick={() => setTab("study")}
           >
-            공부
+            <NavIcon tab="study" />공부
           </button>
           <button
             className={tab === "history" ? "active" : ""}
             aria-current={tab === "history" ? "page" : undefined}
             onClick={() => setTab("history")}
           >
-            기록
+            <NavIcon tab="history" />기록
           </button>
           <button
             className={tab === "groups" ? "active" : ""}
             aria-current={tab === "groups" ? "page" : undefined}
             onClick={() => setTab("groups")}
           >
-            그룹
+            <NavIcon tab="groups" />그룹
           </button>
         </nav>
         <button
@@ -1209,6 +1217,9 @@ function App() {
               <h1>
                 {tab === "study" ? "공부" : tab === "history" ? "기록" : "그룹"}
               </h1>
+              <p className="page-subtitle">
+                {tab === "study" ? "오늘의 집중을 이어가세요." : tab === "history" ? "쌓인 시간을 한눈에 확인하세요." : "함께 공부하는 사람들을 만나보세요."}
+              </p>
             </div>
             <label className="sync-control" htmlFor="sync-seconds" title="타이머 상태와 선택한 그룹 멤버의 서버 조회 주기입니다. 화면의 시간 표시는 매초 갱신됩니다.">
               자동 동기화
@@ -1253,20 +1264,25 @@ function App() {
                     {refreshingSnapshot ? "확인 중…" : "상태 새로고침"}
                   </button>
                 </div>
-                <div className="timer-display" aria-live="off">
-                  {running
-                    ? duration(liveMs)
-                    : timer?.state === "paused"
-                      ? "--:--:--"
-                      : "00:00:00"}
+                <div className={`timer-face ${running ? "is-running" : ""}`}>
+                  <div className="timer-face-inner">
+                    <span className="timer-face-kicker">나의 집중 시간</span>
+                    <div className="timer-display" aria-live="off">
+                      {running
+                        ? duration(liveMs)
+                        : timer?.state === "paused"
+                          ? "--:--:--"
+                          : "00:00:00"}
+                    </div>
+                    <div className="timer-caption">
+                      {status}
+                      {timer?.subject ? ` · ${timer.subject}` : ""}
+                    </div>
+                    {focusMessage && (
+                      <p className="focus-milestone">{focusMessage}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="timer-caption">
-                  {status}
-                  {timer?.subject ? ` · ${timer.subject}` : ""}
-                </div>
-                {focusMessage && (
-                  <p className="focus-milestone">{focusMessage}</p>
-                )}
                 {timer?.state === "idle" && !appOnly && (
                   <div className="form-area">
                     <label htmlFor="subject">과목</label>
@@ -1762,21 +1778,21 @@ function App() {
           aria-current={tab === "study" ? "page" : undefined}
           onClick={() => setTab("study")}
         >
-          <span aria-hidden="true">◉</span>공부
+          <NavIcon tab="study" />공부
         </button>
         <button
           className={tab === "history" ? "active" : ""}
           aria-current={tab === "history" ? "page" : undefined}
           onClick={() => setTab("history")}
         >
-          <span aria-hidden="true">▦</span>기록
+          <NavIcon tab="history" />기록
         </button>
         <button
           className={tab === "groups" ? "active" : ""}
           aria-current={tab === "groups" ? "page" : undefined}
           onClick={() => setTab("groups")}
         >
-          <span aria-hidden="true">◎</span>그룹
+          <NavIcon tab="groups" />그룹
         </button>
       </nav>
     </div>
