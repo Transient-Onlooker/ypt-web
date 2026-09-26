@@ -125,6 +125,40 @@ function duration(ms: number | null | undefined) {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
+function SubjectBreakdown({ day, empty }: { day: Day; empty: string }) {
+  const subjects = [...day.subjects].sort((a, b) =>
+    (b.studyMs ?? -1) - (a.studyMs ?? -1) ||
+    a.title.localeCompare(b.title, "ko-KR"),
+  );
+  const maxMs = Math.max(0, ...subjects.map((subject) => subject.studyMs ?? 0));
+  return (
+    <div className="subject-list">
+      {subjects.map((subject) => (
+        <div className="subject-row" key={subject.title}>
+          <div className="subject-row-top">
+            <span className="subject-name">
+              {subject.color && (
+                <span className="subject-color" aria-hidden="true"
+                  style={{ backgroundColor: subject.color }} />
+              )}
+              {subject.title}
+            </span>
+            <strong>{duration(subject.studyMs)}</strong>
+          </div>
+          {subject.studyMs !== null && maxMs > 0 && (
+            <div className="subject-track" aria-hidden="true">
+              <span style={{
+                width: `${Math.min(100, subject.studyMs / maxMs * 100)}%`,
+                backgroundColor: subject.color || "#28784a",
+              }} />
+            </div>
+          )}
+        </div>
+      ))}
+      {!subjects.length && <p className="empty">{empty}</p>}
+    </div>
+  );
+}
 function shiftDate(date: string, days: number) {
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + days);
@@ -1034,26 +1068,8 @@ function App() {
                     <small>완료된 기록과 별도로 표시합니다.</small>
                   </div>
                 )}
-                <div className="subject-list">
-                  {snapshot?.today.subjects.map((subject) => (
-                    <div className="subject-row" key={subject.title}>
-                      <span className="subject-name">
-                        {subject.color && (
-                          <span
-                            className="subject-color"
-                            aria-hidden="true"
-                            style={{ backgroundColor: subject.color }}
-                          />
-                        )}
-                        {subject.title}
-                      </span>
-                      <strong>{duration(subject.studyMs)}</strong>
-                    </div>
-                  ))}
-                  {!snapshot?.today.subjects.length && (
-                    <p className="empty">오늘 기록된 과목 시간이 없습니다.</p>
-                  )}
-                </div>
+                {snapshot?.today && <SubjectBreakdown day={snapshot.today}
+                  empty="오늘 기록된 과목 시간이 없습니다." />}
               </section>
             </div>
           )}
@@ -1124,26 +1140,8 @@ function App() {
                     <span>{displayedDay.date} 총 공부시간</span>
                     <strong>{duration(displayedDay.totalMs)}</strong>
                   </div>
-                  <div className="subject-list">
-                    {displayedDay.subjects.map((subject) => (
-                      <div className="subject-row" key={subject.title}>
-                        <span className="subject-name">
-                          {subject.color && (
-                            <span
-                              className="subject-color"
-                              aria-hidden="true"
-                              style={{ backgroundColor: subject.color }}
-                            />
-                          )}
-                          {subject.title}
-                        </span>
-                        <strong>{duration(subject.studyMs)}</strong>
-                      </div>
-                    ))}
-                    {!displayedDay.subjects.length && (
-                      <p className="empty">이 날짜에 기록된 과목 시간이 없습니다.</p>
-                    )}
-                  </div>
+                  <SubjectBreakdown day={displayedDay}
+                    empty="이 날짜에 기록된 과목 시간이 없습니다." />
                   {!displayedDay.subjectTimesAvailable && (
                     <p className="card-note">
                       이 날짜의 과목별 시간은 확인되지 않았습니다.

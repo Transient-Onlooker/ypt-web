@@ -1,6 +1,6 @@
 # YPT Web
 
-현재 버전: **v0.5.1 · 타이머 인증 만료 처리**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
+현재 버전: **v0.6.0 · 과목별 시간 시각화**. [변경 기록](docs/CHANGELOG.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. [ypt.mcv.kr](https://ypt.mcv.kr)에서 접속할 수 있습니다. API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 웹 클라이언트입니다. 별도 서비스 가입이나 허용 목록은 없습니다. 화면은 React·Vite로 만들고 GitHub Pages에서 제공하며, Cloudflare Worker가 열품타 API를 중계하고 D1에 웹 세션과 타이머 상태를 보관합니다.
 
@@ -53,9 +53,9 @@ try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
 
 | 후보 | 현재 판단 |
 | --- | --- |
-| 기록의 과목별 시간 막대그래프 | 이미 확인한 날짜별 과목 시간을 활용할 수 있어 우선 후보 |
+| 기록의 과목별 시간 막대그래프 | v0.6.0에 적용. 확인된 과목 시간만 막대로 표시 |
 | 가입 그룹의 소개·카테고리 등 추가 정보 | 응답 필드를 실제 계정으로 확인한 뒤 표시 |
-| 구글 로그인 | 실제 구글 토큰 → 열품타 JWT 교환 성공. 웹용 OAuth 클라이언트와 기존 앱 계정 일치 확인 필요 |
+| 구글 로그인 | 토큰 교환은 성공했지만 새 열품타 계정 생성 가능성이 있어 웹 적용 보류 |
 | 그룹 둘러보기·카테고리 순위 | 참조 구현에서 확인. 실제 API 검증 후 범위를 결정 |
 
 ## 검증

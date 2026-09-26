@@ -391,17 +391,38 @@ input[type="search"] {
   border-top: 1px solid #d2e2d1;
 }
 .subject-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
+  display: grid;
+  gap: 9px;
   border-bottom: 1px solid #d2e2d1;
   padding: 15px 2px;
   font-size: 15px;
+}
+.subject-row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 15px;
+}
+.subject-row-top .subject-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .subject-row strong {
   font-family: "Pretendard Variable", sans-serif;
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
+}
+.subject-track {
+  height: 7px;
+  border-radius: 999px;
+  background: #e4ece3;
+  overflow: hidden;
+}
+.subject-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
 }
 .history-card {
   max-width: 780px;
