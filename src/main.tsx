@@ -9,8 +9,10 @@ type MemberSort = "time" | "name";
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
+const GOAL_MINUTES = [0, 30, 60, 90, 120, 180, 240, 360, 480, 600, 720] as const;
 const HISTORY_CACHE_MS = 5 * 60_000;
 const SYNC_STORAGE_KEY = "ypt-web-sync-seconds";
+const GOAL_STORAGE_KEY = "ypt-web-daily-goal-minutes";
 const REMEMBERED_EMAIL_KEY = "ypt-web-remembered-email";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const CROSS_ORIGIN_API = API_BASE_URL !== "" &&
@@ -42,6 +44,15 @@ function savedSyncSeconds(): number {
     return SYNC_SECONDS.find((value) => value === saved) ?? 15;
   } catch {
     return 15;
+  }
+}
+
+function savedGoalMinutes(): number {
+  try {
+    const saved = Number(localStorage.getItem(GOAL_STORAGE_KEY));
+    return GOAL_MINUTES.find((value) => value === saved) ?? 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -125,6 +136,67 @@ function duration(ms: number | null | undefined) {
   if (ms == null) return "확인 중";
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+function goalLabel(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours && rest ? `${hours}시간 ${rest}분` : hours ? `${hours}시간` : `${rest}분`;
+}
+function focusMilestone(ms: number) {
+  if (ms >= 90 * 60_000) return "🎉 현재 타이머 90분 돌파";
+  if (ms >= 50 * 60_000) return "✦ 현재 타이머 50분 돌파";
+  if (ms >= 25 * 60_000) return "✦ 현재 타이머 25분 돌파";
+  return null;
+}
+function DailyGoal({ minutes, onChange, recordedMs }: {
+  minutes: number;
+  onChange: (minutes: number) => void;
+  recordedMs: number;
+}) {
+  const goalMs = minutes * 60_000;
+  const progress = goalMs ? Math.min(100, Math.floor(recordedMs / goalMs * 100)) : 0;
+  const milestone = progress >= 100 ? "🎉 오늘의 목표 달성!"
+    : progress >= 75 ? "✦ 거의 다 왔어요"
+    : progress >= 50 ? "✦ 절반을 넘었어요"
+    : progress >= 25 ? "✦ 좋은 출발이에요"
+    : "첫 25%를 향해 시작해 볼까요?";
+  return (
+    <div className="daily-goal">
+      <div className="daily-goal-head">
+        <label htmlFor="daily-goal-minutes">하루 목표</label>
+        <select id="daily-goal-minutes" value={minutes}
+          onChange={(event) => onChange(Number(event.target.value))}>
+          {GOAL_MINUTES.map((value) => (
+            <option key={value} value={value}>
+              {value ? goalLabel(value) : minutes ? "목표 지우기" : "목표 정하기"}
+            </option>
+          ))}
+        </select>
+      </div>
+      {goalMs ? (
+        <>
+          <div className="daily-goal-numbers">
+            <strong>{progress}%</strong>
+            <span>기록된 {duration(recordedMs)} / 목표 {goalLabel(minutes)}</span>
+          </div>
+          <div className="daily-goal-track" role="progressbar"
+            aria-label="오늘 기록된 공부시간 목표 달성률"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
+            <span style={{ width: `${progress}%` }} />
+          </div>
+          <p className="daily-goal-message">{milestone}</p>
+          {progress < 100 && (
+            <p className="daily-goal-detail">기록 기준 남은 시간 {duration(goalMs - recordedMs)}</p>
+          )}
+          {recordedMs > goalMs && (
+            <p className="daily-goal-detail">목표보다 {duration(recordedMs - goalMs)} 더 공부했어요.</p>
+          )}
+        </>
+      ) : (
+        <p className="daily-goal-detail">목표 시간을 고르면 오늘의 진행률을 볼 수 있어요. 이 브라우저에만 저장됩니다.</p>
+      )}
+    </div>
+  );
 }
 function SubjectBreakdown({ day, empty }: { day: Day; empty: string }) {
   const subjects = [...day.subjects].sort((a, b) =>
@@ -217,6 +289,9 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
   const known = days?.filter((row) => row.totalMs !== null) ?? [];
   const maxMs = Math.max(1, ...known.map((row) => row.totalMs ?? 0));
   const knownTotal = known.reduce((sum, row) => sum + (row.totalMs ?? 0), 0);
+  const studyDays = known.filter((row) => (row.totalMs ?? 0) > 0).length;
+  const bestDay = known.reduce<TrendDay | null>((best, row) =>
+    !best || (row.totalMs ?? 0) > (best.totalMs ?? 0) ? row : best, null);
   return (
     <div className="history-trend">
       <div className="card-head">
@@ -229,6 +304,13 @@ function HistoryTrend({ today, previous, onLoaded, onSelect, loadDay }: {
       {days && (
         <>
           <p className="week-total">확인된 {known.length}일 합계 <strong>{duration(knownTotal)}</strong></p>
+          <div className="week-insights">
+            <span>공부한 날 <strong>{studyDays}/{known.length}일</strong></span>
+            <span>확인된 날 평균 <strong>{duration(knownTotal / Math.max(1, known.length))}</strong></span>
+            {studyDays > 0 && bestDay && (
+              <span>가장 많이 한 날 <strong>{bestDay.date.slice(5).replace("-", ".")} · {duration(bestDay.totalMs)}</strong></span>
+            )}
+          </div>
           <div className="week-list">
             {days.map((row) => (
               <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
@@ -397,6 +479,7 @@ function App() {
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
   const [tab, setTab] = useState<Tab>("study");
   const [syncSeconds, setSyncSeconds] = useState(savedSyncSeconds);
+  const [goalMinutes, setGoalMinutes] = useState(savedGoalMinutes);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -900,6 +983,8 @@ function App() {
     now - timer.updatedAt < PENDING_RECOVERY_MS;
   const statusStale =
     snapshotCheckedAt !== null && now - snapshotCheckedAt > 45_000;
+  const focusMessage = running && !statusStale && !remoteUnverified
+    ? focusMilestone(liveMs) : null;
   const visibleMembers = shownMembers
     ?.filter((member) =>
       member.nickname
@@ -1069,6 +1154,9 @@ function App() {
                   {status}
                   {timer?.subject ? ` · ${timer.subject}` : ""}
                 </div>
+                {focusMessage && (
+                  <p className="focus-milestone">{focusMessage}</p>
+                )}
                 {timer?.state === "idle" && !appOnly && (
                   <div className="form-area">
                     <label htmlFor="subject">과목</label>
@@ -1214,6 +1302,18 @@ function App() {
                   {duration(snapshot?.today.totalMs)}
                 </div>
                 <p className="summary-label">기록된 총 공부시간</p>
+                {snapshot?.today && (
+                  <DailyGoal minutes={goalMinutes} recordedMs={snapshot.today.totalMs}
+                    onChange={(minutes) => {
+                      if (!GOAL_MINUTES.some((value) => value === minutes)) return;
+                      setGoalMinutes(minutes);
+                      try {
+                        localStorage.setItem(GOAL_STORAGE_KEY, String(minutes));
+                      } catch {
+                        // The setting remains available in this tab.
+                      }
+                    }} />
+                )}
                 {running && (
                   <div className="live-session">
                     <span>
