@@ -14,7 +14,7 @@ export function pomodoroStatusLabel(timer: Pick<Pomodoro, "phase" | "status">): 
   if (timer.status === "transition") return "열품타 상태 확인 중…";
   if (timer.status === "paused")
     return timer.phase === "break" ? "휴식 잠시 멈춤 · 열품타 일시정지" : "집중 일시정지";
-  return timer.phase === "break" ? "휴식 중 · 열품타 일시정지" : "열품타 공부 중";
+  return timer.phase === "break" ? "휴식 중 · 열품타 일시정지" : "";
 }
 
 export function pomodoroRemaining(timer: Pomodoro, now: number): number {

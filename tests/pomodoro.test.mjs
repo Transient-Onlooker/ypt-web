@@ -23,7 +23,7 @@ test("수동 일시정지는 남은 시간을 보존하고 재개 시 새 종료
 test("뽀모도로 상태 문구는 집중·휴식 상태에 맞는 고정 문자열을 표시한다", () => {
   assert.equal(pomodoroStatusLabel({ phase: "break", status: "running" }), "휴식 중 · 열품타 일시정지");
   assert.equal(pomodoroStatusLabel({ phase: "break", status: "paused" }), "휴식 잠시 멈춤 · 열품타 일시정지");
-  assert.equal(pomodoroStatusLabel({ phase: "focus", status: "running" }), "열품타 공부 중");
+  assert.equal(pomodoroStatusLabel({ phase: "focus", status: "running" }), "");
   assert.equal(pomodoroStatusLabel({ phase: "focus", status: "transition" }), "열품타 상태 확인 중…");
 });
 

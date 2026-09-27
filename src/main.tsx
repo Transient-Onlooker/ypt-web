@@ -10,6 +10,8 @@ import type { Tab } from "../shared/navigation.ts";
 import { clearPersonalTools, StudyTools } from "./study-tools.tsx";
 import { freshPomodoro, nextPomodoro, parsePomodoro, pausePomodoro, pomodoroRemaining, pomodoroStatusLabel, runPomodoro, shouldAdvancePomodoro } from "../shared/pomodoro.ts";
 import type { Pomodoro } from "../shared/pomodoro.ts";
+import { parseTimerContinuity, pauseTimerContinuity, resumeTimerContinuity, startTimerContinuity, timerContinuityElapsed } from "../shared/timer-continuity.ts";
+import type { TimerContinuity } from "../shared/timer-continuity.ts";
 import { parseIntervalSettings } from "../shared/study-tools.ts";
 import "./style.css";
 
@@ -36,6 +38,7 @@ const POMODORO_MODE_KEY = "ypt-web-pomodoro-mode";
 const POMODORO_KEY = "ypt-web-personal-tools-pomodoro";
 const POMODORO_SETTINGS_KEY = "ypt-web-personal-tools-settings";
 const REMEMBERED_EMAIL_KEY = "ypt-web-remembered-email";
+const TIMER_CONTINUITY_KEY = "ypt-web-timer-continuity";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const CROSS_ORIGIN_API = API_BASE_URL !== "" &&
   new URL(API_BASE_URL).origin !== window.location.origin;
@@ -731,6 +734,10 @@ function App() {
   const [loginNotice, setLoginNotice] = useState("");
   const [rememberWarning, setRememberWarning] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [timerContinuity, setTimerContinuity] = useState<TimerContinuity | null>(() => {
+    try { return parseTimerContinuity(localStorage.getItem(TIMER_CONTINUITY_KEY)); }
+    catch { return null; }
+  });
   const [snapshotCheckedAt, setSnapshotCheckedAt] = useState<number | null>(null);
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromSearch(window.location.search));
@@ -815,6 +822,22 @@ function App() {
   const forceHistoryDate = useRef<string | null>(null);
   const wakeRunning = (snapshot?.timer.state === "running" && snapshot.timer.startedAt !== null) ||
     (snapshot?.timer.state === "idle" && snapshot.remoteStatus === "running" && snapshot.remoteStartedAt !== null);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === TIMER_CONTINUITY_KEY)
+        setTimerContinuity(parseTimerContinuity(event.newValue));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+  useEffect(() => {
+    if (session === null) return;
+    try {
+      if (timerContinuity) localStorage.setItem(TIMER_CONTINUITY_KEY, JSON.stringify(timerContinuity));
+      else localStorage.removeItem(TIMER_CONTINUITY_KEY);
+    } catch { /* Keep the timer usable when storage is unavailable. */ }
+  }, [session, timerContinuity]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
@@ -959,6 +982,7 @@ function App() {
         return;
       if ((cause as ApiError).status === 401) {
         clearPersonalTools();
+        setTimerContinuity(null);
         setPomodoro(freshPomodoro());
         setPomodoroSettings(parseIntervalSettings(null));
         setPomodoroDraft({ focus: "25", short: "5" });
@@ -1021,6 +1045,7 @@ function App() {
         csrf = result.csrf ?? "";
         if (!result.authenticated) {
           clearPersonalTools();
+          setTimerContinuity(null);
           setPomodoro(freshPomodoro());
           setPomodoroSettings(parseIntervalSettings(null));
           setPomodoroDraft({ focus: "25", short: "5" });
@@ -1045,16 +1070,18 @@ function App() {
       document.title = "YPT Web · 로그인";
       return;
     }
-    const startedAt =
-      snapshot?.timer.state === "running"
-        ? snapshot.timer.startedAt
-        : snapshot?.remoteStatus === "running"
-          ? snapshot.remoteStartedAt
-          : null;
-    document.title = startedAt
-      ? `${duration(now + clockOffset - startedAt)} · YPT Web`
+    const startedAt = snapshot?.timer.state === "running" && snapshot.timer.startedAt !== null
+      ? snapshot.timer.startedAt
+      : snapshot?.remoteStatus === "running" ? snapshot.remoteStartedAt : null;
+    const subject = snapshot?.timer.subject ?? snapshot?.remoteSubject;
+    const elapsed = startedAt !== null && startedAt !== undefined
+      ? (subject ? timerContinuityElapsed(timerContinuity, subject, startedAt, now + clockOffset) : null)
+        ?? Math.max(0, now + clockOffset - startedAt)
+      : null;
+    document.title = elapsed !== null
+      ? `${duration(elapsed)} · YPT Web`
       : "YPT Web · 공부";
-  }, [session?.authenticated, snapshot, now, clockOffset]);
+  }, [session?.authenticated, snapshot, timerContinuity, now, clockOffset]);
   useEffect(() => {
     if (!session?.authenticated) return;
     const onVisible = () => {
@@ -1230,6 +1257,12 @@ function App() {
     action: "start" | "pause" | "resume" | "stop" | "resolve",
   ): Promise<Snapshot | null> {
     if (!snapshot || inFlight.current) return null;
+    const activeStartedAt = snapshot.timer.state === "running" && snapshot.timer.startedAt !== null
+      ? snapshot.timer.startedAt
+      : snapshot.remoteStatus === "running" ? snapshot.remoteStartedAt : null;
+    const activeSubject = snapshot.timer.subject ?? snapshot.remoteSubject ?? selectedSubject;
+    const actionRequestedAt = Date.now();
+    const pauseElapsedAt = actionRequestedAt + clockOffset;
     const epoch = authEpoch.current;
     inFlight.current = true;
     setBusy(true);
@@ -1247,7 +1280,29 @@ function App() {
             },
       );
       if (epoch !== authEpoch.current) return null;
-      return await loadSnapshot(true) ?? null;
+      const updated = await loadSnapshot(true) ?? null;
+      if (!updated) return null;
+      const updatedStartedAt = updated.timer.state === "running" && updated.timer.startedAt !== null
+        ? updated.timer.startedAt
+        : updated.remoteStatus === "running" ? updated.remoteStartedAt : null;
+      const updatedSubject = updated.timer.subject ?? updated.remoteSubject ?? selectedSubject;
+      const isRunning = updatedStartedAt !== null && updatedStartedAt !== undefined &&
+        (updated.timer.state === "running" || updated.remoteStatus === "running");
+      if (action === "start" && isRunning && updatedSubject)
+        setTimerContinuity(startTimerContinuity(updatedSubject, updatedStartedAt));
+      else if (action === "pause" && updated.timer.state === "paused" &&
+        activeStartedAt !== null && activeStartedAt !== undefined && activeSubject)
+        setTimerContinuity((current) => pauseTimerContinuity(
+          current, activeSubject, activeStartedAt, pauseElapsedAt, Date.now(),
+        ));
+      else if (action === "resume" && isRunning && updatedSubject)
+        setTimerContinuity((current) => resumeTimerContinuity(
+          current, updatedSubject, updatedStartedAt, actionRequestedAt,
+        ));
+      else if ((action === "stop" || action === "resolve") &&
+        updated.timer.state === "idle" && updated.remoteStatus === "idle")
+        setTimerContinuity(null);
+      return updated;
     } catch (cause) {
       if (epoch !== authEpoch.current) return null;
       await loadSnapshot(true);
@@ -1266,11 +1321,18 @@ function App() {
     if (pomodoroAction.current || busy) return;
     pomodoroAction.current = true;
     const current = pomodoro;
-    setPomodoro({ ...current, remainingMs: pomodoroRemaining(current, Date.now()), endsAt: null, status: "transition" });
+    setPomodoro({ ...current, remainingMs: pomodoroRemaining(current, Date.now() + clockOffset), endsAt: null, status: "transition" });
     const result = await change(action);
     const expected = action === "start" || action === "resume" ? "running" : action === "pause" ? "paused" : "idle";
-    if (result?.timer.state === expected && result.remoteStatus !== "unverified") {
-      setPomodoro(next(current, Date.now()));
+    const anchorAt = result === null ? null
+      : action === "start" || action === "resume"
+        ? result.timer.startedAt ?? result.remoteStartedAt
+        : action === "pause"
+          ? result.timer.updatedAt + (result.upstreamClockOffsetMs ?? 0)
+          : Date.now() + clockOffset;
+    const confirmed = result?.timer.state === expected && result.remoteStatus !== "unverified";
+    if (result && confirmed && anchorAt !== null) {
+      setPomodoro(next(current, anchorAt));
       setPomodoroError("");
     } else {
       setPomodoro((old) => ({ ...old, status: "halted" }));
@@ -1278,21 +1340,29 @@ function App() {
     }
     pomodoroAction.current = false;
   }
+  function adjustPomodoroDraft(field: "focus" | "short", amount: -1 | 1) {
+    const [minimum, maximum] = field === "focus" ? [5, 180] : [1, 60];
+    setPomodoroDraft((old) => {
+      const current = Number(old[field]);
+      const value = Number.isFinite(current) ? Math.trunc(current) : minimum;
+      return { ...old, [field]: String(Math.max(minimum, Math.min(maximum, value + amount))) };
+    });
+  }
   useEffect(() => {
     if (!session?.authenticated || !pomodoroMode || !snapshot || pomodoro.status === "idle" ||
       pomodoro.status === "transition" || pomodoro.status === "halted" || pomodoroAction.current) return;
     const expected = pomodoro.phase === "focus" && pomodoro.status === "running" ? "running" : "paused";
     if (snapshot.timer.state !== expected || snapshot.remoteStatus === "unverified") {
-      setPomodoro((old) => ({ ...old, status: "halted", remainingMs: pomodoroRemaining(old, Date.now()), endsAt: null }));
+      setPomodoro((old) => ({ ...old, status: "halted", remainingMs: pomodoroRemaining(old, now + clockOffset), endsAt: null }));
       setPomodoroError("열품타 타이머 상태가 바뀌어 뽀모도로 자동 전환을 멈췄습니다. 상태를 확인하고 초기화해 주세요.");
       return;
     }
-    if (!shouldAdvancePomodoro(pomodoro, now, document.visibilityState === "visible",
+    if (!shouldAdvancePomodoro(pomodoro, now + clockOffset, document.visibilityState === "visible",
       snapshotCheckedAt, lastVisibleAt.current) || busy) return;
     const action = pomodoro.phase === "focus" ? "pause" : "resume";
     void pomodoroMutation(action, (current, finishedAt) =>
       nextPomodoro(current, finishedAt, pomodoroSettings.focus, pomodoroSettings.short));
-  }, [now, pomodoro, snapshot, snapshotCheckedAt, busy, session?.authenticated, pomodoroMode, pomodoroSettings]);
+  }, [now, clockOffset, pomodoro, snapshot, snapshotCheckedAt, busy, session?.authenticated, pomodoroMode, pomodoroSettings]);
   async function logout() {
     if (loggingOut || busy) return;
     setLoggingOut(true);
@@ -1308,6 +1378,7 @@ function App() {
     } finally {
       if (clearLocalSession) {
         clearPersonalTools();
+        setTimerContinuity(null);
         authEpoch.current++;
         historyCache.current.clear();
         historyRequests.current.clear();
@@ -1383,6 +1454,7 @@ function App() {
         onToggleTheme={() => setDarkMode((old) => !old)}
         onLogin={async (warning) => {
           clearPersonalTools();
+          setTimerContinuity(null);
           setPomodoro(freshPomodoro(pomodoroSettings.focus));
           setPomodoroError("");
           authEpoch.current++;
@@ -1412,13 +1484,12 @@ function App() {
     (timer?.state === "running" && timer.startedAt !== null) || appOnly;
   const pomodoroActive = pomodoroMode && ["running", "paused", "transition"].includes(pomodoro.status);
   const timerCaptionSubject = timer?.subject || snapshot?.remoteSubject;
-  const liveMs = running
-    ? Math.max(
-        0,
-        now +
-          clockOffset -
-          (timer?.startedAt ?? snapshot?.remoteStartedAt ?? now),
-      )
+  const liveStartedAt = timer?.state === "running" && timer.startedAt !== null
+    ? timer.startedAt : snapshot?.remoteStatus === "running" ? snapshot.remoteStartedAt : null;
+  const liveMs = running && liveStartedAt !== null && liveStartedAt !== undefined
+    ? (timerCaptionSubject
+      ? timerContinuityElapsed(timerContinuity, timerCaptionSubject, liveStartedAt, now + clockOffset)
+      : null) ?? Math.max(0, now + clockOffset - liveStartedAt)
     : 0;
   let status = "상태 확인 중";
   if (timer) {
@@ -1527,7 +1598,7 @@ function App() {
                 {timer?.subject || snapshot?.remoteSubject}
               </span>
             )}
-            {pomodoroActive ? <strong>{pomodoro.phase === "focus" ? "집중" : "휴식"} {countdown(pomodoroRemaining(pomodoro, now))}</strong>
+            {pomodoroActive ? <strong>{pomodoro.phase === "focus" ? "집중" : "휴식"} {countdown(pomodoroRemaining(pomodoro, now + clockOffset))}</strong>
               : running && <strong>{duration(liveMs)}</strong>}
           </div>
           <button
@@ -1554,7 +1625,7 @@ function App() {
                     ? ` · ${timer?.subject || snapshot?.remoteSubject}`
                     : ""}
                 </span>
-                <strong>{pomodoroActive ? countdown(pomodoroRemaining(pomodoro, now)) : duration(liveMs)}</strong>
+                <strong>{pomodoroActive ? countdown(pomodoroRemaining(pomodoro, now + clockOffset)) : duration(liveMs)}</strong>
               </div>
               <button className="secondary" onClick={() => navigateTab("study")}
               >
@@ -1638,7 +1709,7 @@ function App() {
                       : "나의 집중 시간"}</span>
                     <div className="timer-display" aria-live="off">
                       {pomodoroActive
-                        ? countdown(pomodoroRemaining(pomodoro, now))
+                        ? countdown(pomodoroRemaining(pomodoro, now + clockOffset))
                         : running
                         ? duration(liveMs)
                         : timer?.state === "paused"
@@ -1646,9 +1717,10 @@ function App() {
                           : "00:00:00"}
                     </div>
                     <div className="timer-caption">
-                      <span className="timer-caption-label">
-                        {pomodoroActive ? pomodoroStatusLabel(pomodoro) : status}
-                      </span>
+                      {(pomodoroActive ? pomodoroStatusLabel(pomodoro) : status) &&
+                        <span className="timer-caption-label">
+                          {pomodoroActive ? pomodoroStatusLabel(pomodoro) : status}
+                        </span>}
                       {timerCaptionSubject && <span className="timer-caption-subject">과목 · {timerCaptionSubject}</span>}
                     </div>
                     {pomodoroActive && pomodoro.phase === "focus" && focusTask &&
@@ -1699,7 +1771,7 @@ function App() {
                       onClick={() => {
                         if (pomodoro.phase === "break") {
                           setPomodoro((old) => old.status === "running"
-                            ? pausePomodoro(old, Date.now()) : runPomodoro(old, Date.now()));
+                            ? pausePomodoro(old, Date.now() + clockOffset) : runPomodoro(old, Date.now() + clockOffset));
                         } else {
                           void pomodoroMutation(pomodoro.status === "running" ? "pause" : "resume",
                             (old, at) => old.status === "running" ? pausePomodoro(old, at) : runPomodoro(old, at));
@@ -1788,10 +1860,34 @@ function App() {
                       if (pomodoro.status === "idle") setPomodoro(freshPomodoro(focus));
                       setPomodoroError("");
                     }}>
-                      <label>집중 <input type="number" inputMode="numeric" min="5" max="180" value={pomodoroDraft.focus}
-                        onChange={(event) => setPomodoroDraft((old) => ({ ...old, focus: event.target.value }))} /> 분</label>
-                      <label>휴식 <input type="number" inputMode="numeric" min="1" max="60" value={pomodoroDraft.short}
-                        onChange={(event) => setPomodoroDraft((old) => ({ ...old, short: event.target.value }))} /> 분</label>
+                      <div className="pomodoro-length-control">
+                        <label htmlFor="pomodoro-focus-minutes">집중</label>
+                        <div className="pomodoro-stepper">
+                          <button className="secondary" type="button" aria-label="집중 시간 1분 줄이기"
+                            disabled={Number(pomodoroDraft.focus) <= 5}
+                            onClick={() => adjustPomodoroDraft("focus", -1)}>−</button>
+                          <input id="pomodoro-focus-minutes" type="number" inputMode="numeric" min="5" max="180" value={pomodoroDraft.focus}
+                            onChange={(event) => setPomodoroDraft((old) => ({ ...old, focus: event.target.value }))} />
+                          <button className="secondary" type="button" aria-label="집중 시간 1분 늘리기"
+                            disabled={Number(pomodoroDraft.focus) >= 180}
+                            onClick={() => adjustPomodoroDraft("focus", 1)}>+</button>
+                        </div>
+                        <span>분</span>
+                      </div>
+                      <div className="pomodoro-length-control">
+                        <label htmlFor="pomodoro-break-minutes">휴식</label>
+                        <div className="pomodoro-stepper">
+                          <button className="secondary" type="button" aria-label="휴식 시간 1분 줄이기"
+                            disabled={Number(pomodoroDraft.short) <= 1}
+                            onClick={() => adjustPomodoroDraft("short", -1)}>−</button>
+                          <input id="pomodoro-break-minutes" type="number" inputMode="numeric" min="1" max="60" value={pomodoroDraft.short}
+                            onChange={(event) => setPomodoroDraft((old) => ({ ...old, short: event.target.value }))} />
+                          <button className="secondary" type="button" aria-label="휴식 시간 1분 늘리기"
+                            disabled={Number(pomodoroDraft.short) >= 60}
+                            onClick={() => adjustPomodoroDraft("short", 1)}>+</button>
+                        </div>
+                        <span>분</span>
+                      </div>
                       <button className="secondary" type="submit">적용</button>
                     </form>
                     <p>진행 중 변경한 길이는 다음 구간부터 적용됩니다. 자동 전환은 웹 화면이 보일 때만 실행됩니다. 화면을 닫아도 열품타 타이머는 자동 종료되지 않습니다.</p>
@@ -1818,6 +1914,7 @@ function App() {
                   <summary>타이머 이용 안내</summary>
                   <p>일시정지는 과목을 기억해 재개할 수 있습니다. 공부 끝내기는 구간을 마무리하고 다음 시작 때 과목을 다시 고릅니다.</p>
                   <p>시작·재개 전에 서버가 앱 타이머 상태를 다시 확인합니다. 화면을 닫아도 타이머는 계속되며, 앱에서 시작한 공부도 여기서 제어할 수 있습니다.</p>
+                  {pomodoroMode && <p>집중·휴식 길이는 설정의 − / + 버튼으로 1분씩 조절하거나 숫자를 입력한 뒤 적용할 수 있습니다.</p>}
                 </details>
                 {pendingRecoveryWait ? (
                   <p className="caution">

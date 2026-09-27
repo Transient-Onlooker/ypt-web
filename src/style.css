@@ -1294,7 +1294,10 @@ h1 {
   box-shadow: 0 0 32px #bcf27a17;
 }
 .timer-face-inner {
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  container-type: inline-size;
 }
 .timer-face-kicker {
   color: #d9f2c3;
@@ -1303,13 +1306,17 @@ h1 {
   letter-spacing: .12em;
 }
 .timer-display {
+  max-width: 100%;
   margin: 17px 0 6px;
   color: #fff;
-  font-size: clamp(39px, 5vw, 64px);
+  font-size: clamp(26px, 10vw, 64px);
   font-weight: 700;
   letter-spacing: -.045em;
   line-height: 1.2;
   text-shadow: 0 4px 25px #061f13;
+}
+@supports (font-size: 1cqi) {
+  .timer-face .timer-display { font-size: clamp(26px, 22cqi, 64px); }
 }
 .timer-caption {
   display: grid;
@@ -1709,7 +1716,7 @@ input[type="search"] {
   .history-card,
   .group-card { padding: 18px; border-radius: 21px; }
   .timer-face { min-height: 232px; margin: 16px 0 23px; }
-  .timer-display { font-size: clamp(39px, 10vw, 58px); }
+  .timer-display { font-size: clamp(26px, 10vw, 58px); }
   .bottom-nav {
     left: 12px;
     right: 12px;
@@ -1996,8 +2003,11 @@ input[type="search"] {
 }
 .pomodoro-settings summary { display: flex; align-items: center; min-height: 44px; color: #315f43; font-size: 13px; font-weight: 700; cursor: pointer; }
 .pomodoro-settings form { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 0 0 12px; }
-.pomodoro-settings label { display: flex; align-items: center; gap: 6px; color: var(--ink); font-size: 13px; }
-.pomodoro-settings input { width: 70px; min-height: 40px; padding: 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); }
+.pomodoro-length-control { display: grid; grid-template-columns: auto auto auto; align-items: center; gap: 6px; color: var(--ink); font-size: 13px; }
+.pomodoro-length-control > label { color: inherit; }
+.pomodoro-stepper { display: flex; align-items: center; gap: 4px; }
+.pomodoro-settings input { width: 58px; min-height: 40px; padding: 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); text-align: center; }
+.pomodoro-stepper button { width: 36px; padding: 0; font-size: 18px; font-weight: 700; line-height: 1; }
 .pomodoro-settings button { min-height: 40px; }
 .pomodoro-settings p { margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 
@@ -2221,10 +2231,11 @@ input[type="search"] {
 :root:not([data-theme="dark"]) .bottom-nav button { background: #fff; color: #000; }
 :root:not([data-theme="dark"]) .content :where(*) { color: #000; border-color: #000; }
 :root:not([data-theme="dark"]) .content .timer-face,
-:root:not([data-theme="dark"]) .content .timer-face * { color: #fff; }
+:root:not([data-theme="dark"]) .content .timer-face * { color: #000; }
 :root:not([data-theme="dark"]) .content .primary,
 :root:not([data-theme="dark"]) .content .primary * { color: #fff; }
-:root:not([data-theme="dark"]) .timer-face { background: #000; border-color: #22a447; }
+:root:not([data-theme="dark"]) .timer-face { background: #fff; border-color: #000; }
+:root:not([data-theme="dark"]) .timer-display { text-shadow: none; }
 :root:not([data-theme="dark"]) .timer-face::before,
 :root:not([data-theme="dark"]) .timer-face::after { border-color: #22a447; }
 :root:not([data-theme="dark"]) .timer-face.is-running::after { box-shadow: 0 0 0 2px #22a447; }
