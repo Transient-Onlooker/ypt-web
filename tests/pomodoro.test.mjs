@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { freshPomodoro, nextPomodoro, parsePomodoro, pausePomodoro, pomodoroRemaining, runPomodoro, shouldAdvancePomodoro } from "../shared/pomodoro.ts";
+import { freshPomodoro, nextPomodoro, parsePomodoro, pausePomodoro, pomodoroRemaining, pomodoroStatusLabel, runPomodoro, shouldAdvancePomodoro } from "../shared/pomodoro.ts";
 
 test("집중 종료 후 휴식, 휴식 종료 후 다음 집중의 길이와 회차를 계산한다", () => {
   const start = runPomodoro(freshPomodoro(25), 1_000);
@@ -18,6 +18,13 @@ test("수동 일시정지는 남은 시간을 보존하고 재개 시 새 종료
   assert.equal(paused.remainingMs, 900_000);
   assert.equal(paused.endsAt, null);
   assert.equal(runPomodoro(paused, 701_000).endsAt, 1_601_000);
+});
+
+test("뽀모도로 상태 문구는 집중·휴식 상태에 맞는 고정 문자열을 표시한다", () => {
+  assert.equal(pomodoroStatusLabel({ phase: "break", status: "running" }), "휴식 중 · 열품타 일시정지");
+  assert.equal(pomodoroStatusLabel({ phase: "break", status: "paused" }), "휴식 잠시 멈춤 · 열품타 일시정지");
+  assert.equal(pomodoroStatusLabel({ phase: "focus", status: "running" }), "열품타 공부 중");
+  assert.equal(pomodoroStatusLabel({ phase: "focus", status: "transition" }), "열품타 상태 확인 중…");
 });
 
 test("응답 대기 중 새로고침되면 자동 전환을 중단한다", () => {

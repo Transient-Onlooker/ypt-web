@@ -5,13 +5,14 @@ import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, verifiedGoalStreak } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
+import { tabFromSearch, tabUrl } from "../shared/navigation.ts";
+import type { Tab } from "../shared/navigation.ts";
 import { clearPersonalTools, StudyTools } from "./study-tools.tsx";
-import { freshPomodoro, nextPomodoro, parsePomodoro, pausePomodoro, pomodoroRemaining, runPomodoro, shouldAdvancePomodoro } from "../shared/pomodoro.ts";
+import { freshPomodoro, nextPomodoro, parsePomodoro, pausePomodoro, pomodoroRemaining, pomodoroStatusLabel, runPomodoro, shouldAdvancePomodoro } from "../shared/pomodoro.ts";
 import type { Pomodoro } from "../shared/pomodoro.ts";
 import { parseIntervalSettings } from "../shared/study-tools.ts";
 import "./style.css";
 
-type Tab = "study" | "history" | "groups";
 function NavIcon({ tab }: { tab: Tab }) {
   const paths = {
     study: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.7 1.8" /></>,
@@ -732,7 +733,20 @@ function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [snapshotCheckedAt, setSnapshotCheckedAt] = useState<number | null>(null);
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
-  const [tab, setTab] = useState<Tab>("study");
+  const [tab, setTab] = useState<Tab>(() => tabFromSearch(window.location.search));
+  const navigateTab = useCallback((next: Tab, replace = false) => {
+    if (tabFromSearch(window.location.search) !== next) {
+      const href = tabUrl(window.location.href, next);
+      if (replace) window.history.replaceState({ yptTab: next }, "", href);
+      else window.history.pushState({ yptTab: next }, "", href);
+    }
+    setTab(next);
+  }, []);
+  useEffect(() => {
+    const restoreTab = () => setTab(tabFromSearch(window.location.search));
+    window.addEventListener("popstate", restoreTab);
+    return () => window.removeEventListener("popstate", restoreTab);
+  }, []);
   const [syncSeconds, setSyncSeconds] = useState(savedSyncSeconds);
   const [goalMinutes, setGoalMinutes] = useState(savedGoalMinutes);
   const [darkMode, setDarkMode] = useState(() => {
@@ -981,7 +995,7 @@ function App() {
         setMemberQuery("");
         setMemberSort("time");
         setMemberFilter("all");
-        setTab("study");
+        navigateTab("study", true);
         setLoginNotice(
           cause instanceof Error ? cause.message : "다시 로그인해 주세요.",
         );
@@ -998,7 +1012,7 @@ function App() {
         setRefreshingSnapshot(false);
     }
     return null;
-  }, []);
+  }, [navigateTab]);
   useEffect(() => {
     let active = true;
     api<Session>("/session")
@@ -1333,7 +1347,7 @@ function App() {
         setPomodoroError("");
         setFocusTask("");
         setDate("");
-        setTab("study");
+        navigateTab("study", true);
         setLoginNotice("");
         setRememberWarning("");
       }
@@ -1397,6 +1411,7 @@ function App() {
   const running =
     (timer?.state === "running" && timer.startedAt !== null) || appOnly;
   const pomodoroActive = pomodoroMode && ["running", "paused", "transition"].includes(pomodoro.status);
+  const timerCaptionSubject = timer?.subject || snapshot?.remoteSubject;
   const liveMs = running
     ? Math.max(
         0,
@@ -1468,21 +1483,21 @@ function App() {
           <button
             className={tab === "study" ? "active" : ""}
             aria-current={tab === "study" ? "page" : undefined}
-            onClick={() => setTab("study")}
+            onClick={() => navigateTab("study")}
           >
             <NavIcon tab="study" />공부
           </button>
           <button
             className={tab === "history" ? "active" : ""}
             aria-current={tab === "history" ? "page" : undefined}
-            onClick={() => setTab("history")}
+            onClick={() => navigateTab("history")}
           >
             <NavIcon tab="history" />기록
           </button>
           <button
             className={tab === "groups" ? "active" : ""}
             aria-current={tab === "groups" ? "page" : undefined}
-            onClick={() => setTab("groups")}
+            onClick={() => navigateTab("groups")}
           >
             <NavIcon tab="groups" />그룹
           </button>
@@ -1541,7 +1556,7 @@ function App() {
                 </span>
                 <strong>{pomodoroActive ? countdown(pomodoroRemaining(pomodoro, now)) : duration(liveMs)}</strong>
               </div>
-              <button className="secondary" onClick={() => setTab("study")}
+              <button className="secondary" onClick={() => navigateTab("study")}
               >
                 타이머 보기
               </button>
@@ -1631,10 +1646,10 @@ function App() {
                           : "00:00:00"}
                     </div>
                     <div className="timer-caption">
-                      {pomodoroActive ? pomodoro.status === "transition" ? "열품타 상태 확인 중…"
-                        : pomodoro.phase === "break" ? pomodoro.status === "paused" ? "휴식 잠시 멈춤 · 열품타 일시정지" : "휴식 중 · 열품타 일시정지"
-                        : pomodoro.status === "paused" ? "집중 일시정지" : "열품타 공부 중" : status}
-                      {timer?.subject ? ` · ${timer.subject}` : ""}
+                      <span className="timer-caption-label">
+                        {pomodoroActive ? pomodoroStatusLabel(pomodoro) : status}
+                      </span>
+                      {timerCaptionSubject && <span className="timer-caption-subject">과목 · {timerCaptionSubject}</span>}
                     </div>
                     {pomodoroActive && pomodoro.phase === "focus" && focusTask &&
                       <span className="pomodoro-task">{focusTask}</span>}
@@ -2225,21 +2240,21 @@ function App() {
         <button
           className={tab === "study" ? "active" : ""}
           aria-current={tab === "study" ? "page" : undefined}
-          onClick={() => setTab("study")}
+          onClick={() => navigateTab("study")}
         >
           <NavIcon tab="study" />공부
         </button>
         <button
           className={tab === "history" ? "active" : ""}
           aria-current={tab === "history" ? "page" : undefined}
-          onClick={() => setTab("history")}
+          onClick={() => navigateTab("history")}
         >
           <NavIcon tab="history" />기록
         </button>
         <button
           className={tab === "groups" ? "active" : ""}
           aria-current={tab === "groups" ? "page" : undefined}
-          onClick={() => setTab("groups")}
+          onClick={() => navigateTab("groups")}
         >
           <NavIcon tab="groups" />그룹
         </button>

@@ -1312,11 +1312,17 @@ h1 {
   text-shadow: 0 4px 25px #061f13;
 }
 .timer-caption {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
   margin: 0;
   color: #d8ebda;
   font-size: 14px;
-  overflow-wrap: anywhere;
+  line-height: 1.4;
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
+.timer-caption-subject { font-size: 12px; overflow-wrap: anywhere; }
 .form-area {
   margin-bottom: 15px;
 }
