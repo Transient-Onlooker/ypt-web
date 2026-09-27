@@ -249,7 +249,7 @@ export function membersFrom(reply: Record<string, unknown>): Member[] {
         studying,
         studyMs: number(log?.sm),
         startedAt: Number.isSafeInteger(startedAt) &&
-          startedAt >= Date.now() - 24 * 60 * 60_000 &&
+          startedAt > 0 &&
           startedAt <= Date.now() + 30_000 ? startedAt : null,
       };
     })

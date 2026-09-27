@@ -45,6 +45,8 @@ function upstream() {
   let expireAfterNextStart = false;
   let nextReloadDay = null;
   let nextGroupMembers = null;
+  let phoneStartNextStart = null;
+  let phoneStopNextStop = false;
   const reply = (data) =>
     new Response(JSON.stringify({ s: true, ...data }), {
       status: 200,
@@ -94,6 +96,15 @@ function upstream() {
       });
     }
     if (path === "/study/start") {
+      if (phoneStartNextStart) {
+        state.active = true;
+        state.subject = phoneStartNextStart.subject ?? inputBody.subject;
+        state.startedAt = phoneStartNextStart.startedAt;
+        phoneStartNextStart = null;
+        return new Response(JSON.stringify({ s: false, c: 104 }), {
+          status: 200,
+        });
+      }
       if (state.active)
         return new Response(JSON.stringify({ s: false, c: 104 }), {
           status: 200,
@@ -116,6 +127,13 @@ function upstream() {
       });
     }
     if (path === "/study/stop") {
+      if (phoneStopNextStop) {
+        phoneStopNextStop = false;
+        state.active = false;
+        return new Response(JSON.stringify({ s: false, c: 104 }), {
+          status: 200,
+        });
+      }
       if (
         !state.active ||
         Math.abs(inputBody.startedAt - state.startedAt) > 3000
@@ -191,13 +209,20 @@ function upstream() {
     groupMembersOnce(members) {
       nextGroupMembers = { ms: members };
     },
+    phoneStartsBeforeNextStart(subject, startedAt = Date.now() - 2_000) {
+      phoneStartNextStart = { subject, startedAt };
+    },
+    phoneStopsBeforeNextStop() {
+      phoneStopNextStop = true;
+    },
   };
 }
-function request(path, method = "GET", data, cookie, csrf, reqOrigin = origin) {
+function request(path, method = "GET", data, cookie, csrf, reqOrigin = origin, cfIp) {
   return new Request(`${origin}/api${path}`, {
     method,
     headers: {
       ...(cookie ? { Cookie: cookie } : {}),
+      ...(cfIp ? { "CF-Connecting-IP": cfIp } : {}),
       ...(method !== "GET"
         ? {
             Origin: reqOrigin,
@@ -209,9 +234,9 @@ function request(path, method = "GET", data, cookie, csrf, reqOrigin = origin) {
     ...(data ? { body: JSON.stringify(data) } : {}),
   });
 }
-async function call(env, path, method = "GET", data, cookie, csrf, reqOrigin) {
+async function call(env, path, method = "GET", data, cookie, csrf, reqOrigin, cfIp) {
   const response = await worker.fetch(
-    request(path, method, data, cookie, csrf, reqOrigin),
+    request(path, method, data, cookie, csrf, reqOrigin, cfIp),
     env,
   );
   return {
@@ -247,6 +272,112 @@ async function pagesCall(env, path, method = "GET", data, token, csrf, reqOrigin
     allowCredentials: response.headers.get("Access-Control-Allow-Credentials"),
   };
 }
+
+test("IP login limits block unique emails without growing email buckets", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const db = database();
+  const env = {
+    DB: db,
+    APP_ORIGIN: origin,
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    db.sqlite.prepare(
+      "INSERT INTO login_limits(key,count,expires_at) VALUES(?,?,?)",
+    ).run("expired-test-bucket", 10, Date.now() - 1);
+    for (let i = 0; i < 12; i += 1) {
+      const response = await call(
+        env,
+        "/login",
+        "POST",
+        { email: `guess-${i}@example.test`, password: "wrong" },
+        undefined,
+        undefined,
+        undefined,
+        "198.51.100.44",
+      );
+      assert.equal(response.status, i < 10 ? 401 : 429);
+    }
+    assert.equal(
+      db.sqlite.prepare("SELECT COUNT(*) AS count FROM login_limits WHERE key LIKE 'email:%'").get().count,
+      10,
+    );
+    assert.equal(
+      db.sqlite.prepare("SELECT COUNT(*) AS count FROM login_limits WHERE key=?").get("expired-test-bucket").count,
+      0,
+    );
+  } finally {
+    db.sqlite.close();
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("verified app races repair rejected web timer changes and old operation rows expire", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const db = database();
+  const env = {
+    DB: db,
+    APP_ORIGIN: origin,
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    const login = await call(env, "/login", "POST", {
+      email: "race@example.test",
+      password: "correct",
+    });
+    assert.equal(login.status, 200);
+    const account = db.sqlite.prepare("SELECT id FROM accounts").get().id;
+    const oldOperationId = randomUUID();
+    db.sqlite.prepare(
+      "INSERT INTO operations(account_id,id,action,created_at) VALUES(?,?,?,?)",
+    ).run(account, oldOperationId, "start", Date.now() - 31 * 24 * 60 * 60_000);
+
+    const phoneStartedAt = Date.now() - 2_000;
+    stub.phoneStartsBeforeNextStart("수학", phoneStartedAt);
+    const rejectedStart = await call(
+      env,
+      "/timer/start",
+      "POST",
+      { revision: 0, operationId: randomUUID(), subject: "수학" },
+      login.cookie,
+      login.data.csrf,
+    );
+    assert.equal(rejectedStart.status, 502);
+    assert.equal(rejectedStart.data.code, "API_REJECTED");
+    assert.equal(
+      db.sqlite.prepare("SELECT COUNT(*) AS count FROM operations WHERE account_id=? AND id=?").get(account, oldOperationId).count,
+      0,
+    );
+    const running = await call(env, "/snapshot", "GET", undefined, login.cookie);
+    assert.equal(running.data.timer.state, "running");
+    assert.equal(running.data.timer.origin, "app");
+    assert.equal(running.data.timer.startedAt, phoneStartedAt);
+
+    stub.phoneStopsBeforeNextStop();
+    const rejectedStop = await call(
+      env,
+      "/timer/stop",
+      "POST",
+      { revision: running.data.timer.revision, operationId: randomUUID(), subject: "수학" },
+      login.cookie,
+      login.data.csrf,
+    );
+    assert.equal(rejectedStop.status, 502);
+    assert.equal(rejectedStop.data.code, "API_REJECTED");
+    const idle = await call(env, "/snapshot", "GET", undefined, login.cookie);
+    assert.equal(idle.data.timer.state, "idle");
+    assert.equal(idle.data.remoteStatus, "idle");
+  } finally {
+    db.sqlite.close();
+    globalThis.fetch = realFetch;
+  }
+});
 
 test("Pages uses isolated bearer sessions and restricted CORS", async () => {
   const stub = upstream();

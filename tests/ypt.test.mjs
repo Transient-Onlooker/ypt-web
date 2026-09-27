@@ -145,6 +145,19 @@ test("member study status comes from the day log, not im", () => {
   ]);
 });
 
+test("group members keep verified start times for sessions longer than a day", () => {
+  const startedAt = Date.now() - 25 * 60 * 60_000;
+  const tooFarInFuture = Date.now() + 31_000;
+  const members = membersFrom({ ms: [
+    { ud: 1, n: "Long session", dl: { is: true, st: new Date(startedAt).toISOString(), sm: 90_000_000 } },
+    { ud: 2, n: "Invalid future", dl: { is: true, st: new Date(tooFarInFuture).toISOString(), sm: 0 } },
+  ] });
+  assert.deepEqual(members, [
+    { id: 1, nickname: "Long session", studying: true, studyMs: 90_000_000, startedAt },
+    { id: 2, nickname: "Invalid future", studying: true, studyMs: 0, startedAt: null },
+  ]);
+});
+
 test("duplicate group member ids count once and conflicting values stay unverified", () => {
   const members = membersFrom({ ms: [
     { ud: 7, n: "A", dl: { is: true, sm: 20_000 } },

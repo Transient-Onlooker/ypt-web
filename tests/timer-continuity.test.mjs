@@ -31,6 +31,14 @@ test("exactly 15 seconds carries time, but a longer pause starts a fresh display
   assert.equal(timerContinuityElapsed(laterResume, "Math", 50_000, 51_000), 1_000);
 });
 
+test("a delayed pause confirmation does not extend the 15-second resume window", () => {
+  const first = startTimerContinuity("Math", 1_000);
+  const pausedAtClick = 31_000;
+  const paused = pauseTimerContinuity(first, "Math", 1_000, 31_000, pausedAtClick);
+  const resumed = resumeTimerContinuity(paused, "Math", 50_000, 46_001);
+  assert.equal(timerContinuityElapsed(resumed, "Math", 50_000, 51_000), 1_000);
+});
+
 test("multiple quick pauses keep carrying the accumulated focus time", () => {
   const first = startTimerContinuity("Math", 1_000);
   const firstPause = pauseTimerContinuity(first, "Math", 1_000, 31_000, 31_000);

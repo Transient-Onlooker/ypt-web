@@ -38,6 +38,7 @@ type TimerRow = {
 };
 const encoder = new TextEncoder();
 const TTL = 30 * 24 * 60 * 60 * 1000;
+const OPERATION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const COOKIE = "ypt_session";
 const REMEMBER_COOKIE = "__Host-ypt_remember";
 const PAGES_ORIGIN = "https://ypt.mcv.kr";
@@ -283,23 +284,36 @@ function mutationAllowed(request: Request, env: Env, s?: Session | null) {
 }
 async function limit(env: Env, email: string, request: Request) {
   const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-  const emailKey = await accountId(env, email);
   const ipKey = await accountId(env, `ip:${ip}`);
-  const expiry = Date.now() + 15 * 60_000;
-  for (const key of [`email:${emailKey}`, `ip:${ipKey}`]) {
-    await env.DB.prepare(
-      "INSERT INTO login_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires_at<? THEN 1 ELSE count+1 END, expires_at=CASE WHEN expires_at<? THEN excluded.expires_at ELSE expires_at END",
-    )
-      .bind(key, expiry, Date.now(), Date.now())
-      .run();
-    const row = await env.DB.prepare(
-      "SELECT count FROM login_limits WHERE key=?",
-    )
-      .bind(key)
-      .first<{ count: number }>();
-    if (!row || row.count > 10) return false;
-  }
-  return true;
+  const now = Date.now();
+  const expiry = now + 15 * 60_000;
+  await env.DB.prepare("DELETE FROM login_limits WHERE expires_at<=?")
+    .bind(now)
+    .run();
+  await env.DB.prepare(
+    "INSERT INTO login_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires_at<? THEN 1 ELSE count+1 END, expires_at=CASE WHEN expires_at<? THEN excluded.expires_at ELSE expires_at END",
+  )
+    .bind(`ip:${ipKey}`, expiry, now, now)
+    .run();
+  const ipRow = await env.DB.prepare(
+    "SELECT count FROM login_limits WHERE key=?",
+  )
+    .bind(`ip:${ipKey}`)
+    .first<{ count: number }>();
+  if (!ipRow || ipRow.count > 10) return false;
+
+  const emailKey = await accountId(env, email);
+  await env.DB.prepare(
+    "INSERT INTO login_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires_at<? THEN 1 ELSE count+1 END, expires_at=CASE WHEN expires_at<? THEN excluded.expires_at ELSE expires_at END",
+  )
+    .bind(`email:${emailKey}`, expiry, now, now)
+    .run();
+  const emailRow = await env.DB.prepare(
+    "SELECT count FROM login_limits WHERE key=?",
+  )
+    .bind(`email:${emailKey}`)
+    .first<{ count: number }>();
+  return !!emailRow && emailRow.count <= 10;
 }
 function resultError(error: unknown, headers: HeadersInit = {}) {
   if (error instanceof YptError) {
@@ -475,6 +489,11 @@ async function changeTimer(
   const subject = action === "start" ? input.subject : row.subject;
   if (typeof subject !== "string" || !subject.trim())
     return fail("SUBJECT", 400, "과목을 선택해 주세요.");
+  await env.DB.prepare(
+    "DELETE FROM operations WHERE account_id=? AND created_at<?",
+  )
+    .bind(s.account_id, Date.now() - OPERATION_RETENTION_MS)
+    .run();
   let jwt: string;
   try {
     jwt = await credential(env, s.account_id);
@@ -565,10 +584,16 @@ async function changeTimer(
   )
     .bind(s.account_id, op, action, Date.now())
     .run();
+  let mutationRejected = false;
   try {
     let confirmedStartedAt = startedAt;
     if (pending === "starting") {
-      await start(jwt, subject);
+      try {
+        await start(jwt, subject);
+      } catch (error) {
+        mutationRejected = error instanceof YptError && error.code === "REJECTED";
+        throw error;
+      }
       const confirmed = remoteFrom(await reload(jwt));
       if (
         confirmed.status !== "running" ||
@@ -577,7 +602,14 @@ async function changeTimer(
       )
         throw new YptError("UNCERTAIN");
       confirmedStartedAt = confirmed.startedAt;
-    } else await stop(jwt, startedAt!);
+    } else {
+      try {
+        await stop(jwt, startedAt!);
+      } catch (error) {
+        mutationRejected = error instanceof YptError && error.code === "REJECTED";
+        throw error;
+      }
+    }
     const finalState: TimerState =
       pending === "starting"
         ? "running"
@@ -605,6 +637,55 @@ async function changeTimer(
     if (!final.meta.changes) throw new YptError("UNCERTAIN");
     return json({ timer: publicTimer(await timer(env, s.account_id)) });
   } catch (e) {
+    let verificationError: unknown;
+    if (e instanceof YptError && e.code === "REJECTED" && mutationRejected) {
+      try {
+        const remote = remoteFrom(await reload(jwt));
+        if (
+          remote.status === "running" &&
+          remote.startedAt !== null &&
+          remote.subject
+        ) {
+          const sameTimer = previous === "running" && row.subject === remote.subject &&
+            row.started_at !== null &&
+            Math.abs(remote.startedAt - row.started_at) <= (row.origin === "app" ? 0 : 3000);
+          const repaired = await env.DB.prepare(
+            "UPDATE timers SET state='running',subject=?,started_at=?,origin=?,pending_id=NULL,revision=revision+1,updated_at=? WHERE account_id=? AND state=? AND pending_id=?",
+          )
+            .bind(
+              remote.subject,
+              remote.startedAt,
+              sameTimer && row.origin ? row.origin : "app",
+              Date.now(),
+              s.account_id,
+              pending,
+              op,
+            )
+            .run();
+          if (repaired.meta.changes) return resultError(e);
+        } else if (remote.status === "idle") {
+          const restoredState = pending === "starting" ? previous : "idle";
+          const restored = await env.DB.prepare(
+            "UPDATE timers SET state=?,subject=?,started_at=?,origin=?,pending_id=NULL,revision=revision+1,updated_at=? WHERE account_id=? AND state=? AND pending_id=?",
+          )
+            .bind(
+              restoredState,
+              restoredState === "idle" ? null : row.subject,
+              restoredState === "running" ? row.started_at : null,
+              restoredState === "idle" ? null : row.origin,
+              Date.now(),
+              s.account_id,
+              pending,
+              op,
+            )
+            .run();
+          if (restored.meta.changes) return resultError(e);
+        }
+      } catch (error) {
+        // Keep the timer uncertain if the read-only verification cannot confirm a state.
+        verificationError = error;
+      }
+    }
     // An upstream error can mean that a mutation succeeded but its reply was lost.
     // Never retry it and never invent a stop timestamp for an app-started timer.
     await env.DB.prepare(
@@ -613,6 +694,8 @@ async function changeTimer(
       .bind(Date.now(), s.account_id, pending, op)
       .run();
     if (e instanceof YptError && e.code === "AUTH_EXPIRED") throw e;
+    if (verificationError instanceof YptError && verificationError.code === "AUTH_EXPIRED")
+      throw verificationError;
     return fail(
       "UNCERTAIN",
       503,

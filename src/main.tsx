@@ -1293,7 +1293,7 @@ function App() {
       else if (action === "pause" && updated.timer.state === "paused" &&
         activeStartedAt !== null && activeStartedAt !== undefined && activeSubject)
         setTimerContinuity((current) => pauseTimerContinuity(
-          current, activeSubject, activeStartedAt, pauseElapsedAt, Date.now(),
+          current, activeSubject, activeStartedAt, pauseElapsedAt, actionRequestedAt,
         ));
       else if (action === "resume" && isRunning && updatedSubject)
         setTimerContinuity((current) => resumeTimerContinuity(
