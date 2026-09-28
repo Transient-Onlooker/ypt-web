@@ -5,6 +5,7 @@
   "compatibility_date": "2026-09-24",
   "workers_dev": true,
   "preview_urls": false,
+  "vars": { "GOOGLE_CLIENT_ID": "127236632013-pot358bj1baegfbikuv7r0na51hii6bv.apps.googleusercontent.com" },
   "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": true },
   "d1_databases": [{ "binding": "DB", "database_name": "ypt-web", "database_id": "a0700873-2fbe-4f1f-9e98-6956b0a0d4da", "migrations_dir": "worker/migrations" }],
   "observability": { "enabled": false }

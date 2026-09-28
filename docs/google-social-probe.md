@@ -1,6 +1,6 @@
 # 구글 계정 → 열품타 로그인 로컬 검증
 
-이 절차는 구글 OAuth 토큰이 열품타의 `/user/social/sign-up-jwt`에서 받아들여지는지 조사합니다. 2026-09-26 사용자가 자신의 구글 본계정으로 실행해 Google UserInfo 확인, 열품타 교환 HTTP 200·`success=true`, 인증된 재조회 HTTP 200·`verified=true`를 보고했습니다. 웹에는 Google 로그인 코드를 설정값으로 켤 수 있게 추가했지만, 운영용 웹 OAuth 클라이언트 ID가 없어 아직 로그인 버튼은 비활성 상태입니다. 웹 클라이언트 토큰과 기존 앱 계정 데이터 일치 여부도 검증되지 않았습니다.
+이 절차는 구글 OAuth 토큰이 열품타의 `/user/social/sign-up-jwt`에서 받아들여지는지 조사합니다. 2026-09-26 사용자가 자신의 구글 본계정으로 실행해 Google UserInfo 확인, 열품타 교환 HTTP 200·`success=true`, 인증된 재조회 HTTP 200·`verified=true`를 보고했습니다. 2026-09-28 운영 Worker에 웹 OAuth 클라이언트 ID를 설정해 배포했습니다. 다만 웹 클라이언트로 로그인한 계정과 기존 앱 계정의 데이터 일치 여부는 실제로 확인해야 합니다.
 
 열품타의 소셜 경로는 새 제공자 ID를 받으면 **새 계정을 만들 수 있습니다**. 기존 열품타 이메일 계정과 구글 이메일이 같아도 연결된다고 가정하지 마세요. 이미 열품타 앱에서 구글로 로그인한 계정으로 시험하는 것이 안전합니다.
 
@@ -17,7 +17,7 @@
 
 클라이언트 ID는 공개 설정값이지만 클라이언트 **보안 비밀**, Access token, Refresh token, JWT와 다릅니다. 이 문서의 로컬 검증은 Google OAuth Playground의 토큰으로 수행됐고, `ypt.mcv.kr`용 웹 클라이언트 ID로 발급한 토큰은 아직 시험하지 않았습니다.
 
-웹 클라이언트 ID를 만든 뒤 Worker의 `GOOGLE_CLIENT_ID` 설정값에 넣으면 `/api/auth/providers`가 ID를 공개하고 Google 로그인 버튼이 켜집니다. 버튼은 Google Identity Services 팝업에서 `openid email profile` Access token을 받습니다. Worker는 Google의 토큰 확인 응답에서 발급 대상(`aud`·`azp`)이 설정된 웹 클라이언트 ID와 같은지 확인하고, UserInfo의 `sub`와 검증된 이메일을 대조한 뒤 열품타 소셜 로그인에 전달합니다. 토큰은 브라우저 저장소나 D1에 보관하지 않습니다. 열품타 JWT만 기존과 같이 암호화해 저장합니다. Google `sub`를 기준으로 만든 웹 계정 키를 이메일 로그인 키와 분리해 같은 이메일의 서로 다른 열품타 계정이 서로의 JWT를 덮어쓰지 않게 합니다.
+운영 Worker의 `GOOGLE_CLIENT_ID` 공개 설정으로 `/api/auth/providers`가 ID를 반환하고 Google 로그인 버튼을 켭니다. 배포 후 해당 API가 HTTP 200과 설정된 ID를 반환하는 것을 확인했습니다. 버튼은 Google Identity Services 팝업에서 `openid email profile` Access token을 받습니다. Worker는 Google의 토큰 확인 응답에서 발급 대상(`aud`·`azp`)이 설정된 웹 클라이언트 ID와 같은지 확인하고, UserInfo의 `sub`와 검증된 이메일을 대조한 뒤 열품타 소셜 로그인에 전달합니다. 토큰은 브라우저 저장소나 D1에 보관하지 않습니다. 열품타 JWT만 기존과 같이 암호화해 저장합니다. Google `sub`를 기준으로 만든 웹 계정 키를 이메일 로그인 키와 분리해 같은 이메일의 서로 다른 열품타 계정이 서로의 JWT를 덮어쓰지 않게 합니다.
 
 토큰 발급 대상 확인은 Google의 [사용자 액세스 토큰 확인 응답](https://docs.cloud.google.com/docs/authentication/token-types#user_access_tokens)에 근거합니다. 이 확인이나 Google UserInfo가 실패하면 열품타 API를 호출하지 않습니다.
 

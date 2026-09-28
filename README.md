@@ -1,12 +1,12 @@
 # YPT Web
 
-현재 코드 버전: **v0.20.1 · 동기화와 과목 선택 개선**. [변경 기록](docs/CHANGELOG.md), [직접 테스트 안내](docs/manual-test-plan.md), [기능 벤치마크](docs/benchmark-features.md), [디자인 참고와 적용 원칙](docs/design-direction.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 배포된 사이트는 [ypt.mcv.kr](https://ypt.mcv.kr)이며, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
+현재 코드 버전: **v0.20.2 · Google 로그인 연결**. [변경 기록](docs/CHANGELOG.md), [직접 테스트 안내](docs/manual-test-plan.md), [기능 벤치마크](docs/benchmark-features.md), [디자인 참고와 적용 원칙](docs/design-direction.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 배포된 사이트는 [ypt.mcv.kr](https://ypt.mcv.kr)이며, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 웹 클라이언트입니다. 별도 서비스 가입이나 허용 목록은 없습니다. 화면은 React·Vite로 만들고 GitHub Pages에서 제공하며, Cloudflare Worker가 열품타 API를 중계하고 D1에 웹 세션과 타이머 상태를 보관합니다.
 
 ## 사용하기
 
-1. [ypt.mcv.kr](https://ypt.mcv.kr)에서 열품타 **이메일 계정**으로 로그인합니다. Google 웹 클라이언트 ID를 설정하면 Google 로그인 버튼도 사용할 수 있습니다. 현재 운영 환경에는 ID가 없어 버튼이 표시되지 않습니다.
+1. [ypt.mcv.kr](https://ypt.mcv.kr)에서 열품타 **이메일 계정** 또는 Google 계정으로 로그인합니다. Google 로그인은 Google로 로그인한 기존 열품타 계정과 기록이 일치하는지 확인한 뒤 사용하세요. 처음에는 타이머를 조작하지 말고 과목·그룹·기록을 비교합니다.
 2. **공부**에서 앱의 과목을 선택해 타이머를 시작합니다. 일시정지는 열품타의 정지, 재개는 새 시작이며, **공부 끝내기**는 웹의 선택 과목을 해제합니다. **하루 목표**는 기본값 중 고르거나 15분~24시간 범위에서 직접 입력할 수 있습니다. 완료 기록 기준 진행률과 남은 시간을 볼 수 있습니다.
 3. **공부**의 메인 타이머에서 **일반 타이머 / 뽀모도로**를 고릅니다. 뽀모도로는 기본 25분 집중 뒤 열품타 타이머를 일시정지하고, 5분 휴식 뒤 자동 재개합니다. 집중·휴식 길이를 바꿀 수 있습니다. 자동 전환은 웹 화면이 보일 때만 실행되며, 닫거나 잠근 동안에는 돌아온 뒤 상태를 확인합니다. 전환 응답이 불확실하면 자동화를 멈추고 상태 확인·초기화를 안내합니다. 오른쪽 위 버튼으로 밝은/어두운 화면을 바꿀 수 있습니다.
    **요약 복사**는 오늘 완료 기록을 클립보드에 넣습니다. 목표를 정해 두면 완료 기록의 달성률과 현재 세션을 더한 임시 예상치를 구분해 보여줍니다. 화면 아래 **오늘의 계획**에서는 할 일·예상 시간·과목을 적고, 집중 대상을 고르면 뽀모도로 메인 타이머에 제목이 표시됩니다. 전날 미완료 계획 이어가기, 반복 계획, 여러 줄 빠른 입력도 제공합니다.
