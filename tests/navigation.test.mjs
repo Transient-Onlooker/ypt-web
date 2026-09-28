@@ -10,12 +10,12 @@ test("탭 URL은 GitHub Pages 경로와 기존 검색어·앵커를 유지한다
   assert.equal(next.hash, "#main-content");
 });
 
-test("각 탭의 history URL을 복원하고 잘못된 탭은 공부로 안전하게 돌아간다", () => {
+test("모든 메뉴 URL을 복원하고 잘못된 탭은 공부로 안전하게 돌아간다", () => {
   const href = "https://ypt.mcv.kr/?tab=study";
-  const entries = ["study", "history", "groups"].map((tab) =>
+  const entries = ["study", "today", "plan", "history", "insights", "groups"].map((tab) =>
     tabFromSearch(new URL(tabUrl(href, tab)).search),
   );
-  assert.deepEqual(entries, ["study", "history", "groups"]);
+  assert.deepEqual(entries, ["study", "today", "plan", "history", "insights", "groups"]);
   assert.equal(tabFromSearch("?tab=unknown"), "study");
   assert.equal(tabFromSearch(""), "study");
 });

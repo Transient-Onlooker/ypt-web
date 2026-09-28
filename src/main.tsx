@@ -18,7 +18,10 @@ import "./style.css";
 function NavIcon({ tab }: { tab: Tab }) {
   const paths = {
     study: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.7 1.8" /></>,
+    today: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M8 14h3M8 17h5" /></>,
+    plan: <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4.5h6M8 11h8M8 15l2 2 5-5" /></>,
     history: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M8 14h3M8 17h6" /></>,
+    insights: <><path d="M4 20V12h4v8M10 20V8h4v12M16 20V4h4v16M3 20.5h18" /></>,
     groups: <><circle cx="9" cy="9" r="2.5" /><path d="M3.5 19v-1.2a5.5 5.5 0 0 1 11 0V19zM16 7a2.5 2.5 0 0 1 0 5M17 14a4 4 0 0 1 3.5 4V19h-3" /></>,
   };
   return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[tab]}</svg>;
@@ -47,6 +50,26 @@ type GoogleIdentity = {
 };
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
 const GOAL_MINUTES = [0, 30, 60, 90, 120, 180, 240, 360, 480, 600, 720] as const;
+const PAGE_INFO: Record<Tab, { eyebrow: string; title: string; subtitle: string }> = {
+  study: { eyebrow: "FOCUS", title: "타이머", subtitle: "과목을 고르고 공부 시간을 기록하세요." },
+  today: { eyebrow: "TODAY", title: "오늘", subtitle: "오늘 공부한 시간과 과목을 확인하세요." },
+  plan: { eyebrow: "PLAN", title: "계획", subtitle: "오늘 할 공부를 정리하세요." },
+  history: { eyebrow: "RECORDS", title: "기록", subtitle: "날짜를 골라 상세 기록을 확인하세요." },
+  insights: { eyebrow: "INSIGHTS", title: "통계", subtitle: "최근 공부 흐름을 살펴보세요." },
+  groups: { eyebrow: "TOGETHER", title: "그룹", subtitle: "함께 공부하는 사람들의 현황을 확인하세요." },
+};
+const SIDEBAR_SECTIONS: { title: string; items: { tab: Tab; label: string }[] }[] = [
+  { title: "집중", items: [{ tab: "study", label: "타이머" }] },
+  { title: "오늘", items: [{ tab: "today", label: "오늘 요약" }, { tab: "plan", label: "계획" }] },
+  { title: "기록", items: [{ tab: "history", label: "날짜별 기록" }, { tab: "insights", label: "통계" }] },
+  { title: "함께", items: [{ tab: "groups", label: "그룹" }] },
+];
+const MOBILE_TABS: { tab: Tab; label: string }[] = [
+  { tab: "study", label: "타이머" },
+  { tab: "today", label: "오늘" },
+  { tab: "history", label: "기록" },
+  { tab: "groups", label: "그룹" },
+];
 const HISTORY_CACHE_MS = 5 * 60_000;
 const SYNC_STORAGE_KEY = "ypt-web-sync-seconds";
 const GOAL_STORAGE_KEY = "ypt-web-daily-goal-minutes";
@@ -510,7 +533,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
   return (
     <div className="history-trend">
       <div className="card-head">
-        <span>최근 기록</span>
+        <span>기간별 공부 분석</span>
         <div className="history-trend-actions">
           <label className="trend-range" htmlFor="trend-range">기간
             <select id="trend-range" value={rangeDays} disabled={loading}
@@ -927,6 +950,9 @@ function App() {
     window.addEventListener("popstate", restoreTab);
     return () => window.removeEventListener("popstate", restoreTab);
   }, []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [tab]);
   const [syncSeconds, setSyncSeconds] = useState(savedSyncSeconds);
   const [goalMinutes, setGoalMinutes] = useState(savedGoalMinutes);
   const [darkMode, setDarkMode] = useState(() => {
@@ -949,7 +975,7 @@ function App() {
     catch { return freshPomodoro(); }
   });
   const [pomodoroError, setPomodoroError] = useState("");
-  const [focusTask, setFocusTask] = useState("");
+  const [focusTask, setFocusTask] = useState<{ date: string; text: string } | null>(null);
   const [keepScreenOn, setKeepScreenOn] = useState(false);
   const [screenAwake, setScreenAwake] = useState(false);
   const [wakeError, setWakeError] = useState("");
@@ -980,6 +1006,10 @@ function App() {
   const [memberQuery, setMemberQuery] = useState("");
   const [memberSort, setMemberSort] = useState<MemberSort>("time");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
+  const reportFocusTask = useCallback((text: string) => {
+    const todayDate = snapshot?.today.date;
+    setFocusTask(todayDate ? { date: todayDate, text } : null);
+  }, [snapshot?.today.date]);
   const inFlight = useRef(false);
   const pomodoroAction = useRef(false);
   const lastVisibleAt = useRef(0);
@@ -1169,7 +1199,7 @@ function App() {
         setPomodoroSettings(parseIntervalSettings(null));
         setPomodoroDraft({ focus: "25", short: "5" });
         setPomodoroError("");
-        setFocusTask("");
+        setFocusTask(null);
         authEpoch.current++;
         snapshotGate.current.invalidate();
         groupGate.current.invalidate();
@@ -1598,7 +1628,7 @@ function App() {
         setPomodoroSettings(parseIntervalSettings(null));
         setPomodoroDraft({ focus: "25", short: "5" });
         setPomodoroError("");
-        setFocusTask("");
+        setFocusTask(null);
         setDate("");
         navigateTab("study", true);
         setLoginNotice("");
@@ -1725,6 +1755,8 @@ function App() {
       const timeOrder = (b.studyMs ?? -1) - (a.studyMs ?? -1);
       return timeOrder || nameOrder;
     });
+  const pageInfo = PAGE_INFO[tab];
+  const mobileActiveTab = tab === "plan" ? "today" : tab === "insights" ? "history" : tab;
   return (
     <div className="shell">
       <a className="skip-link" href="#main-content">본문으로 이동</a>
@@ -1734,27 +1766,21 @@ function App() {
           <span>YPT WEB</span>
         </div>
         <nav aria-label="메뉴">
-          <button
-            className={tab === "study" ? "active" : ""}
-            aria-current={tab === "study" ? "page" : undefined}
-            onClick={() => navigateTab("study")}
-          >
-            <NavIcon tab="study" />공부
-          </button>
-          <button
-            className={tab === "history" ? "active" : ""}
-            aria-current={tab === "history" ? "page" : undefined}
-            onClick={() => navigateTab("history")}
-          >
-            <NavIcon tab="history" />기록
-          </button>
-          <button
-            className={tab === "groups" ? "active" : ""}
-            aria-current={tab === "groups" ? "page" : undefined}
-            onClick={() => navigateTab("groups")}
-          >
-            <NavIcon tab="groups" />그룹
-          </button>
+          {SIDEBAR_SECTIONS.map((section) => (
+            <div className="sidebar-nav-group" key={section.title}>
+              <span className="sidebar-nav-label">{section.title}</span>
+              {section.items.map((item) => (
+                <button
+                  key={item.tab}
+                  className={tab === item.tab ? "active" : ""}
+                  aria-current={tab === item.tab ? "page" : undefined}
+                  onClick={() => navigateTab(item.tab)}
+                >
+                  <NavIcon tab={item.tab} />{item.label}
+                </button>
+              ))}
+            </div>
+          ))}
         </nav>
         <button
           className="sidebar-logout"
@@ -1821,19 +1847,9 @@ function App() {
           )}
           <div className="page-title">
             <div>
-              <p className="eyebrow">
-                {tab === "study"
-                  ? "FOCUS"
-                  : tab === "history"
-                    ? "HISTORY"
-                    : "TOGETHER"}
-              </p>
-              <h1>
-                {tab === "study" ? "공부" : tab === "history" ? "기록" : "그룹"}
-              </h1>
-              <p className="page-subtitle">
-                {tab === "study" ? "오늘의 집중을 이어가세요." : tab === "history" ? "쌓인 시간을 한눈에 확인하세요." : "함께 공부하는 사람들을 만나보세요."}
-              </p>
+              <p className="eyebrow">{pageInfo.eyebrow}</p>
+              <h1>{pageInfo.title}</h1>
+              <p className="page-subtitle">{pageInfo.subtitle}</p>
             </div>
             <div className="page-controls">
               <ThemeToggle dark={darkMode} onToggle={() => setDarkMode((old) => !old)} />
@@ -1868,9 +1884,29 @@ function App() {
               </button>
             </div>
           )}
+          {(tab === "today" || tab === "plan") && (
+            <nav className="mobile-page-switcher" aria-label="오늘 메뉴">
+              <button className={tab === "today" ? "active" : ""}
+                aria-current={tab === "today" ? "page" : undefined}
+                onClick={() => navigateTab("today")}>오늘 요약</button>
+              <button className={tab === "plan" ? "active" : ""}
+                aria-current={tab === "plan" ? "page" : undefined}
+                onClick={() => navigateTab("plan")}>계획</button>
+            </nav>
+          )}
+          {(tab === "history" || tab === "insights") && (
+            <nav className="mobile-page-switcher" aria-label="기록 메뉴">
+              <button className={tab === "history" ? "active" : ""}
+                aria-current={tab === "history" ? "page" : undefined}
+                onClick={() => navigateTab("history")}>날짜별 기록</button>
+              <button className={tab === "insights" ? "active" : ""}
+                aria-current={tab === "insights" ? "page" : undefined}
+                onClick={() => navigateTab("insights")}>기간 분석</button>
+            </nav>
+          )}
           {tab === "study" && (
             <>
-            <div className="study-grid">
+            <div className="study-grid timer-home-grid">
               <section className="timer-card">
                 <div className="card-head">
                   <span>현재 타이머</span>
@@ -1909,8 +1945,8 @@ function App() {
                         </span>}
                       {timerCaptionSubject && <span className="timer-caption-subject">과목 · {timerCaptionSubject}</span>}
                     </div>
-                    {pomodoroActive && pomodoro.phase === "focus" && focusTask &&
-                      <span className="pomodoro-task">{focusTask}</span>}
+                    {pomodoroActive && pomodoro.phase === "focus" && focusTask && focusTask.date === snapshot?.today.date && focusTask.text &&
+                      <span className="pomodoro-task">{focusTask.text}</span>}
                   </div>
                 </div>
                 {timer?.state === "idle" && !appOnly && !pomodoroActive && (
@@ -2134,56 +2170,54 @@ function App() {
                   </p>
                 )}
               </section>
-              <section className="summary-card">
-                <div className="card-head">
-                  <span>오늘의 공부</span>
-                  {snapshot?.today && <CopyDayButton
-                    key={`${snapshot.today.date}:${snapshot.today.totalMs}`}
-                    day={snapshot.today} />}
-                </div>
-                <div className="summary-date">
-                  {snapshot?.today.date ?? "—"}
-                </div>
-                <div className="summary-time">
-                  {duration(snapshot?.today.totalMs)}
-                </div>
-                <p className="summary-label">기록된 총 공부시간</p>
-                {snapshot?.today && (
-                  <DailyGoal minutes={goalMinutes} recordedMs={snapshot.today.totalMs}
-                    liveMs={running && !statusStale && !remoteUnverified ? liveMs : 0}
-                    onChange={(minutes) => {
-                      if (!validGoalMinutes(minutes)) return;
-                      setGoalMinutes(minutes);
-                      try {
-                        localStorage.setItem(GOAL_STORAGE_KEY, String(minutes));
-                      } catch {
-                        // The setting remains available in this tab.
-                      }
-                    }} />
-                )}
-                {running && (
-                  <div className="live-session">
-                    <span>
-                      진행 중인 시간 · {timer?.subject || snapshot?.remoteSubject || "과목 미확인"}
-                    </span>
-                    <strong>{duration(liveMs)}</strong>
-                    <small>완료된 기록과 별도로 표시합니다.</small>
-                  </div>
-                )}
-                {snapshot?.today && <SubjectBreakdown day={snapshot.today}
-                  empty={snapshot.today.subjectTimesAvailable
-                    ? "오늘 기록된 과목 시간이 없습니다."
-                    : "오늘 과목별 시간을 확인할 수 없습니다."} />}
-                {snapshot?.today && !snapshot.today.subjectTimesAvailable &&
-                  snapshot.today.subjects.length > 0 && (
-                  <p className="card-note">오늘의 과목별 시간은 확인되지 않았습니다.</p>
-                )}
-              </section>
             </div>
-            {snapshot?.today && <StudyTools key={snapshot.today.date} date={snapshot.today.date}
-              today={snapshot.today} subjects={snapshot.subjects} onFocusTaskChange={setFocusTask} />}
             </>
           )}
+          {tab === "today" && (
+            <section className="summary-card today-summary">
+              <div className="card-head">
+                <span>오늘의 공부</span>
+                {snapshot?.today && <CopyDayButton
+                  key={`${snapshot.today.date}:${snapshot.today.totalMs}`}
+                  day={snapshot.today} />}
+              </div>
+              <div className="summary-date">{snapshot?.today.date ?? "—"}</div>
+              <div className="summary-time">{duration(snapshot?.today.totalMs)}</div>
+              <p className="summary-label">기록된 총 공부시간</p>
+              {snapshot?.today && (
+                <DailyGoal minutes={goalMinutes} recordedMs={snapshot.today.totalMs}
+                  liveMs={running && !statusStale && !remoteUnverified ? liveMs : 0}
+                  onChange={(minutes) => {
+                    if (!validGoalMinutes(minutes)) return;
+                    setGoalMinutes(minutes);
+                    try {
+                      localStorage.setItem(GOAL_STORAGE_KEY, String(minutes));
+                    } catch {
+                      // The setting remains available in this tab.
+                    }
+                  }} />
+              )}
+              {running && (
+                <div className="live-session">
+                  <span>진행 중인 시간 · {timer?.subject || snapshot?.remoteSubject || "과목 미확인"}</span>
+                  <strong>{duration(liveMs)}</strong>
+                  <small>완료된 기록과 별도로 표시합니다.</small>
+                </div>
+              )}
+              {snapshot?.today && <SubjectBreakdown day={snapshot.today}
+                empty={snapshot.today.subjectTimesAvailable
+                  ? "오늘 기록된 과목 시간이 없습니다."
+                  : "오늘 과목별 시간을 확인할 수 없습니다."} />}
+              {snapshot?.today && !snapshot.today.subjectTimesAvailable &&
+                snapshot.today.subjects.length > 0 && (
+                <p className="card-note">오늘의 과목별 시간은 확인되지 않았습니다.</p>
+              )}
+            </section>
+          )}
+          {tab === "plan" && (snapshot?.today
+            ? <StudyTools key={snapshot.today.date} date={snapshot.today.date}
+                today={snapshot.today} subjects={snapshot.subjects} onFocusTaskChange={reportFocusTask} />
+            : <section className="tool-card"><p className="empty">오늘 정보를 불러오는 중입니다.</p></section>)}
           {tab === "history" && (
             <section className="history-card" id="history-top">
               <div className="history-picker">
@@ -2295,7 +2329,11 @@ function App() {
               ) : !loadingDay && (
                 <p className="empty">해당 날짜의 기록을 확인할 수 없습니다.</p>
               )}
-              {snapshot?.capabilities.history && snapshot.today && (
+            </section>
+          )}
+          {tab === "insights" && (
+            <section className="history-card insights-card">
+              {snapshot?.capabilities.history && snapshot.today ? (
                 <HistoryTrend key={`${snapshot.today.date}:${trendRange}`} today={snapshot.today}
                   rangeDays={trendRange} goalMinutes={goalMinutes} onRangeChange={setTrendRange}
                   previous={trends[trendRange]?.todayDate === snapshot.today.date
@@ -2306,8 +2344,12 @@ function App() {
                   loadDay={getHistoryDay}
                   onSelect={(selectedDate) => {
                     setDate(selectedDate);
-                    document.getElementById("history-top")?.scrollIntoView();
+                    navigateTab("history");
                   }} />
+              ) : (
+                <p className="card-note">
+                  {snapshot ? "기록 통계 조회를 사용할 수 없습니다." : "오늘 정보를 불러오는 중입니다."}
+                </p>
               )}
             </section>
           )}
@@ -2520,27 +2562,17 @@ function App() {
         </main>
       </div>
       <nav className="bottom-nav" aria-label="메뉴">
-        <button
-          className={tab === "study" ? "active" : ""}
-          aria-current={tab === "study" ? "page" : undefined}
-          onClick={() => navigateTab("study")}
-        >
-          <NavIcon tab="study" />공부
-        </button>
-        <button
-          className={tab === "history" ? "active" : ""}
-          aria-current={tab === "history" ? "page" : undefined}
-          onClick={() => navigateTab("history")}
-        >
-          <NavIcon tab="history" />기록
-        </button>
-        <button
-          className={tab === "groups" ? "active" : ""}
-          aria-current={tab === "groups" ? "page" : undefined}
-          onClick={() => navigateTab("groups")}
-        >
-          <NavIcon tab="groups" />그룹
-        </button>
+        {MOBILE_TABS.map((item) => (
+          <button
+            key={item.tab}
+            className={mobileActiveTab === item.tab ? "active" : ""}
+            aria-current={mobileActiveTab === item.tab ? "page" : undefined}
+            onClick={() => navigateTab(item.tab)}
+          >
+            <NavIcon tab={item.tab} />
+            <span className="bottom-nav-label">{item.label}</span>
+          </button>
+        ))}
       </nav>
     </div>
   );
