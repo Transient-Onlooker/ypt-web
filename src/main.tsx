@@ -1377,12 +1377,12 @@ function App() {
       if (document.visibilityState === "visible") void loadGroups();
     };
     document.addEventListener("visibilitychange", refresh);
-    const interval = setInterval(refresh, 30_000);
+    const interval = setInterval(refresh, syncSeconds * 1000);
     return () => {
       document.removeEventListener("visibilitychange", refresh);
       clearInterval(interval);
     };
-  }, [tab, session?.authenticated, loadGroups]);
+  }, [tab, session?.authenticated, loadGroups, syncSeconds]);
   useEffect(() => {
     if (tab !== "groups" || !session?.authenticated) return;
     if (lastMemberGroup.current !== selectedGroup) {
@@ -1822,7 +1822,7 @@ function App() {
             </div>
             <div className="page-controls">
               <ThemeToggle dark={darkMode} onToggle={() => setDarkMode((old) => !old)} />
-              <label className="sync-control" htmlFor="sync-seconds" title="타이머 상태와 선택한 그룹 멤버의 서버 조회 주기입니다. 화면의 시간 표시는 매초 갱신됩니다.">
+              <label className="sync-control" htmlFor="sync-seconds" title="타이머 상태, 가입 그룹 목록, 선택한 그룹 멤버의 서버 조회 주기입니다. 화면의 시간 표시는 매초 갱신됩니다.">
               자동 동기화
               <select
                 id="sync-seconds"
