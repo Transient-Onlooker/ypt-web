@@ -23,6 +23,9 @@ function NavIcon({ tab }: { tab: Tab }) {
   };
   return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[tab]}</svg>;
 }
+function BrandMark() {
+  return <img className="brand-mark" src="/ypt-mark.svg" alt="" aria-hidden="true" />;
+}
 type MemberSort = "time" | "name" | "status";
 type MemberFilter = "all" | "studying" | "resting" | "unknown";
 type TrendRange = 7 | 14;
@@ -806,9 +809,7 @@ function Login({
     <div className="login-page">
       <div className="login-card">
         <div className="login-theme"><ThemeToggle dark={darkMode} onToggle={onToggleTheme} /></div>
-        <div className="brand-mark" aria-hidden="true">
-          Y
-        </div>
+        <BrandMark />
         <div className="eyebrow">YPT WEB</div>
         <h1>공부를 이어가세요</h1>
         <p className="intro">열품타 이메일 계정으로 로그인합니다.</p>
@@ -1729,7 +1730,7 @@ function App() {
       <a className="skip-link" href="#main-content">본문으로 이동</a>
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">Y</div>
+          <BrandMark />
           <span>YPT WEB</span>
         </div>
         <nav aria-label="메뉴">
@@ -1765,7 +1766,10 @@ function App() {
       </aside>
       <div className="content">
         <header className="topbar">
-          <div className="mobile-brand">YPT WEB</div>
+          <div className="mobile-brand">
+            <BrandMark />
+            <span>YPT WEB</span>
+          </div>
           <div
             className={`top-status ${statusStale ? "stale" : ""}`}
             title={statusStale ? "최근 상태 확인이 지연되고 있습니다." : undefined}
