@@ -997,12 +997,11 @@ function App() {
   const [trends, setTrends] = useState<Partial<Record<TrendRange, { todayDate: string; days: TrendDay[] }>>>({});
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
-  const [members, setMembers] = useState<Member[] | null>(null);
-  const [groupCheckedAt, setGroupCheckedAt] = useState<number | null>(null);
+  const [memberSnapshots, setMemberSnapshots] = useState<Record<number, { members: Member[]; checkedAt: number }>>({});
+  const [memberErrors, setMemberErrors] = useState<Record<number, string>>({});
+  const [loadingMemberIds, setLoadingMemberIds] = useState<Set<number>>(() => new Set());
   const [loadingGroup, setLoadingGroup] = useState(false);
-  const [loadingMembers, setLoadingMembers] = useState(false);
   const [groupError, setGroupError] = useState("");
-  const [memberError, setMemberError] = useState("");
   const [memberQuery, setMemberQuery] = useState("");
   const [memberSort, setMemberSort] = useState<MemberSort>("time");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
@@ -1016,10 +1015,8 @@ function App() {
   const authEpoch = useRef(0);
   const snapshotGate = useRef(new RequestGate());
   const groupGate = useRef(new RequestGate());
-  const memberRequest = useRef(0);
-  const memberLoadingGroup = useRef<{ id: number; requestId: number } | null>(
-    null,
-  );
+  const memberRequests = useRef(new Map<number, number>());
+  const memberRequestSequence = useRef(0);
   const lastMemberGroup = useRef<number | null>(null);
   const previousTimerKey = useRef<string | null>(null);
   const previousTab = useRef<Tab>("study");
@@ -1213,13 +1210,13 @@ function App() {
         setWakeError("");
         setSnapshotCheckedAt(null);
         setGroups(null);
-        setMembers(null);
+        setMemberSnapshots({});
+        setMemberErrors({});
+        setLoadingMemberIds(new Set());
         setSelectedGroup(null);
-        setGroupCheckedAt(null);
         setLoadingGroup(false);
-        setLoadingMembers(false);
         setLoadingDay(false);
-        memberLoadingGroup.current = null;
+        memberRequests.current.clear();
         lastMemberGroup.current = null;
         setDay(null);
         setDate("");
@@ -1227,7 +1224,6 @@ function App() {
         setError("");
         setHistoryError("");
         setGroupError("");
-        setMemberError("");
         setMemberQuery("");
         setMemberSort("time");
         setMemberFilter("all");
@@ -1379,33 +1375,51 @@ function App() {
     }
   }, []);
   const loadMembers = useCallback(async (id: number) => {
-    if (memberLoadingGroup.current?.id === id) return;
-    const requestId = ++memberRequest.current;
-    memberLoadingGroup.current = { id, requestId };
+    if (memberRequests.current.has(id)) return;
+    const requestId = ++memberRequestSequence.current;
+    memberRequests.current.set(id, requestId);
     const epoch = authEpoch.current;
-    setLoadingMembers(true);
+    setLoadingMemberIds((current) => new Set(current).add(id));
+    setMemberErrors((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
     try {
       const result = await api<{ members: Member[]; checkedAt: number }>(
         `/groups/${id}/members`,
       );
-      if (requestId !== memberRequest.current || epoch !== authEpoch.current)
+      if (memberRequests.current.get(id) !== requestId || epoch !== authEpoch.current)
         return;
-      setMembers(result.members);
-      setGroupCheckedAt(result.checkedAt);
-      setMemberError("");
+      setMemberSnapshots((current) => ({
+        ...current,
+        [id]: { members: result.members, checkedAt: result.checkedAt },
+      }));
+      setMemberErrors((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
     } catch (cause) {
-      if (requestId !== memberRequest.current || epoch !== authEpoch.current)
+      if (memberRequests.current.get(id) !== requestId || epoch !== authEpoch.current)
         return;
-      setMemberError(
-        cause instanceof Error
+      setMemberErrors((current) => ({
+        ...current,
+        [id]: cause instanceof Error
           ? cause.message
           : "멤버 상태를 가져오지 못했습니다.",
-      );
+      }));
     } finally {
-      if (memberLoadingGroup.current?.requestId === requestId)
-        memberLoadingGroup.current = null;
-      if (requestId === memberRequest.current && epoch === authEpoch.current)
-        setLoadingMembers(false);
+      if (memberRequests.current.get(id) === requestId) {
+        memberRequests.current.delete(id);
+        if (epoch === authEpoch.current)
+          setLoadingMemberIds((current) => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+      }
     }
   }, []);
   useEffect(() => {
@@ -1428,11 +1442,6 @@ function App() {
     if (tab !== "groups" || !session?.authenticated) return;
     if (lastMemberGroup.current !== selectedGroup) {
       lastMemberGroup.current = selectedGroup;
-      memberRequest.current++;
-      memberLoadingGroup.current = null;
-      setMembers(null);
-      setGroupCheckedAt(null);
-      setMemberError("");
       setMemberQuery("");
       setMemberFilter("all");
     }
@@ -1598,8 +1607,7 @@ function App() {
         setTrends({});
         snapshotGate.current.invalidate();
         groupGate.current.invalidate();
-        memberRequest.current++;
-        memberLoadingGroup.current = null;
+        memberRequests.current.clear();
         lastMemberGroup.current = null;
         csrf = "";
         setSession({ authenticated: false });
@@ -1609,15 +1617,14 @@ function App() {
         setSnapshotCheckedAt(null);
         setRefreshingSnapshot(false);
         setGroups(null);
-        setMembers(null);
+        setMemberSnapshots({});
+        setMemberErrors({});
+        setLoadingMemberIds(new Set());
         setLoadingGroup(false);
-        setLoadingMembers(false);
         setLoadingDay(false);
         setSelectedGroup(null);
-        setGroupCheckedAt(null);
         setError("");
         setGroupError("");
-        setMemberError("");
         setMemberQuery("");
         setMemberSort("time");
         setMemberFilter("all");
@@ -1720,8 +1727,13 @@ function App() {
     ? snapshot.today
     : day?.date === date ? day : null;
   const selectedGroupDetails = groups?.find((group) => group.id === selectedGroup);
-  const shownMembers = selectedGroup !== null && lastMemberGroup.current === selectedGroup
-    ? members : null;
+  const selectedMemberSnapshot = selectedGroup === null
+    ? null
+    : memberSnapshots[selectedGroup] ?? null;
+  const shownMembers = selectedMemberSnapshot?.members ?? null;
+  const groupCheckedAt = selectedMemberSnapshot?.checkedAt ?? null;
+  const loadingMembers = selectedGroup !== null && loadingMemberIds.has(selectedGroup);
+  const memberError = selectedGroup === null ? "" : memberErrors[selectedGroup] ?? "";
   const memberCounts = shownMembers ? {
     studying: shownMembers.filter((member) => member.studying === true).length,
     resting: shownMembers.filter((member) => member.studying === false).length,
@@ -1853,27 +1865,33 @@ function App() {
             </div>
             <div className="page-controls">
               <ThemeToggle dark={darkMode} onToggle={() => setDarkMode((old) => !old)} />
-              <label className="sync-control" htmlFor="sync-seconds" title="타이머 상태, 가입 그룹 목록, 선택한 그룹 멤버의 서버 조회 주기입니다. 화면의 시간 표시는 매초 갱신됩니다.">
-              자동 동기화
-              <select
-                id="sync-seconds"
-                value={syncSeconds}
-                onChange={(event) => {
-                  const seconds = Number(event.target.value);
-                  if (!SYNC_SECONDS.some((value) => value === seconds)) return;
-                  setSyncSeconds(seconds);
-                  try {
-                    localStorage.setItem(SYNC_STORAGE_KEY, String(seconds));
-                  } catch {
-                    // Storage can be unavailable in private browsing.
-                  }
-                }}
-              >
-                {SYNC_SECONDS.map((seconds) => (
-                  <option key={seconds} value={seconds}>{seconds}초</option>
-                ))}
-              </select>
-              </label>
+              <details className="settings-menu">
+                <summary>설정</summary>
+                <div className="settings-popover">
+                  <label className="sync-control" htmlFor="sync-seconds">
+                    <span>자동 동기화 간격</span>
+                    <select
+                      id="sync-seconds"
+                      value={syncSeconds}
+                      onChange={(event) => {
+                        const seconds = Number(event.target.value);
+                        if (!SYNC_SECONDS.some((value) => value === seconds)) return;
+                        setSyncSeconds(seconds);
+                        try {
+                          localStorage.setItem(SYNC_STORAGE_KEY, String(seconds));
+                        } catch {
+                          // Storage can be unavailable in private browsing.
+                        }
+                      }}
+                    >
+                      {SYNC_SECONDS.map((seconds) => (
+                        <option key={seconds} value={seconds}>{seconds}초</option>
+                      ))}
+                    </select>
+                  </label>
+                  <p>타이머, 가입 그룹, 선택한 그룹 현황의 서버 확인 간격입니다.</p>
+                </div>
+              </details>
             </div>
           </div>
           {error && (
@@ -2388,8 +2406,8 @@ function App() {
                       >
                         {group.title}
                         <span>
-                          {selectedGroup === group.id && shownMembers
-                            ? `현재 ${shownMembers.length}명${group.capacity === null ? "" : ` / 정원 ${group.capacity}명`}`
+                          {memberSnapshots[group.id]
+                            ? `현재 ${memberSnapshots[group.id].members.length}명${group.capacity === null ? "" : ` / 정원 ${group.capacity}명`}`
                             : group.capacity === null
                               ? ""
                               : `정원 ${group.capacity}명`}
