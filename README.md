@@ -1,6 +1,6 @@
 # YPT Web
 
-현재 코드 버전: **v0.20.1 · 그룹 동기화 간격 설정**. [변경 기록](docs/CHANGELOG.md), [직접 테스트 안내](docs/manual-test-plan.md), [기능 벤치마크](docs/benchmark-features.md), [디자인 참고와 적용 원칙](docs/design-direction.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 배포된 사이트는 [ypt.mcv.kr](https://ypt.mcv.kr)이며, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
+현재 코드 버전: **v0.20.1 · 동기화와 과목 선택 개선**. [변경 기록](docs/CHANGELOG.md), [직접 테스트 안내](docs/manual-test-plan.md), [기능 벤치마크](docs/benchmark-features.md), [디자인 참고와 적용 원칙](docs/design-direction.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 배포된 사이트는 [ypt.mcv.kr](https://ypt.mcv.kr)이며, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
 휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 웹 클라이언트입니다. 별도 서비스 가입이나 허용 목록은 없습니다. 화면은 React·Vite로 만들고 GitHub Pages에서 제공하며, Cloudflare Worker가 열품타 API를 중계하고 D1에 웹 세션과 타이머 상태를 보관합니다.
 
@@ -16,7 +16,7 @@
 
 지원 브라우저에서는 공부 중 **화면 켜두기**를 직접 선택할 수 있습니다. [Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/)를 사용하며 화면이 보일 때만 요청합니다. 다른 앱·탭으로 이동하거나 공부가 끝나면 해제됩니다. 화면 켜두기를 사용할 수 없어도 타이머는 계속 동작합니다.
 
-휴대폰에서는 상단에 타이머 상태가 고정되고 아래 탭으로 공부·기록·그룹을 전환합니다. 탭을 바꾸면 화면 맨 위로 이동하며, 기록 추이에서 날짜를 누르면 해당 날짜의 상세 기록으로 이동합니다. 최근 조회한 과거 기록은 같은 로그인 탭에서 5분간 재사용합니다. 기록이나 기간별 추이의 **새로고침/다시 불러오기**를 누르면 서버에서 다시 확인합니다. 탭을 오가도 7일·14일 추이와 그룹 멤버 현황이 유지되며, 그룹 현황은 화면 복귀 시 다시 확인합니다.
+휴대폰에서는 상단에 타이머 상태가 고정되고 아래 탭으로 공부·기록·그룹을 전환합니다. 탭을 바꾸면 화면 맨 위로 이동하며, 기록 추이에서 날짜를 누르면 해당 날짜의 상세 기록으로 이동합니다. 최근 조회한 과거 기록은 같은 로그인 탭에서 5분간 재사용합니다. 기록이나 기간별 추이의 **새로고침/다시 불러오기**를 누르면 서버에서 다시 확인합니다. 탭을 오가도 7일·14일 추이와 그룹 멤버 현황이 유지되며, 그룹 현황은 화면 복귀 시 다시 확인합니다. 같은 로그인 탭에서는 마지막으로 선택한 과목을 기억해 새로고침 뒤에도 유효한 과목을 다시 고릅니다.
 
 ## 로컬 실행
 

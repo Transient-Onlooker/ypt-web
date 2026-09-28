@@ -53,6 +53,7 @@ const POMODORO_KEY = "ypt-web-personal-tools-pomodoro";
 const POMODORO_SETTINGS_KEY = "ypt-web-personal-tools-settings";
 const REMEMBERED_EMAIL_KEY = "ypt-web-remembered-email";
 const TIMER_CONTINUITY_KEY = "ypt-web-timer-continuity";
+const LAST_SUBJECT_KEY = "ypt-web-personal-tools-last-subject";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const CROSS_ORIGIN_API = API_BASE_URL !== "" &&
   new URL(API_BASE_URL).origin !== window.location.origin;
@@ -954,7 +955,10 @@ function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState(() => {
+    try { return sessionStorage.getItem(LAST_SUBJECT_KEY) ?? ""; }
+    catch { return ""; }
+  });
   const [now, setNow] = useState(Date.now());
   const [clockOffset, setClockOffset] = useState(0);
   const [date, setDate] = useState("");
@@ -1016,6 +1020,12 @@ function App() {
     try { localStorage.setItem(THEME_STORAGE_KEY, darkMode ? "dark" : "light"); }
     catch { /* Keep the choice in this page. */ }
   }, [darkMode]);
+  useEffect(() => {
+    if (!selectedSubject || !snapshot?.subjects.some((subject) => subject.title === selectedSubject))
+      return;
+    try { sessionStorage.setItem(LAST_SUBJECT_KEY, selectedSubject); }
+    catch { /* Keep subject selection available in this page. */ }
+  }, [selectedSubject, snapshot?.subjects]);
   useEffect(() => {
     try { localStorage.setItem(POMODORO_MODE_KEY, pomodoroMode ? "pomodoro" : "normal"); }
     catch { /* Keep the choice in this page. */ }
