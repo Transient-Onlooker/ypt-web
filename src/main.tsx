@@ -28,6 +28,20 @@ type MemberFilter = "all" | "studying" | "resting" | "unknown";
 type TrendRange = 7 | 14;
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
+type GoogleTokenResponse = { access_token?: string; error?: string };
+type GoogleTokenClient = { requestAccessToken: (options?: { prompt?: string }) => void };
+type GoogleIdentity = {
+  accounts?: {
+    oauth2?: {
+      initTokenClient: (config: {
+        client_id: string;
+        scope: string;
+        callback: (response: GoogleTokenResponse) => void;
+        error_callback?: (error: { type?: string }) => void;
+      }) => GoogleTokenClient;
+    };
+  };
+};
 const SYNC_SECONDS = [10, 15, 30, 60, 120] as const;
 const GOAL_MINUTES = [0, 30, 60, 90, 120, 180, 240, 360, 480, 600, 720] as const;
 const HISTORY_CACHE_MS = 5 * 60_000;
@@ -43,6 +57,7 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, ""
 const CROSS_ORIGIN_API = API_BASE_URL !== "" &&
   new URL(API_BASE_URL).origin !== window.location.origin;
 const SESSION_STORAGE_KEY = "ypt-web-session-token";
+let googleIdentityScript: Promise<void> | null = null;
 let csrf = "";
 let sessionToken = "";
 if (CROSS_ORIGIN_API) {
@@ -102,14 +117,37 @@ function rememberEmail(email: string) {
   }
 }
 
+function loadGoogleIdentityScript(): Promise<void> {
+  if ((window as Window & { google?: GoogleIdentity }).google?.accounts?.oauth2)
+    return Promise.resolve();
+  if (googleIdentityScript) return googleIdentityScript;
+  googleIdentityScript = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src="https://accounts.google.com/gsi/client"]',
+    );
+    const script = existing ?? document.createElement("script");
+    script.async = true;
+    script.defer = true;
+    script.src = "https://accounts.google.com/gsi/client";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Google 로그인 기능을 불러오지 못했습니다."));
+    if (!existing) document.head.appendChild(script);
+  }).catch((error: unknown) => {
+    googleIdentityScript = null;
+    throw error;
+  });
+  return googleIdentityScript;
+}
+
 async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
+  const isLoginRequest = path === "/login" || path === "/login/google";
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/api${path}`, {
       method,
       credentials: CROSS_ORIGIN_API ? "include" : "same-origin",
       headers: {
-        ...(CROSS_ORIGIN_API && sessionToken && path !== "/login"
+        ...(CROSS_ORIGIN_API && sessionToken && !isLoginRequest
           ? { Authorization: `Bearer ${sessionToken}` }
           : {}),
         ...(method !== "GET"
@@ -143,7 +181,7 @@ async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
     rememberSessionToken("");
   }
   if (!response.ok) {
-    if (CROSS_ORIGIN_API && response.status === 401 && path !== "/login")
+    if (CROSS_ORIGIN_API && response.status === 401 && !isLoginRequest)
       rememberSessionToken("");
     const error = new Error(
       result.error || "요청을 처리하지 못했습니다.",
@@ -152,7 +190,7 @@ async function api<T>(path: string, method = "GET", data?: object): Promise<T> {
     error.status = response.status;
     throw error;
   }
-  if (CROSS_ORIGIN_API && path === "/login") {
+  if (CROSS_ORIGIN_API && isLoginRequest) {
     if (typeof result.sessionToken !== "string" ||
         !/^[0-9a-f]{64}$/.test(result.sessionToken))
       throw new Error("로그인 세션을 확인할 수 없습니다.");
@@ -599,6 +637,117 @@ function Login({
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+  const [googleConfigured, setGoogleConfigured] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const [googleLoadFailed, setGoogleLoadFailed] = useState(false);
+  const googleClient = useRef<GoogleTokenClient | null>(null);
+  const onLoginRef = useRef(onLogin);
+  const keepSignedInRef = useRef(keepSignedIn);
+  onLoginRef.current = onLogin;
+  keepSignedInRef.current = keepSignedIn;
+
+  useEffect(() => {
+    let active = true;
+    api<{ googleClientId?: unknown }>("/auth/providers")
+      .then((providers) => {
+        if (!active) return;
+        const clientId = typeof providers.googleClientId === "string"
+          ? providers.googleClientId.trim()
+          : "";
+        setGoogleClientId(clientId || null);
+        setGoogleConfigured(Boolean(clientId));
+      })
+      .catch(() => {
+        if (active) {
+          setGoogleClientId(null);
+          setGoogleConfigured(false);
+        }
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!googleClientId) return;
+    let active = true;
+    void loadGoogleIdentityScript()
+      .then(() => {
+        if (!active) return;
+        const identity = (window as Window & { google?: GoogleIdentity }).google;
+        const initTokenClient = identity?.accounts?.oauth2?.initTokenClient;
+        if (!initTokenClient) throw new Error("Google 로그인 기능을 사용할 수 없습니다.");
+        googleClient.current = initTokenClient({
+          client_id: googleClientId,
+          scope: "openid email profile",
+          callback: (response) => {
+            const accessToken = response.access_token;
+            if (response.error || !accessToken) {
+              setError("Google 로그인이 취소되었거나 완료되지 않았습니다.");
+              setBusy(false);
+              return;
+            }
+            void (async () => {
+              setBusy(true);
+              setError("");
+              try {
+                const result = await api<Session>("/login/google", "POST", {
+                  accessToken,
+                  rememberDevice: CROSS_ORIGIN_API && keepSignedInRef.current,
+                });
+                csrf = result.csrf ?? "";
+                let rememberWarning = "";
+                if (CROSS_ORIGIN_API && keepSignedInRef.current) {
+                  try {
+                    const check = await fetch(`${API_BASE_URL}/api/session`, {
+                      credentials: "include",
+                      cache: "no-store",
+                    });
+                    const state: unknown = await check.json();
+                    if (!check.ok || !state || typeof state !== "object" ||
+                        !("authenticated" in state) || state.authenticated !== true ||
+                        !("csrf" in state) || state.csrf !== csrf)
+                      rememberWarning = "로그인 유지 쿠키를 확인하지 못했습니다. 현재 탭에서는 계속 사용할 수 있습니다.";
+                  } catch {
+                    rememberWarning = "로그인 유지 쿠키를 확인하지 못했습니다. 현재 탭에서는 계속 사용할 수 있습니다.";
+                  }
+                }
+                await onLoginRef.current(rememberWarning);
+              } catch (cause) {
+                setError(cause instanceof Error ? cause.message : "Google 로그인에 실패했습니다.");
+              } finally {
+                setBusy(false);
+              }
+            })();
+          },
+          error_callback: () => {
+            setError("Google 로그인 창을 열지 못했습니다. 팝업 차단을 확인해 주세요.");
+            setBusy(false);
+          },
+        });
+        setGoogleReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setGoogleLoadFailed(true);
+      });
+    return () => {
+      active = false;
+      googleClient.current = null;
+    };
+  }, [googleClientId]);
+
+  function startGoogleLogin() {
+    if (busy || !googleReady || !googleClient.current) return;
+    setBusy(true);
+    setError("");
+    try {
+      googleClient.current.requestAccessToken({ prompt: "select_account" });
+    } catch {
+      setBusy(false);
+      setError("Google 로그인 창을 열지 못했습니다. 다시 시도해 주세요.");
+    }
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (busy) return;
@@ -716,6 +865,28 @@ function Login({
             {busy ? "확인 중…" : "로그인"}
           </button>
         </form>
+        {googleConfigured && (
+          <>
+            <div className="login-divider" aria-hidden="true"><span>또는</span></div>
+            <button
+              className="google-login-button"
+              type="button"
+              disabled={busy || !googleReady}
+              onClick={startGoogleLogin}
+            >
+              <span className="google-mark" aria-hidden="true">G</span>
+              {busy ? "Google 로그인 중…" : googleReady ? "Google로 로그인" : "Google 로그인 준비 중…"}
+            </button>
+            <p className="password-manager-note">
+              열품타 앱에서 쓰는 Google 계정을 선택하세요. 처음 쓰는 Google 계정은 열품타 계정이 새로 만들어질 수 있습니다.
+            </p>
+            {googleLoadFailed && (
+              <p className="password-manager-note" role="status">
+                Google 로그인 기능을 불러오지 못했습니다. 네트워크를 확인하고 페이지를 새로고침해 주세요.
+              </p>
+            )}
+          </>
+        )}
         {error && (
           <p className="error" role="alert">
             {error}

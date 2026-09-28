@@ -3,6 +3,7 @@ import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import {
   YptError,
   dayFrom,
+  googleSocialLogin,
   groups,
   history,
   login,
@@ -20,6 +21,7 @@ export interface Env {
   ASSETS: Fetcher;
   YPT_ENCRYPTION_KEY: string;
   APP_ORIGIN?: string;
+  GOOGLE_CLIENT_ID?: string;
 }
 type Session = {
   token_hash: string;
@@ -85,7 +87,7 @@ async function master(env: Env) {
   if (raw.byteLength !== 32) throw new Error("INVALID_KEY");
   return new Uint8Array(raw);
 }
-async function accountId(env: Env, email: string) {
+async function accountId(env: Env, email: string, normalize = true) {
   const key = await crypto.subtle.importKey(
     "raw",
     (await master(env)) as BufferSource,
@@ -98,7 +100,7 @@ async function accountId(env: Env, email: string) {
       await crypto.subtle.sign(
         "HMAC",
         key,
-        encoder.encode(email.trim().toLowerCase()),
+        encoder.encode(normalize ? email.trim().toLowerCase() : email),
       ),
     ),
   );
@@ -365,9 +367,78 @@ async function loginRoute(request: Request, env: Env) {
   } catch (e) {
     return resultError(e);
   }
+  return issueSession(request, env, await accountId(env, email), jwt,
+    input?.rememberDevice === true);
+}
+
+async function googleLoginRoute(request: Request, env: Env) {
+  if (!env.GOOGLE_CLIENT_ID)
+    return fail("NOT_CONFIGURED", 503, "Google 로그인이 아직 설정되지 않았습니다.");
+  if (!mutationAllowed(request, env))
+    return fail("ORIGIN", 403, "요청 출처를 확인할 수 없습니다.");
+  const input = await body(request);
+  const accessToken = typeof input?.accessToken === "string" ? input.accessToken : "";
+  if (!accessToken || accessToken.length > 4096)
+    return fail("INPUT", 400, "Google 로그인 정보를 확인해 주세요.");
+  if (!(await limit(env, "google:login", request)))
+    return fail("RATE_LIMIT", 429, "로그인 시도가 많습니다. 15분 후 다시 시도해 주세요.");
+  let profile: unknown;
+  let tokenInfo: unknown;
+  try {
+    const tokenUrl = new URL("https://oauth2.googleapis.com/tokeninfo");
+    tokenUrl.searchParams.set("access_token", accessToken);
+    const tokenResponse = await fetch(tokenUrl, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+      cache: "no-store",
+    });
+    if (!tokenResponse.ok)
+      return tokenResponse.status === 400 || tokenResponse.status === 401
+        ? fail("GOOGLE_AUTH", 401, "Google 인증을 확인할 수 없습니다.")
+        : fail("GOOGLE_UNAVAILABLE", 503, "Google 인증 서버에 연결할 수 없습니다.");
+    tokenInfo = await tokenResponse.json();
+    const info = object(tokenInfo);
+    const expiresIn = Number(info?.expires_in);
+    if (info?.aud !== env.GOOGLE_CLIENT_ID ||
+        (info.azp !== undefined && info.azp !== env.GOOGLE_CLIENT_ID) ||
+        !Number.isFinite(expiresIn) || expiresIn <= 0)
+      return fail("GOOGLE_AUTH", 401, "Google 인증 대상을 확인할 수 없습니다.");
+    const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok)
+      return response.status === 401 || response.status === 403
+        ? fail("GOOGLE_AUTH", 401, "Google 인증을 확인할 수 없습니다.")
+        : fail("GOOGLE_UNAVAILABLE", 503, "Google 인증 서버에 연결할 수 없습니다.");
+    profile = await response.json();
+  } catch {
+    return fail("GOOGLE_UNAVAILABLE", 503, "Google 인증 서버에 연결할 수 없습니다.");
+  }
+  const user = object(profile);
+  const googleId = typeof user?.sub === "string" ? user.sub : "";
+  const email = typeof user?.email === "string" ? user.email : "";
+  if (!googleId || googleId.length > 255 || !/^[\x21-\x7e]+$/.test(googleId) ||
+      (typeof object(tokenInfo)?.sub === "string" && object(tokenInfo)?.sub !== googleId) ||
+      !email || email.length > 254 ||
+      user?.email_verified !== true)
+    return fail("GOOGLE_AUTH", 401, "Google 계정 정보를 확인할 수 없습니다.");
+  let jwt: string;
+  try {
+    jwt = await googleSocialLogin(accessToken, googleId, email);
+    await reload(jwt);
+  } catch (e) {
+    return resultError(e);
+  }
+  return issueSession(request, env, await accountId(env, `google:${googleId}`, false), jwt,
+    input?.rememberDevice === true);
+}
+
+async function issueSession(request: Request, env: Env, id: string, jwt: string,
+  rememberDevice: boolean) {
   const pages = request.headers.get("Origin") === PAGES_ORIGIN;
-  const remember = pages && input?.rememberDevice === true;
-  const id = await accountId(env, email);
+  const remember = pages && rememberDevice;
   const sealed = await encrypt(env, id, jwt);
   const token = hex(crypto.getRandomValues(new Uint8Array(32)));
   const rememberedToken = remember
@@ -713,6 +784,15 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return await loginRoute(request, env);
       } catch {
         return fail("SERVER_ERROR", 500, "로그인을 처리하지 못했습니다.");
+      }
+    }
+    if (path === "/api/auth/providers" && request.method === "GET")
+      return json({ googleClientId: env.GOOGLE_CLIENT_ID || null });
+    if (path === "/api/login/google" && request.method === "POST") {
+      try {
+        return await googleLoginRoute(request, env);
+      } catch {
+        return fail("SERVER_ERROR", 500, "Google 로그인을 처리하지 못했습니다.");
       }
     }
     let s: Session | null;

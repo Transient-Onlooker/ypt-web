@@ -436,6 +436,105 @@ test("Pages uses isolated bearer sessions and restricted CORS", async () => {
   }
 });
 
+test("Google login validates UserInfo and keeps its local account separate", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (input, options) => {
+    const url = new URL(input);
+    if (url.hostname === "oauth2.googleapis.com") {
+      calls.push("tokeninfo");
+      const token = url.searchParams.get("access_token");
+      const subject = token === "valid-google-token" ? "CaseSensitive"
+        : token === "other-google-token" ? "casesensitive" : null;
+      if (!subject && token !== "wrong-audience-token")
+        return new Response("{}", { status: 400 });
+      return new Response(JSON.stringify({
+        aud: token === "wrong-audience-token" ? "other.apps.googleusercontent.com"
+          : "web-client.apps.googleusercontent.com",
+        azp: token === "wrong-audience-token" ? "other.apps.googleusercontent.com"
+          : "web-client.apps.googleusercontent.com",
+        sub: subject ?? "Different",
+        expires_in: 3500,
+      }));
+    }
+    if (url.hostname === "openidconnect.googleapis.com") {
+      calls.push("userinfo");
+      const subject = options.headers.Authorization === "Bearer valid-google-token"
+        ? "CaseSensitive" : options.headers.Authorization === "Bearer other-google-token"
+          ? "casesensitive" : null;
+      if (!subject)
+        return new Response("{}", { status: 401 });
+      return new Response(JSON.stringify({
+        sub: subject, email: "a@example.test", email_verified: true,
+      }));
+    }
+    if (url.pathname === "/user/social/sign-up-jwt") {
+      calls.push("social");
+      const body = JSON.parse(options.body);
+      assert.ok(["valid-google-token", "other-google-token"].includes(body.accessToken));
+      assert.deepEqual(body, {
+        accessToken: body.accessToken,
+        providerId: body.accessToken === "valid-google-token"
+          ? "gCaseSensitive" : "gcasesensitive",
+        email: "a@example.test",
+        loginProvider: "Google",
+        new: true,
+        getx: true,
+        version: 810046,
+      });
+      return new Response(JSON.stringify({ s: true, jwt: "jwt-a@example.test" }));
+    }
+    return stub.fetch(input, options);
+  };
+  const env = {
+    DB: database(), GOOGLE_CLIENT_ID: "web-client.apps.googleusercontent.com",
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    assert.equal((await pagesCall(env, "/auth/providers")).data.googleClientId,
+      env.GOOGLE_CLIENT_ID);
+    const email = await pagesCall(env, "/login", "POST", {
+      email: "a@example.test", password: "correct",
+    });
+    assert.equal(email.status, 200);
+    const rejected = await pagesCall(env, "/login/google", "POST", {
+      accessToken: "invalid-google-token", providerId: "gspoofed",
+    });
+    assert.equal(rejected.status, 401);
+    const wrongAudience = await pagesCall(env, "/login/google", "POST", {
+      accessToken: "wrong-audience-token",
+    });
+    assert.equal(wrongAudience.status, 401);
+    assert.deepEqual(calls, ["tokeninfo", "tokeninfo"]);
+    const google = await pagesCall(env, "/login/google", "POST", {
+      accessToken: "valid-google-token", providerId: "gspoofed", email: "spoof@example.test",
+    });
+    assert.equal(google.status, 200);
+    assert.match(google.data.sessionToken, /^[0-9a-f]{64}$/);
+    assert.equal("jwt" in google.data, false);
+    assert.equal("accessToken" in google.data, false);
+    assert.notEqual(google.data.sessionToken, email.data.sessionToken);
+    assert.deepEqual(calls, ["tokeninfo", "tokeninfo", "tokeninfo", "userinfo", "social"]);
+    const otherGoogle = await pagesCall(env, "/login/google", "POST", {
+      accessToken: "other-google-token",
+    });
+    assert.equal(otherGoogle.status, 200);
+    assert.equal(env.DB.sqlite.prepare("SELECT COUNT(*) AS count FROM accounts").get().count, 3);
+    assert.equal((await pagesCall(env, "/session", "GET", undefined,
+      google.data.sessionToken)).data.authenticated, true);
+    delete env.GOOGLE_CLIENT_ID;
+    assert.equal((await pagesCall(env, "/auth/providers")).data.googleClientId, null);
+    assert.equal((await pagesCall(env, "/login/google", "POST", {
+      accessToken: "valid-google-token",
+    })).status, 503);
+  } finally {
+    env.DB.sqlite.close();
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("remembered Pages cookie restores a new tab and revokes linked sessions", async () => {
   const stub = upstream();
   const realFetch = globalThis.fetch;

@@ -2441,3 +2441,58 @@ input[type="search"] {
 :root[data-theme="dark"] .shell,
 :root[data-theme="dark"] .content,
 :root[data-theme="dark"] .content main { background: #000 !important; }
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+.google-login-button {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.google-login-button:hover:not(:disabled) {
+  border-color: #4285f4;
+  transform: translateY(-1px);
+}
+.google-mark {
+  color: #4285f4;
+  font-family: Arial, sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1;
+}
+:root:not([data-theme="dark"]) .google-login-button {
+  background: #fff;
+  border-color: #000;
+  color: #000;
+}
+:root[data-theme="dark"] .google-login-button {
+  background: #000;
+  border-color: #fff;
+  color: #fff;
+}
+:root:not([data-theme="dark"]) .login-divider::before,
+:root:not([data-theme="dark"]) .login-divider::after { background: #000; }
+:root[data-theme="dark"] .login-divider::before,
+:root[data-theme="dark"] .login-divider::after { background: #fff; }

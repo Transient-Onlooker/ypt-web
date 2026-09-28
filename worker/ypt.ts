@@ -312,6 +312,20 @@ export async function login(email: string, password: string) {
   }
   return reply.jwt;
 }
+export async function googleSocialLogin(accessToken: string, googleId: string, email: string) {
+  const reply = await ypt("/user/social/sign-up-jwt", "POST", {
+    accessToken,
+    providerId: `g${googleId}`,
+    email,
+    loginProvider: "Google",
+    new: true,
+    getx: true,
+    version: 810046,
+  });
+  if (typeof reply.jwt !== "string" || !reply.jwt)
+    throw new YptError("INVALID_DATA");
+  return reply.jwt;
+}
 export async function reload(jwt: string, onClockOffset?: (offsetMs: number | null) => void) {
   return ypt("/user/v2/reload/info", "POST", RELOAD_BODY, jwt, fetch, onClockOffset);
 }
