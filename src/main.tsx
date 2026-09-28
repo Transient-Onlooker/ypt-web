@@ -67,6 +67,7 @@ const SIDEBAR_SECTIONS: { title: string; items: { tab: Tab; label: string }[] }[
 const MOBILE_TABS: { tab: Tab; label: string }[] = [
   { tab: "study", label: "타이머" },
   { tab: "today", label: "오늘" },
+  { tab: "plan", label: "계획" },
   { tab: "history", label: "기록" },
   { tab: "groups", label: "그룹" },
 ];
@@ -1795,7 +1796,7 @@ function App() {
       return timeOrder || nameOrder;
     });
   const pageInfo = PAGE_INFO[tab];
-  const mobileActiveTab = tab === "plan" ? "today" : tab === "insights" ? "history" : tab;
+  const mobileActiveTab = tab === "insights" ? "history" : tab;
   return (
     <div className="shell">
       <a className="skip-link" href="#main-content">본문으로 이동</a>
@@ -1934,16 +1935,6 @@ function App() {
                 ×
               </button>
             </div>
-          )}
-          {(tab === "today" || tab === "plan") && (
-            <nav className="mobile-page-switcher" aria-label="오늘 메뉴">
-              <button className={tab === "today" ? "active" : ""}
-                aria-current={tab === "today" ? "page" : undefined}
-                onClick={() => navigateTab("today")}>오늘 요약</button>
-              <button className={tab === "plan" ? "active" : ""}
-                aria-current={tab === "plan" ? "page" : undefined}
-                onClick={() => navigateTab("plan")}>계획</button>
-            </nav>
           )}
           {(tab === "history" || tab === "insights") && (
             <nav className="mobile-page-switcher" aria-label="기록 메뉴">
