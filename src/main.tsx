@@ -1635,6 +1635,7 @@ function App() {
         onToggleTheme={() => setDarkMode((old) => !old)}
         onLogin={async (warning) => {
           clearPersonalTools();
+          setSelectedSubject("");
           setTimerContinuity(null);
           setPomodoro(freshPomodoro(pomodoroSettings.focus));
           setPomodoroError("");
