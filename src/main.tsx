@@ -78,6 +78,7 @@ const POMODORO_MODE_KEY = "ypt-web-pomodoro-mode";
 const POMODORO_KEY = "ypt-web-personal-tools-pomodoro";
 const POMODORO_SETTINGS_KEY = "ypt-web-personal-tools-settings";
 const REMEMBERED_EMAIL_KEY = "ypt-web-remembered-email";
+const ACCOUNT_LABEL_KEY = "ypt-web-account-label";
 const TIMER_CONTINUITY_KEY = "ypt-web-timer-continuity";
 const LAST_SUBJECT_KEY = "ypt-web-personal-tools-last-subject";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -141,6 +142,23 @@ function rememberEmail(email: string) {
     else localStorage.removeItem(REMEMBERED_EMAIL_KEY);
   } catch {
     // Login still works when browser storage is unavailable.
+  }
+}
+
+function savedAccountLabel(): string {
+  try {
+    return sessionStorage.getItem(ACCOUNT_LABEL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberAccountLabel(label: string) {
+  try {
+    if (label) sessionStorage.setItem(ACCOUNT_LABEL_KEY, label);
+    else sessionStorage.removeItem(ACCOUNT_LABEL_KEY);
+  } catch {
+    // Account details are optional and must not block sign-in.
   }
 }
 
@@ -654,7 +672,7 @@ function Login({
   darkMode,
   onToggleTheme,
 }: {
-  onLogin: (rememberWarning: string) => Promise<void>;
+  onLogin: (rememberWarning: string, accountLabel: string) => Promise<void>;
   notice: string;
   darkMode: boolean;
   onToggleTheme: () => void;
@@ -738,7 +756,7 @@ function Login({
                     rememberWarning = "로그인 유지 쿠키를 확인하지 못했습니다. 현재 탭에서는 계속 사용할 수 있습니다.";
                   }
                 }
-                await onLoginRef.current(rememberWarning);
+                await onLoginRef.current(rememberWarning, "Google로 로그인됨");
               } catch (cause) {
                 setError(cause instanceof Error ? cause.message : "Google 로그인에 실패했습니다.");
               } finally {
@@ -819,7 +837,7 @@ function Login({
           // Browser password storage is optional and must not block login.
         }
       }
-      await onLogin(rememberWarning);
+      await onLogin(rememberWarning, email);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "로그인하지 못했습니다.",
@@ -925,6 +943,7 @@ function Login({
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
+  const [accountLabel, setAccountLabel] = useState(savedAccountLabel);
   const [sessionLoadError, setSessionLoadError] = useState(false);
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const [loginNotice, setLoginNotice] = useState("");
@@ -1192,6 +1211,8 @@ function App() {
       if ((cause as ApiError).status === 401) {
         clearPersonalTools();
         setTimerContinuity(null);
+        rememberAccountLabel("");
+        setAccountLabel("");
         setPomodoro(freshPomodoro());
         setPomodoroSettings(parseIntervalSettings(null));
         setPomodoroDraft({ focus: "25", short: "5" });
@@ -1254,6 +1275,8 @@ function App() {
         if (!result.authenticated) {
           clearPersonalTools();
           setTimerContinuity(null);
+          rememberAccountLabel("");
+          setAccountLabel("");
           setPomodoro(freshPomodoro());
           setPomodoroSettings(parseIntervalSettings(null));
           setPomodoroDraft({ focus: "25", short: "5" });
@@ -1600,6 +1623,8 @@ function App() {
       if (clearLocalSession) {
         clearPersonalTools();
         setTimerContinuity(null);
+        rememberAccountLabel("");
+        setAccountLabel("");
         authEpoch.current++;
         historyCache.current.clear();
         historyRequests.current.clear();
@@ -1671,10 +1696,12 @@ function App() {
         notice={loginNotice}
         darkMode={darkMode}
         onToggleTheme={() => setDarkMode((old) => !old)}
-        onLogin={async (warning) => {
+        onLogin={async (warning, identity) => {
           clearPersonalTools();
           setSelectedSubject("");
           setTimerContinuity(null);
+          rememberAccountLabel(identity);
+          setAccountLabel(identity);
           setPomodoro(freshPomodoro(pomodoroSettings.focus));
           setPomodoroError("");
           authEpoch.current++;
@@ -1794,13 +1821,6 @@ function App() {
             </div>
           ))}
         </nav>
-        <button
-          className="sidebar-logout"
-          disabled={loggingOut || busy}
-          onClick={() => void logout()}
-        >
-          로그아웃
-        </button>
       </aside>
       <div className="content">
         <header className="topbar">
@@ -1808,30 +1828,26 @@ function App() {
             <BrandMark />
             <span>YPT WEB</span>
           </div>
-          <div
-            className={`top-status ${statusStale ? "stale" : ""}`}
-            title={statusStale ? "최근 상태 확인이 지연되고 있습니다." : undefined}
-          >
-            <span
-              className={`status-dot ${running && !remoteUnverified && !statusStale ? "live" : ""}`}
-            />
-            {statusStale ? `${status} · 갱신 지연` : status}
-            {(timer?.subject || snapshot?.remoteSubject) && (
-              <span className="status-subject">
-                {" · "}
-                {timer?.subject || snapshot?.remoteSubject}
-              </span>
-            )}
-            {pomodoroActive ? <strong>{pomodoro.phase === "focus" ? "집중" : "휴식"} {countdown(pomodoroRemaining(pomodoro, now + clockOffset))}</strong>
-              : running && <strong>{duration(liveMs)}</strong>}
+          <div className="topbar-status-row">
+            <div
+              className={`top-status ${statusStale ? "stale" : ""}`}
+              title={statusStale ? "최근 상태 확인이 지연되고 있습니다." : undefined}
+            >
+              <span
+                className={`status-dot ${running && !remoteUnverified && !statusStale ? "live" : ""}`}
+              />
+              {statusStale ? `${status} · 갱신 지연` : status}
+              {(timer?.subject || snapshot?.remoteSubject) && (
+                <span className="status-subject">
+                  {" · "}
+                  {timer?.subject || snapshot?.remoteSubject}
+                </span>
+              )}
+              {pomodoroActive ? <strong>{pomodoro.phase === "focus" ? "집중" : "휴식"} {countdown(pomodoroRemaining(pomodoro, now + clockOffset))}</strong>
+                : running && <strong>{duration(liveMs)}</strong>}
+            </div>
+            <ThemeToggle dark={darkMode} onToggle={() => setDarkMode((old) => !old)} />
           </div>
-          <button
-            className="desktop-logout"
-            disabled={loggingOut || busy}
-            onClick={() => void logout()}
-          >
-            로그아웃
-          </button>
         </header>
         <main id="main-content" tabIndex={-1}>
           {rememberWarning && (
@@ -1864,10 +1880,27 @@ function App() {
               <p className="page-subtitle">{pageInfo.subtitle}</p>
             </div>
             <div className="page-controls">
-              <ThemeToggle dark={darkMode} onToggle={() => setDarkMode((old) => !old)} />
               <details className="settings-menu">
                 <summary>설정</summary>
                 <div className="settings-popover">
+                  <section className="settings-account" aria-label="계정">
+                    <div>
+                      <span>로그인 정보</span>
+                      <strong>{accountLabel || "현재 세션에서 계정 정보를 확인할 수 없음"}</strong>
+                      {!accountLabel && (
+                        <small>다시 로그인하면 이 탭에 로그인 정보가 표시됩니다.</small>
+                      )}
+                    </div>
+                    <button
+                      className="secondary"
+                      type="button"
+                      disabled={loggingOut || busy}
+                      onClick={() => void logout()}
+                    >
+                      로그아웃
+                    </button>
+                  </section>
+                  <hr />
                   <label className="sync-control" htmlFor="sync-seconds">
                     <span>자동 동기화 간격</span>
                     <select

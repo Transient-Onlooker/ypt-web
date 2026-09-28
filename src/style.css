@@ -123,6 +123,23 @@ select:focus-visible {
   border-bottom: 1px solid #dce6dc;
   background: #fbfdf9;
 }
+.topbar-status-row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.topbar-status-row .top-status {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 120px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar-status-row .theme-toggle { flex: none; white-space: nowrap; }
 .mobile-brand {
   display: none;
 }
@@ -952,8 +969,8 @@ input[type="search"] {
     min-height: 87px;
     padding: calc(9px + env(safe-area-inset-top)) 16px 10px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "brand logout" "status status";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "brand" "status";
     gap: 5px 10px;
   }
   .mobile-brand {
@@ -967,7 +984,7 @@ input[type="search"] {
     font-size: 13px;
   }
   .top-status {
-    grid-area: status;
+    flex: 1;
     min-height: 30px;
     padding: 5px 10px;
     border-radius: 9px;
@@ -982,16 +999,10 @@ input[type="search"] {
     display: none;
   }
   .desktop-logout {
-    display: block;
-    grid-area: logout;
-    min-height: 38px;
-    font-size: 12px;
-    padding: 6px 10px;
-    border: 1px solid #d5e3d5;
-    border-radius: 9px;
-    white-space: nowrap;
-    flex: none;
+    display: none;
   }
+  .topbar-status-row { grid-area: status; gap: 8px; }
+  .topbar-status-row .theme-toggle { min-height: 44px; padding: 7px 10px; font-size: 13px; }
   .top-status strong {
     margin-left: auto;
   }
@@ -2615,7 +2626,7 @@ input[type="search"] {
   z-index: 30;
   display: grid;
   gap: 10px;
-  width: min(320px, calc(100vw - 32px));
+  width: min(360px, calc(100vw - 32px));
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 15px;
@@ -2623,6 +2634,13 @@ input[type="search"] {
   color: var(--ink);
   box-shadow: 0 12px 32px #0002;
 }
+.settings-account { display: grid; gap: 11px; }
+.settings-account > div { display: grid; gap: 5px; min-width: 0; }
+.settings-account span { color: var(--muted); font-size: 12px; }
+.settings-account strong { overflow-wrap: anywhere; font-size: 14px; }
+.settings-account small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.settings-account .secondary { width: 100%; min-height: 44px; }
+.settings-popover hr { width: 100%; margin: 1px 0; border: 0; border-top: 1px solid var(--line); }
 .settings-popover .sync-control {
   display: grid;
   gap: 8px;
