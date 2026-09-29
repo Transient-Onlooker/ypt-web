@@ -994,6 +994,7 @@ function App() {
   const [snapshotCheckedAt, setSnapshotCheckedAt] = useState<number | null>(null);
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [timerHelpOpen, setTimerHelpOpen] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromSearch(window.location.search));
   const navigateTab = useCallback((next: Tab, replace = false) => {
     setSettingsOpen(false);
@@ -1687,7 +1688,7 @@ function App() {
     pomodoroAction.current = false;
   }
   function adjustPomodoroDraft(field: "focus" | "short", amount: -1 | 1) {
-    const [minimum, maximum] = field === "focus" ? [5, 180] : [1, 60];
+    const [minimum, maximum] = field === "focus" ? [1, 180] : [1, 60];
     setPomodoroDraft((old) => {
       const current = Number(old[field]);
       const value = Number.isFinite(current) ? Math.trunc(current) : minimum;
@@ -2218,9 +2219,9 @@ function App() {
                       event.preventDefault();
                       const focus = Number(pomodoroDraft.focus);
                       const short = Number(pomodoroDraft.short);
-                      if (!Number.isInteger(focus) || focus < 5 || focus > 180 ||
+                      if (!Number.isInteger(focus) || focus < 1 || focus > 180 ||
                         !Number.isInteger(short) || short < 1 || short > 60) {
-                        setPomodoroError("집중은 5~180분, 휴식은 1~60분으로 입력해 주세요.");
+                        setPomodoroError("집중은 1~180분, 휴식은 1~60분으로 입력해 주세요.");
                         return;
                       }
                       setPomodoroSettings((old) => ({ ...old, focus, short }));
@@ -2231,9 +2232,9 @@ function App() {
                         <label htmlFor="pomodoro-focus-minutes">집중</label>
                         <div className="pomodoro-stepper">
                           <button className="secondary" type="button" aria-label="집중 시간 1분 줄이기"
-                            disabled={Number(pomodoroDraft.focus) <= 5}
+                            disabled={Number(pomodoroDraft.focus) <= 1}
                             onClick={() => adjustPomodoroDraft("focus", -1)}>−</button>
-                          <input id="pomodoro-focus-minutes" type="number" inputMode="numeric" min="5" max="180" value={pomodoroDraft.focus}
+                          <input id="pomodoro-focus-minutes" type="number" inputMode="numeric" min="1" max="180" value={pomodoroDraft.focus}
                             onChange={(event) => setPomodoroDraft((old) => ({ ...old, focus: event.target.value }))} />
                           <button className="secondary" type="button" aria-label="집중 시간 1분 늘리기"
                             disabled={Number(pomodoroDraft.focus) >= 180}
@@ -2277,12 +2278,24 @@ function App() {
                       ? "이 브라우저에서 지원하지 않습니다."
                       : "선택하면 공부 중 화면이 꺼지지 않도록 요청합니다.")}</span>
                 </div>}
-                <details className="timer-help">
-                  <summary>타이머 이용 안내</summary>
-                  <p>일시정지는 과목을 기억해 재개할 수 있습니다. 공부 끝내기는 구간을 마무리하고 다음 시작 때 과목을 다시 고릅니다.</p>
-                  <p>시작·재개 전에 서버가 앱 타이머 상태를 다시 확인합니다. 화면을 닫아도 타이머는 계속되며, 앱에서 시작한 공부도 여기서 제어할 수 있습니다.</p>
-                  {pomodoroMode && <p>집중·휴식 길이는 설정의 − / + 버튼으로 1분씩 조절하거나 숫자를 입력한 뒤 적용할 수 있습니다.</p>}
-                </details>
+                <div className="timer-help">
+                  <button
+                    className="timer-help-toggle"
+                    type="button"
+                    aria-expanded={timerHelpOpen}
+                    onClick={() => setTimerHelpOpen((open) => !open)}
+                  >
+                    <span>타이머 이용 안내</span>
+                    <span aria-hidden="true">{timerHelpOpen ? "−" : "+"}</span>
+                  </button>
+                  {timerHelpOpen && (
+                    <div className="timer-help-body">
+                      <p>일시정지는 과목을 기억해 재개할 수 있습니다. 공부 끝내기는 구간을 마무리하고 다음 시작 때 과목을 다시 고릅니다.</p>
+                      <p>시작·재개 전에 서버가 앱 타이머 상태를 다시 확인합니다. 화면을 닫아도 타이머는 계속되며, 앱에서 시작한 공부도 여기서 제어할 수 있습니다.</p>
+                      {pomodoroMode && <p>집중·휴식 길이는 설정의 − / + 버튼으로 1분씩 조절하거나 숫자를 입력한 뒤 적용할 수 있습니다.</p>}
+                    </div>
+                  )}
+                </div>
                 {pendingRecoveryWait ? (
                   <p className="caution">
                     요청을 처리 중입니다. 같은 요청은 다시 보내지 않습니다. 처리

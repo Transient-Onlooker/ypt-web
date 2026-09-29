@@ -65,6 +65,8 @@ test("손상되거나 범위를 벗어난 세션 저장값은 버린다", () => 
   assert.deepEqual(parseInterval(JSON.stringify({ ...freshInterval(), endsAt: Date.now() + 181 * 60_000 })), freshInterval());
   assert.deepEqual(parseIntervalSettings(JSON.stringify({ focus: 45, short: 10, long: 20 })),
     { focus: 45, short: 10, long: 20 });
+  assert.deepEqual(parseIntervalSettings(JSON.stringify({ focus: 1, short: 1, long: 1 })),
+    { focus: 1, short: 1, long: 1 });
   assert.deepEqual(parseIntervalSettings(JSON.stringify({ focus: 0, short: 10, long: 20 })),
     { focus: 25, short: 5, long: 15 });
 });

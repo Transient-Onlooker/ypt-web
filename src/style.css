@@ -1430,28 +1430,31 @@ input[type="search"] {
   font-size: 13px;
   line-height: 1.6;
 }
-.timer-help summary {
+.timer-help-toggle {
+  width: 100%;
   min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   cursor: pointer;
   color: #315f43;
+  font: inherit;
   font-weight: 700;
-  list-style: none;
+  text-align: left;
 }
-.timer-help summary::-webkit-details-marker { display: none; }
-.timer-help summary::after {
-  content: "+";
+.timer-help-toggle > span:last-child {
   font-size: 20px;
   font-weight: 400;
 }
-.timer-help[open] summary::after { content: "−"; }
-.timer-help summary:focus-visible {
+.timer-help-toggle:focus-visible {
   outline: 2px solid var(--focus-accent);
   outline-offset: 2px;
 }
+.timer-help-body { padding-bottom: 1px; }
 .timer-help p { margin: 0 0 12px; }
 .summary-card {
   background: #f0f5e9;
@@ -2099,7 +2102,7 @@ input[type="search"] {
 :root[data-theme="dark"] .plan-list .plan-focus[aria-pressed="true"],
 :root[data-theme="dark"] .trend-view-controls button[aria-pressed="true"] { background: #31573d; border-color: #70a57b; color: #eaf6da; }
 :root[data-theme="dark"] .text-button,
-:root[data-theme="dark"] .timer-help summary,
+:root[data-theme="dark"] .timer-help-toggle,
 :root[data-theme="dark"] .pomodoro-settings summary,
 :root[data-theme="dark"] .plan-template summary,
 :root[data-theme="dark"] .plan-vs-record h3,
@@ -2555,7 +2558,7 @@ input[type="search"] {
 :root:not([data-theme="dark"]) .login-divider::after { background: #000; }
 :root[data-theme="dark"] .login-divider::before,
 :root[data-theme="dark"] .login-divider::after { background: #fff; }
-:root[data-theme="dark"] .content .timer-help summary,
+:root[data-theme="dark"] .content .timer-help-toggle,
 :root[data-theme="dark"] .content .pomodoro-settings summary,
 :root[data-theme="dark"] .content .plan-template summary,
 :root[data-theme="dark"] .content .plan-vs-record h3,
@@ -2769,7 +2772,7 @@ input[type="search"] {
 }
 
 :root[data-theme="dark"] .text-button,
-:root[data-theme="dark"] .timer-help summary,
+:root[data-theme="dark"] .timer-help-toggle,
 :root[data-theme="dark"] .pomodoro-settings summary,
 :root[data-theme="dark"] .plan-template summary {
   color: #cff7ad;
