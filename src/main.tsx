@@ -492,11 +492,40 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
     try {
       const endDate = shiftDate(today.date, -1);
       const count = Math.max(1, rangeDays - 1);
-      const result = await api<{
+      type HistoryRangeResponse = {
         days: Array<{ date: string; day: Day | null; cached: boolean }>;
         cacheHits: number;
         fetched: number;
-      }>(`/history/range?end=${encodeURIComponent(endDate)}&days=${count}${force ? "&refresh=1" : ""}`);
+      };
+      let result: HistoryRangeResponse;
+      try {
+        result = await api<HistoryRangeResponse>(
+          `/history/range?end=${encodeURIComponent(endDate)}&days=${count}${force ? "&refresh=1" : ""}`,
+        );
+      } catch (cause) {
+        if ((cause as ApiError).status !== 404) throw cause;
+        const dates = Array.from({ length: count }, (_, index) =>
+          shiftDate(today.date, -(index + 1)));
+        const rows: HistoryRangeResponse["days"] = [];
+        for (let offset = 0; offset < dates.length; offset += 4) {
+          const batch = dates.slice(offset, offset + 4);
+          const replies = await Promise.allSettled(batch.map((date) =>
+            api<Day>(`/history?date=${encodeURIComponent(date)}${force ? "&refresh=1" : ""}`)));
+          replies.forEach((reply, index) => {
+            rows.push({
+              date: batch[index],
+              day: reply.status === "fulfilled" ? reply.value : null,
+              cached: false,
+            });
+          });
+        }
+        result = {
+          days: rows,
+          cacheHits: 0,
+          fetched: rows.filter((row) => row.day !== null).length,
+        };
+        setSourceNote("Worker 업데이트 전 호환 모드로 기록을 불러왔습니다.");
+      }
       if (currentRequest !== requestId.current) return;
       const byDate = new Map(result.days.map((row) => [row.date, row.day]));
       const rows: TrendDay[] = Array.from({ length: count }, (_, index) => {
@@ -511,13 +540,16 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
       });
       onLoaded(rows);
       const unavailable = rows.filter((row) => row.totalMs === null).length;
-      setSourceNote(
-        force
-          ? `열품타에서 ${result.fetched}일을 새로 확인했습니다.`
-          : result.fetched === 0 && result.cacheHits > 0
-            ? `저장된 기록 ${result.cacheHits}일을 즉시 불러왔습니다.`
-            : `저장된 기록 ${result.cacheHits}일 · 열품타에서 ${result.fetched}일 확인`,
-      );
+      if (result.cacheHits > 0 || result.fetched === 0)
+        setSourceNote(
+          force
+            ? `열품타에서 ${result.fetched}일을 새로 확인했습니다.`
+            : result.fetched === 0 && result.cacheHits > 0
+              ? `저장된 기록 ${result.cacheHits}일을 즉시 불러왔습니다.`
+              : `저장된 기록 ${result.cacheHits}일 · 열품타에서 ${result.fetched}일 확인`,
+        );
+      else if (!sourceNote)
+        setSourceNote(`열품타에서 ${result.fetched}일을 확인했습니다.`);
       if (unavailable > 0)
         setError(`${unavailable}일은 확인하지 못했습니다. 다시 불러오면 열품타에서 재확인합니다.`);
     } catch {
