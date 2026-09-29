@@ -701,7 +701,14 @@ test("timer auth expiry revokes both remembered and current-tab sessions", async
     assert.match(expiredAfterStart.cookie, /Max-Age=0/);
     assert.equal((await pagesCall(env, "/session", "GET", undefined,
       nextLogin.data.sessionToken)).data.authenticated, false);
-    assert.equal(env.DB.sqlite.prepare("SELECT state FROM timers").get().state, "uncertain");
+    assert.equal(
+      env.DB.sqlite.prepare("SELECT COUNT(*) AS count FROM timers").get().count,
+      0,
+    );
+    assert.equal(
+      env.DB.sqlite.prepare("SELECT COUNT(*) AS count FROM accounts").get().count,
+      0,
+    );
     env.DB.sqlite.close();
   } finally {
     globalThis.fetch = realFetch;
