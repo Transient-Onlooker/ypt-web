@@ -42,6 +42,7 @@ const encoder = new TextEncoder();
 const TTL = 30 * 24 * 60 * 60 * 1000;
 const OPERATION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const GROUP_ACCESS_TTL_MS = 5 * 60 * 1000;
+const HISTORY_FETCH_CONCURRENCY = 4;
 const COOKIE = "ypt_session";
 const REMEMBER_COOKIE = "__Host-ypt_remember";
 const PAGES_ORIGIN = "https://ypt.mcv.kr";
@@ -220,6 +221,105 @@ async function refreshGroupAccess(env: Env, account: string, jwt: string): Promi
   ];
   await env.DB.batch(statements);
   return { list, countryId };
+}
+type CachedDayRow = { payload: string; fetched_at: number };
+function validDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = Date.parse(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
+}
+function shiftIsoDate(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+function parseCachedDay(payload: string, expectedDate: string): Day | null {
+  try {
+    const value: unknown = JSON.parse(payload);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const day = value as Day;
+    if (day.date !== expectedDate || !Number.isSafeInteger(day.totalMs) || day.totalMs < 0 ||
+      typeof day.subjectTimesAvailable !== "boolean" || !Array.isArray(day.subjects) ||
+      !(day.longestSegmentMs === null ||
+        Number.isSafeInteger(day.longestSegmentMs) && day.longestSegmentMs >= 0))
+      return null;
+    if (!day.subjects.every((subject) =>
+      subject && typeof subject === "object" &&
+      typeof subject.title === "string" && !!subject.title &&
+      (subject.studyMs === null || Number.isSafeInteger(subject.studyMs) && subject.studyMs >= 0) &&
+      (subject.color === undefined || typeof subject.color === "string")))
+      return null;
+    return day;
+  } catch {
+    return null;
+  }
+}
+async function readCachedDay(env: Env, account: string, date: string) {
+  const row = await env.DB.prepare(
+    "SELECT payload, fetched_at FROM day_cache WHERE account_id=? AND date=?",
+  ).bind(account, date).first<CachedDayRow>();
+  if (!row) return null;
+  const day = parseCachedDay(row.payload, date);
+  if (!day) {
+    await env.DB.prepare("DELETE FROM day_cache WHERE account_id=? AND date=?")
+      .bind(account, date).run();
+    return null;
+  }
+  return { day, fetchedAt: row.fetched_at };
+}
+async function writeCachedDay(env: Env, account: string, day: Day) {
+  await env.DB.prepare(
+    "INSERT INTO day_cache(account_id,date,payload,fetched_at) VALUES(?,?,?,?) " +
+    "ON CONFLICT(account_id,date) DO UPDATE SET payload=excluded.payload,fetched_at=excluded.fetched_at",
+  ).bind(account, day.date, JSON.stringify(day), Date.now()).run();
+}
+async function historyDay(env: Env, account: string, jwt: string, date: string, force = false) {
+  if (!force) {
+    const cached = await readCachedDay(env, account, date);
+    if (cached) return { day: cached.day, cached: true, fetchedAt: cached.fetchedAt };
+  }
+  const day = await history(jwt, date);
+  await writeCachedDay(env, account, day);
+  return { day, cached: false, fetchedAt: Date.now() };
+}
+async function historyRange(env: Env, account: string, jwt: string, end: string, count: number, force = false) {
+  const dates = Array.from({ length: count }, (_, index) => shiftIsoDate(end, -index));
+  const rows: Array<{ date: string; day: Day | null; cached: boolean }> =
+    dates.map((date) => ({ date, day: null, cached: false }));
+  const misses: number[] = [];
+  if (!force) {
+    const cached = await Promise.all(dates.map((date) => readCachedDay(env, account, date)));
+    cached.forEach((entry, index) => {
+      if (entry) rows[index] = { date: dates[index], day: entry.day, cached: true };
+      else misses.push(index);
+    });
+  } else {
+    misses.push(...dates.map((_, index) => index));
+  }
+
+  for (let offset = 0; offset < misses.length; offset += HISTORY_FETCH_CONCURRENCY) {
+    const indexes = misses.slice(offset, offset + HISTORY_FETCH_CONCURRENCY);
+    const results = await Promise.allSettled(indexes.map(async (index) => {
+      const day = await history(jwt, dates[index]);
+      await writeCachedDay(env, account, day);
+      return day;
+    }));
+    const authError = results.find((result) =>
+      result.status === "rejected" &&
+      result.reason instanceof YptError &&
+      result.reason.code === "AUTH_EXPIRED");
+    if (authError?.status === "rejected") throw authError.reason;
+    results.forEach((result, resultIndex) => {
+      const index = indexes[resultIndex];
+      if (result.status === "fulfilled")
+        rows[index] = { date: dates[index], day: result.value, cached: false };
+    });
+  }
+  return {
+    days: rows,
+    cacheHits: rows.filter((row) => row.cached && row.day).length,
+    fetched: rows.filter((row) => !row.cached && row.day).length,
+  };
 }
 async function cachedGroupCountryId(env: Env, account: string, jwt: string, groupId: number) {
   const cached = await env.DB.prepare(
@@ -969,20 +1069,36 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         };
         return json(snapshot);
       }
+      if (path === "/api/history/range" && request.method === "GET") {
+        if (!HISTORY_VALIDATED)
+          return fail("UNVERIFIED", 501, "과거 날짜 조회는 검증 중입니다.");
+        const end = url.searchParams.get("end") ?? "";
+        const count = Number(url.searchParams.get("days") ?? "");
+        if (!validDate(end) || !Number.isSafeInteger(count) || count < 1 || count > 30)
+          return fail("DATE", 400, "기간을 확인해 주세요.");
+        return json(await historyRange(
+          env,
+          s.account_id,
+          jwt,
+          end,
+          count,
+          url.searchParams.get("refresh") === "1",
+        ));
+      }
       if (path === "/api/history" && request.method === "GET") {
         if (!HISTORY_VALIDATED)
           return fail("UNVERIFIED", 501, "과거 날짜 조회는 검증 중입니다.");
         const date = url.searchParams.get("date") ?? "";
-        const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
-          ? Date.parse(`${date}T00:00:00Z`)
-          : NaN;
-        if (
-          !Number.isFinite(parsedDate) ||
-          new Date(parsedDate).toISOString().slice(0, 10) !== date
-        )
+        if (!validDate(date))
           return fail("DATE", 400, "날짜를 확인해 주세요.");
-        const day: Day = await history(jwt, date);
-        return json(day);
+        const result = await historyDay(
+          env,
+          s.account_id,
+          jwt,
+          date,
+          url.searchParams.get("refresh") === "1",
+        );
+        return json(result.day);
       }
       if (path === "/api/groups/overview" && request.method === "GET")
         return json(await groupOverview(env, s.account_id, jwt));
