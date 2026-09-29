@@ -371,15 +371,15 @@ async function limitIp(env: Env, request: Request) {
   const ipKey = await accountId(env, `ip:${ip}`);
   return hitLoginLimit(env, `ip:${ipKey}`, now, expiry);
 }
-async function limitIdentity(env: Env, identity: string) {
+async function limitIdentity(env: Env, prefix: "email" | "google", identity: string) {
   const now = Date.now();
   const expiry = now + 15 * 60_000;
   const identityKey = await accountId(env, identity);
-  return hitLoginLimit(env, `identity:${identityKey}`, now, expiry);
+  return hitLoginLimit(env, `${prefix}:${identityKey}`, now, expiry);
 }
 async function limit(env: Env, email: string, request: Request) {
   if (!(await limitIp(env, request))) return false;
-  return limitIdentity(env, `email:${email.trim().toLowerCase()}`);
+  return limitIdentity(env, "email", email.trim().toLowerCase());
 }
 function resultError(error: unknown, headers: HeadersInit = {}) {
   if (error instanceof YptError) {
@@ -488,7 +488,7 @@ async function googleLoginRoute(request: Request, env: Env) {
       !email || email.length > 254 ||
       user?.email_verified !== true)
     return fail("GOOGLE_AUTH", 401, "Google 계정 정보를 확인할 수 없습니다.");
-  if (!(await limitIdentity(env, `google:${googleId}`)))
+  if (!(await limitIdentity(env, "google", googleId)))
     return fail("RATE_LIMIT", 429, "이 Google 계정의 로그인 시도가 많습니다. 15분 후 다시 시도해 주세요.");
   let jwt: string;
   try {
