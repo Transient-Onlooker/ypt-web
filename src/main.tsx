@@ -498,6 +498,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
         fetched: number;
       };
       let result: HistoryRangeResponse;
+      let compatibilityFallback = false;
       try {
         result = await api<HistoryRangeResponse>(
           `/history/range?end=${encodeURIComponent(endDate)}&days=${count}${force ? "&refresh=1" : ""}`,
@@ -524,7 +525,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
           cacheHits: 0,
           fetched: rows.filter((row) => row.day !== null).length,
         };
-        setSourceNote("Worker 업데이트 전 호환 모드로 기록을 불러왔습니다.");
+        compatibilityFallback = true;
       }
       if (currentRequest !== requestId.current) return;
       const byDate = new Map(result.days.map((row) => [row.date, row.day]));
@@ -540,7 +541,9 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
       });
       onLoaded(rows);
       const unavailable = rows.filter((row) => row.totalMs === null).length;
-      if (result.cacheHits > 0 || result.fetched === 0)
+      if (compatibilityFallback)
+        setSourceNote("Worker 업데이트 전 호환 모드로 기록을 불러왔습니다.");
+      else
         setSourceNote(
           force
             ? `열품타에서 ${result.fetched}일을 새로 확인했습니다.`
@@ -548,8 +551,6 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
               ? `저장된 기록 ${result.cacheHits}일을 즉시 불러왔습니다.`
               : `저장된 기록 ${result.cacheHits}일 · 열품타에서 ${result.fetched}일 확인`,
         );
-      else if (!sourceNote)
-        setSourceNote(`열품타에서 ${result.fetched}일을 확인했습니다.`);
       if (unavailable > 0)
         setError(`${unavailable}일은 확인하지 못했습니다. 다시 불러오면 열품타에서 재확인합니다.`);
     } catch {
