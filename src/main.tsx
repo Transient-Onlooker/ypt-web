@@ -1419,11 +1419,41 @@ function App() {
     setLoadingGroup(true);
     try {
       if (includeCounts) {
-        const result = await api<{
+        type GroupOverview = {
           groups: Group[];
           counts: Record<string, number>;
           selected: { groupId: number; members: Member[]; checkedAt: number } | null;
-        }>("/groups/overview");
+        };
+        let result: GroupOverview;
+        try {
+          result = await api<GroupOverview>("/groups/overview");
+        } catch (cause) {
+          if ((cause as ApiError).status !== 404) throw cause;
+          // Keep Pages compatible while an older Worker is still deployed.
+          const fallback = await api<{ groups: Group[] }>("/groups");
+          const counts: Record<string, number> = {};
+          let selected: GroupOverview["selected"] = null;
+          for (let index = 0; index < fallback.groups.length; index += 2) {
+            const batch = fallback.groups.slice(index, index + 2);
+            const rows = await Promise.allSettled(batch.map(async (group) => ({
+              group,
+              snapshot: await api<{ members: Member[]; checkedAt: number }>(
+                `/groups/${group.id}/members`,
+              ),
+            })));
+            rows.forEach((row) => {
+              if (row.status !== "fulfilled") return;
+              counts[String(row.value.group.id)] = row.value.snapshot.members.length;
+              if (row.value.group.id === fallback.groups[0]?.id)
+                selected = {
+                  groupId: row.value.group.id,
+                  members: row.value.snapshot.members,
+                  checkedAt: row.value.snapshot.checkedAt,
+                };
+            });
+          }
+          result = { groups: fallback.groups, counts, selected };
+        }
         if (!groupGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
           return;
         setGroups(result.groups);
