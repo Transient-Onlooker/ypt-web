@@ -41,7 +41,7 @@ export function parseIntervalSettings(raw: string | null): IntervalSettings {
     const value: unknown = JSON.parse(raw);
     if (!value || typeof value !== "object") return { ...INTERVAL_MINUTES };
     const settings = value as IntervalSettings;
-    if (!Number.isInteger(settings.focus) || settings.focus < 5 || settings.focus > 180 ||
+    if (!Number.isInteger(settings.focus) || settings.focus < 1 || settings.focus > 180 ||
       !Number.isInteger(settings.short) || settings.short < 1 || settings.short > 60 ||
       !Number.isInteger(settings.long) || settings.long < 1 || settings.long > 60)
       return { ...INTERVAL_MINUTES };
