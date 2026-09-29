@@ -267,10 +267,10 @@ function DailyGoal({ minutes, onChange, recordedMs, liveMs }: {
   const customSelected = customMode || minutes > 0 && !GOAL_MINUTES.some((value) => value === minutes);
   const progress = goalMs ? Math.min(100, Math.floor(recordedMs / goalMs * 100)) : 0;
   const previewProgress = goalMs ? Math.min(100, Math.floor((recordedMs + liveMs) / goalMs * 100)) : 0;
-  const milestone = progress >= 100 ? "🎉 오늘의 목표 달성!"
-    : progress >= 75 ? "✦ 거의 다 왔어요"
-    : progress >= 50 ? "✦ 절반을 넘었어요"
-    : progress >= 25 ? "✦ 좋은 출발이에요"
+  const milestone = progress >= 100 ? "오늘의 목표 달성!"
+    : progress >= 75 ? "거의 다 왔어요"
+    : progress >= 50 ? "절반을 넘었어요"
+    : progress >= 25 ? "좋은 출발이에요"
     : "첫 25%를 향해 시작해 볼까요?";
   return (
     <div className="daily-goal">
@@ -665,7 +665,43 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
 function ThemeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
   return <button className="theme-toggle" type="button" onClick={onToggle}
     aria-label={dark ? "라이트 모드로 변경" : "다크 모드로 변경"}
-    aria-pressed={dark}>{dark ? "☀ 밝게" : "☾ 어둡게"}</button>;
+    aria-pressed={dark}>{dark ? "밝게" : "어둡게"}</button>;
+}
+function SettingsMenu({ open, onOpenChange, accountLabel, syncSeconds, onSyncSecondsChange, className = "" }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accountLabel: string;
+  syncSeconds: number;
+  onSyncSecondsChange: (seconds: number) => void;
+  className?: string;
+}) {
+  return <details className={`settings-menu ${className}`.trim()} open={open}
+    onToggle={(event) => onOpenChange(event.currentTarget.open)}>
+    <summary>설정</summary>
+    <div className="settings-popover">
+      <section className="settings-account" aria-label="계정">
+        <div>
+          <span>로그인 정보</span>
+          <strong>{accountLabel || "현재 세션에서 계정 정보를 확인할 수 없음"}</strong>
+          {!accountLabel && <small>다시 로그인하면 이 탭에 로그인 정보가 표시됩니다.</small>}
+        </div>
+      </section>
+      <hr />
+      <label className="sync-control" htmlFor={className === "sidebar-settings" ? "sidebar-sync-seconds" : "mobile-sync-seconds"}>
+        <span>자동 동기화 간격</span>
+        <select
+          id={className === "sidebar-settings" ? "sidebar-sync-seconds" : "mobile-sync-seconds"}
+          value={syncSeconds}
+          onChange={(event) => onSyncSecondsChange(Number(event.target.value))}
+        >
+          {SYNC_SECONDS.map((seconds) => (
+            <option key={seconds} value={seconds}>{seconds}초</option>
+          ))}
+        </select>
+      </label>
+      <p>타이머와 선택한 그룹 현황의 서버 확인 간격입니다. 그룹 목록은 최소 60초 간격으로 확인합니다.</p>
+    </div>
+  </details>;
 }
 function Login({
   onLogin,
@@ -956,8 +992,10 @@ function App() {
   });
   const [snapshotCheckedAt, setSnapshotCheckedAt] = useState<number | null>(null);
   const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState<Tab>(() => tabFromSearch(window.location.search));
   const navigateTab = useCallback((next: Tab, replace = false) => {
+    setSettingsOpen(false);
     if (tabFromSearch(window.location.search) !== next) {
       const href = tabUrl(window.location.href, next);
       if (replace) window.history.replaceState({ yptTab: next }, "", href);
@@ -1018,6 +1056,7 @@ function App() {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [memberSnapshots, setMemberSnapshots] = useState<Record<number, { members: Member[]; checkedAt: number }>>({});
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   const [memberErrors, setMemberErrors] = useState<Record<number, string>>({});
   const [loadingMemberIds, setLoadingMemberIds] = useState<Set<number>>(() => new Set());
   const [loadingGroup, setLoadingGroup] = useState(false);
@@ -1233,6 +1272,7 @@ function App() {
         setSnapshotCheckedAt(null);
         setGroups(null);
         setMemberSnapshots({});
+        setGroupMemberCounts({});
         setMemberErrors({});
         setLoadingMemberIds(new Set());
         setSelectedGroup(null);
@@ -1371,21 +1411,50 @@ function App() {
       active = false;
     };
   }, [tab, date, session?.authenticated, snapshot?.today.date, historyRefresh, getHistoryDay]);
-  const loadGroups = useCallback(async () => {
+  const loadGroups = useCallback(async (includeCounts = false) => {
     const requestId = groupGate.current.start();
     if (requestId === null) return;
     const epoch = authEpoch.current;
     setLoadingGroup(true);
     try {
-      const result = await api<{ groups: Group[] }>("/groups");
-      if (!groupGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
-        return;
-      setGroups(result.groups);
-      setSelectedGroup((old) =>
-        old && result.groups.some((g) => g.id === old)
-          ? old
-          : (result.groups[0]?.id ?? null),
-      );
+      if (includeCounts) {
+        const result = await api<{
+          groups: Group[];
+          counts: Record<string, number>;
+          selected: { groupId: number; members: Member[]; checkedAt: number } | null;
+        }>("/groups/overview");
+        if (!groupGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
+          return;
+        setGroups(result.groups);
+        setGroupMemberCounts(Object.fromEntries(
+          Object.entries(result.counts)
+            .map(([id, count]) => [Number(id), count])
+            .filter(([id, count]) =>
+              Number.isSafeInteger(id) && id > 0 && Number.isSafeInteger(count) && count >= 0),
+        ));
+        if (result.selected) {
+          const selected = result.selected;
+          setMemberSnapshots((current) => ({
+            ...current,
+            [selected.groupId]: { members: selected.members, checkedAt: selected.checkedAt },
+          }));
+        }
+        setSelectedGroup((old) =>
+          old && result.groups.some((g) => g.id === old)
+            ? old
+            : (result.groups[0]?.id ?? null),
+        );
+      } else {
+        const result = await api<{ groups: Group[] }>("/groups");
+        if (!groupGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
+          return;
+        setGroups(result.groups);
+        setSelectedGroup((old) =>
+          old && result.groups.some((g) => g.id === old)
+            ? old
+            : (result.groups[0]?.id ?? null),
+        );
+      }
       setGroupError("");
     } catch (cause) {
       if (!groupGate.current.isCurrent(requestId) || epoch !== authEpoch.current)
@@ -1420,6 +1489,7 @@ function App() {
         ...current,
         [id]: { members: result.members, checkedAt: result.checkedAt },
       }));
+      setGroupMemberCounts((current) => ({ ...current, [id]: result.members.length }));
       setMemberErrors((current) => {
         const next = { ...current };
         delete next[id];
@@ -1448,15 +1518,15 @@ function App() {
   }, []);
   useEffect(() => {
     if (tab === "groups" && session?.authenticated)
-      void loadGroups();
+      void loadGroups(true);
   }, [tab, session?.authenticated, loadGroups]);
   useEffect(() => {
     if (tab !== "groups" || !session?.authenticated) return;
     const refresh = () => {
-      if (document.visibilityState === "visible") void loadGroups();
+      if (document.visibilityState === "visible") void loadGroups(false);
     };
     document.addEventListener("visibilitychange", refresh);
-    const interval = setInterval(refresh, syncSeconds * 1000);
+    const interval = setInterval(refresh, Math.max(60_000, syncSeconds * 1000));
     return () => {
       document.removeEventListener("visibilitychange", refresh);
       clearInterval(interval);
@@ -1594,6 +1664,15 @@ function App() {
     });
   }
   useEffect(() => {
+    if (!session?.authenticated || !pomodoroMode || pomodoro.status !== "running" || pomodoro.endsAt === null)
+      return;
+    const delay = Math.max(0, pomodoro.endsAt - (Date.now() + clockOffset) + 50);
+    const boundary = window.setTimeout(() => {
+      if (document.visibilityState === "visible") void loadSnapshot(true);
+    }, delay);
+    return () => window.clearTimeout(boundary);
+  }, [session?.authenticated, pomodoroMode, pomodoro.status, pomodoro.endsAt, clockOffset, loadSnapshot]);
+  useEffect(() => {
     if (!session?.authenticated || !pomodoroMode || !snapshot || pomodoro.status === "idle" ||
       pomodoro.status === "transition" || pomodoro.status === "halted" || pomodoroAction.current) return;
     const expected = pomodoro.phase === "focus" && pomodoro.status === "running" ? "running" : "paused";
@@ -1622,6 +1701,7 @@ function App() {
       );
     } finally {
       if (clearLocalSession) {
+        setSettingsOpen(false);
         clearPersonalTools();
         setTimerContinuity(null);
         rememberAccountLabel("");
@@ -1644,6 +1724,7 @@ function App() {
         setRefreshingSnapshot(false);
         setGroups(null);
         setMemberSnapshots({});
+        setGroupMemberCounts({});
         setMemberErrors({});
         setLoadingMemberIds(new Set());
         setLoadingGroup(false);
@@ -1772,7 +1853,8 @@ function App() {
     (timer.state === "starting" || timer.state === "stopping") &&
     now - timer.updatedAt < PENDING_RECOVERY_MS;
   const statusStale =
-    snapshotCheckedAt !== null && now - snapshotCheckedAt > 45_000;
+    snapshotCheckedAt !== null &&
+    now - snapshotCheckedAt > Math.max(45_000, syncSeconds * 1000 + 5_000);
   const visibleMembers = shownMembers
     ?.filter((member) => {
       const matchesName = member.nickname
@@ -1822,6 +1904,25 @@ function App() {
             </div>
           ))}
         </nav>
+        <div className="sidebar-footer">
+          <SettingsMenu
+            className="sidebar-settings"
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            accountLabel={accountLabel}
+            syncSeconds={syncSeconds}
+            onSyncSecondsChange={(seconds) => {
+              if (!SYNC_SECONDS.some((value) => value === seconds)) return;
+              setSyncSeconds(seconds);
+              try { localStorage.setItem(SYNC_STORAGE_KEY, String(seconds)); }
+              catch { /* Storage can be unavailable in private browsing. */ }
+            }}
+          />
+          <button className="sidebar-logout" type="button" disabled={loggingOut || busy}
+            onClick={() => void logout()}>
+            {loggingOut ? "로그아웃 중…" : "로그아웃"}
+          </button>
+        </div>
       </aside>
       <div className="content">
         <header className="topbar">
@@ -1881,51 +1982,19 @@ function App() {
               <p className="page-subtitle">{pageInfo.subtitle}</p>
             </div>
             <div className="page-controls">
-              <details className="settings-menu">
-                <summary>설정</summary>
-                <div className="settings-popover">
-                  <section className="settings-account" aria-label="계정">
-                    <div>
-                      <span>로그인 정보</span>
-                      <strong>{accountLabel || "현재 세션에서 계정 정보를 확인할 수 없음"}</strong>
-                      {!accountLabel && (
-                        <small>다시 로그인하면 이 탭에 로그인 정보가 표시됩니다.</small>
-                      )}
-                    </div>
-                    <button
-                      className="secondary"
-                      type="button"
-                      disabled={loggingOut || busy}
-                      onClick={() => void logout()}
-                    >
-                      로그아웃
-                    </button>
-                  </section>
-                  <hr />
-                  <label className="sync-control" htmlFor="sync-seconds">
-                    <span>자동 동기화 간격</span>
-                    <select
-                      id="sync-seconds"
-                      value={syncSeconds}
-                      onChange={(event) => {
-                        const seconds = Number(event.target.value);
-                        if (!SYNC_SECONDS.some((value) => value === seconds)) return;
-                        setSyncSeconds(seconds);
-                        try {
-                          localStorage.setItem(SYNC_STORAGE_KEY, String(seconds));
-                        } catch {
-                          // Storage can be unavailable in private browsing.
-                        }
-                      }}
-                    >
-                      {SYNC_SECONDS.map((seconds) => (
-                        <option key={seconds} value={seconds}>{seconds}초</option>
-                      ))}
-                    </select>
-                  </label>
-                  <p>타이머, 가입 그룹, 선택한 그룹 현황의 서버 확인 간격입니다.</p>
-                </div>
-              </details>
+              <SettingsMenu
+                className="mobile-settings-menu"
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+                accountLabel={accountLabel}
+                syncSeconds={syncSeconds}
+                onSyncSecondsChange={(seconds) => {
+                  if (!SYNC_SECONDS.some((value) => value === seconds)) return;
+                  setSyncSeconds(seconds);
+                  try { localStorage.setItem(SYNC_STORAGE_KEY, String(seconds)); }
+                  catch { /* Storage can be unavailable in private browsing. */ }
+                }}
+              />
             </div>
           </div>
           {error && (
@@ -1949,7 +2018,7 @@ function App() {
           {tab === "study" && (
             <>
             <div className="study-grid timer-home-grid">
-              <section className="timer-card">
+              <section className={`timer-card ${pomodoroMode ? "is-pomodoro-mode" : "is-normal-mode"}`}>
                 <div className="card-head">
                   <span>현재 타이머</span>
                   <button
@@ -1966,6 +2035,9 @@ function App() {
                   <button type="button" aria-pressed={pomodoroMode} disabled={pomodoroActive}
                     onClick={() => setPomodoroMode(true)}>뽀모도로</button>
                 </div>
+                <p className="timer-mode-description">
+                  {pomodoroMode ? "뽀모도로 · 집중과 휴식을 자동으로 전환합니다." : "일반 타이머 · 시작, 일시정지, 종료를 직접 조작합니다."}
+                </p>
                 <div className={`timer-face ${running ? "is-running" : ""}`}>
                   <div className="timer-face-inner">
                     <span className="timer-face-kicker">{pomodoroActive
@@ -2415,8 +2487,9 @@ function App() {
                 )}
                 {groups?.length ? (
                   <div className="group-list">
-                    {groups.map((group) => (
-                      <button
+                    {groups.map((group) => {
+                      const currentCount = memberSnapshots[group.id]?.members.length ?? groupMemberCounts[group.id];
+                      return <button
                         key={group.id}
                         className={selectedGroup === group.id ? "selected" : ""}
                         aria-pressed={selectedGroup === group.id}
@@ -2430,14 +2503,14 @@ function App() {
                       >
                         {group.title}
                         <span>
-                          {memberSnapshots[group.id]
-                            ? `현재 ${memberSnapshots[group.id].members.length}명${group.capacity === null ? "" : ` / 정원 ${group.capacity}명`}`
+                          {currentCount !== undefined
+                            ? `현재 ${currentCount}명${group.capacity === null ? "" : ` / 정원 ${group.capacity}명`}`
                             : group.capacity === null
                               ? ""
                               : `정원 ${group.capacity}명`}
                         </span>
-                      </button>
-                    ))}
+                      </button>;
+                    })}
                   </div>
                 ) : (
                   <p className="empty">
@@ -2558,11 +2631,11 @@ function App() {
                       <div className="member-row" key={member.id}>
                         <span
                           aria-hidden="true"
-                          className={`member-indicator ${member.studying ? "live" : ""}`}
+                          className={`member-indicator ${member.studying === true ? "live" : member.studying === false ? "resting" : "unknown"}`}
                         />
                         <span className="member-name">
                           {member.nickname}
-                          <small>
+                          <small className={`member-state-label ${member.studying === true ? "studying" : member.studying === false ? "resting" : "unknown"}`}>
                             {member.studying === true
                               ? "공부 중"
                               : member.studying === false
