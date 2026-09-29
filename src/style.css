@@ -2708,9 +2708,10 @@ input[type="search"] {
 }
 .sidebar-settings .settings-popover {
   top: auto;
-  right: auto;
-  bottom: 0;
-  left: calc(100% + 10px);
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 100%;
 }
 .settings-menu > summary::after { content: "+"; }
 .settings-menu[open] > summary::after { content: "-"; }
@@ -2734,6 +2735,10 @@ input[type="search"] {
   line-height: 1.45;
 }
 
+:root:not([data-theme="dark"]) .member-indicator.live {
+  background: #237a46;
+  box-shadow: 0 0 0 4px #dceee3;
+}
 .member-indicator.resting {
   background: #70877a;
   box-shadow: 0 0 0 4px #e6ece8;
