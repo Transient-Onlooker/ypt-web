@@ -13,6 +13,7 @@ import type { Pomodoro } from "../shared/pomodoro.ts";
 import { parseTimerContinuity, pauseTimerContinuity, resumeTimerContinuity, startTimerContinuity, timerContinuityElapsed } from "../shared/timer-continuity.ts";
 import type { TimerContinuity } from "../shared/timer-continuity.ts";
 import { parseIntervalSettings } from "../shared/study-tools.ts";
+import { groupListRefreshMs, statusStaleAfterMs } from "../shared/sync.ts";
 import "./style.css";
 
 function NavIcon({ tab }: { tab: Tab }) {
@@ -1526,7 +1527,7 @@ function App() {
       if (document.visibilityState === "visible") void loadGroups(false);
     };
     document.addEventListener("visibilitychange", refresh);
-    const interval = setInterval(refresh, Math.max(60_000, syncSeconds * 1000));
+    const interval = setInterval(refresh, groupListRefreshMs(syncSeconds));
     return () => {
       document.removeEventListener("visibilitychange", refresh);
       clearInterval(interval);
@@ -1854,7 +1855,7 @@ function App() {
     now - timer.updatedAt < PENDING_RECOVERY_MS;
   const statusStale =
     snapshotCheckedAt !== null &&
-    now - snapshotCheckedAt > Math.max(45_000, syncSeconds * 1000 + 5_000);
+    now - snapshotCheckedAt > statusStaleAfterMs(syncSeconds);
   const visibleMembers = shownMembers
     ?.filter((member) => {
       const matchesName = member.nickname
