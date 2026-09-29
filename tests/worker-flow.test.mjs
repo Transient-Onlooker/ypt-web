@@ -10,10 +10,10 @@ const origin = "https://study.example";
 function database() {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(
-    readFileSync(
-      new URL("../worker/migrations/0001_initial.sql", import.meta.url),
-      "utf8",
-    ),
+    [
+      "../worker/migrations/0001_initial.sql",
+      "../worker/migrations/0002_group_access_cache.sql",
+    ].map((path) => readFileSync(new URL(path, import.meta.url), "utf8")).join("\n"),
   );
   return {
     sqlite,
@@ -37,6 +37,7 @@ function database() {
 }
 function upstream() {
   const users = new Map();
+  const requestCounts = new Map();
   let dropStartResponse = false;
   let dropStopResponse = false;
   let nextStartOffsetMs = 0;
@@ -53,8 +54,27 @@ function upstream() {
       headers: { "Content-Type": "application/json" },
     });
   const fetch = async (input, options) => {
-    const path = new URL(input).pathname;
+    const url = new URL(input);
+    const path = url.pathname;
+    requestCounts.set(path, (requestCounts.get(path) ?? 0) + 1);
     const inputBody = options?.body ? JSON.parse(options.body) : {};
+    if (url.hostname === "oauth2.googleapis.com" && path === "/tokeninfo") {
+      const accessToken = url.searchParams.get("access_token") ?? "";
+      return new Response(JSON.stringify({
+        aud: "google-client",
+        azp: "google-client",
+        expires_in: "3600",
+        sub: accessToken,
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (url.hostname === "openidconnect.googleapis.com" && path === "/v1/userinfo") {
+      const accessToken = options?.headers?.Authorization?.replace("Bearer ", "") ?? "";
+      return new Response(JSON.stringify({
+        sub: accessToken,
+        email: `${accessToken}@example.test`,
+        email_verified: true,
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     if (path === "/user/sign-in-jwt") {
       if (inputBody.password !== "correct")
         return new Response(JSON.stringify({
@@ -63,6 +83,18 @@ function upstream() {
           status: inputBody.password === "wrong-unauthorized" ? 401 : 200,
         });
       const token = `jwt-${inputBody.email}`;
+      if (!users.has(token))
+        users.set(token, {
+          active: false,
+          subject: null,
+          startedAt: null,
+          total: 0,
+          segments: [],
+        });
+      return reply({ jwt: token });
+    }
+    if (path === "/user/social/sign-up-jwt") {
+      const token = `jwt-${inputBody.providerId}`;
       if (!users.has(token))
         users.set(token, {
           active: false,
@@ -185,6 +217,9 @@ function upstream() {
   return {
     users,
     fetch,
+    count(path) {
+      return requestCounts.get(path) ?? 0;
+    },
     loseNextStart() {
       dropStartResponse = true;
     },
@@ -708,6 +743,14 @@ test("snapshot and group endpoints do not invent times or double-count members",
     assert.equal(group.data.members.length, 2);
     assert.equal(group.data.members[0].studying, null);
     assert.equal(group.data.members[0].studyMs, null);
+    const groupsBefore = stub.count("/group/groups/v2");
+    const reloadBefore = stub.count("/user/v2/reload/info");
+    const membersBefore = stub.count("/logs/group/members/v2");
+    const cachedGroup = await call(env, "/groups/7/members", "GET", undefined, login.cookie);
+    assert.equal(cachedGroup.status, 200);
+    assert.equal(stub.count("/group/groups/v2"), groupsBefore);
+    assert.equal(stub.count("/user/v2/reload/info"), reloadBefore);
+    assert.equal(stub.count("/logs/group/members/v2"), membersBefore + 1);
   } finally {
     globalThis.fetch = realFetch;
     env.DB.sqlite.close();
@@ -859,6 +902,11 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     assert.deepEqual(joinedGroups.data.groups, [
       { id: 7, title: "공부방", capacity: 4 },
     ]);
+    const overview = await call(env, "/groups/overview", "GET", undefined, a.cookie);
+    assert.equal(overview.status, 200);
+    assert.equal(overview.data.counts["7"], 4);
+    assert.equal(overview.data.selected.groupId, 7);
+    assert.equal(overview.data.selected.members.length, 4);
     const groupMembers = await call(
       env, "/groups/7/members", "GET", undefined, a.cookie,
     );
@@ -1214,6 +1262,92 @@ test("pending recovery waits and verifies the app state", async () => {
     );
     assert.equal(recovered.status, 200);
     assert.equal(recovered.data.timer.state, "idle");
+  } finally {
+    db.sqlite.close();
+    globalThis.fetch = realFetch;
+  }
+});
+
+
+test("Google login rate limits are isolated per verified Google account", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const db = database();
+  const env = {
+    DB: db,
+    APP_ORIGIN: origin,
+    GOOGLE_CLIENT_ID: "google-client",
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    for (let i = 0; i < 10; i += 1) {
+      const response = await call(
+        env,
+        "/login/google",
+        "POST",
+        { accessToken: "google-a" },
+        undefined,
+        undefined,
+        undefined,
+        `198.51.100.${i + 1}`,
+      );
+      assert.equal(response.status, 200);
+    }
+    const blocked = await call(
+      env,
+      "/login/google",
+      "POST",
+      { accessToken: "google-a" },
+      undefined,
+      undefined,
+      undefined,
+      "203.0.113.200",
+    );
+    assert.equal(blocked.status, 429);
+    const otherAccount = await call(
+      env,
+      "/login/google",
+      "POST",
+      { accessToken: "google-b" },
+      undefined,
+      undefined,
+      undefined,
+      "203.0.113.201",
+    );
+    assert.equal(otherAccount.status, 200);
+  } finally {
+    db.sqlite.close();
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("expired sessions and orphaned encrypted credentials are cleaned up on login", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const db = database();
+  const env = {
+    DB: db,
+    APP_ORIGIN: origin,
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    const first = await call(env, "/login", "POST", {
+      email: "expired@example.test",
+      password: "correct",
+    });
+    assert.equal(first.status, 200);
+    db.sqlite.prepare("UPDATE sessions SET expires_at=?").run(Date.now() - 1);
+    const second = await call(env, "/login", "POST", {
+      email: "fresh@example.test",
+      password: "correct",
+    }, undefined, undefined, undefined, "198.51.100.250");
+    assert.equal(second.status, 200);
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) AS count FROM accounts").get().count, 1);
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) AS count FROM sessions").get().count, 1);
   } finally {
     db.sqlite.close();
     globalThis.fetch = realFetch;
