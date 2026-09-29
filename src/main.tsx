@@ -2055,7 +2055,7 @@ function App() {
                   <button
                     className="text-button"
                     disabled={refreshingSnapshot}
-                    onClick={() => void loadSnapshot()}
+                    onClick={() => void loadSnapshot(true)}
                   >
                     {refreshingSnapshot ? "확인 중…" : "상태 새로고침"}
                   </button>

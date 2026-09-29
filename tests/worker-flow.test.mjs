@@ -764,6 +764,50 @@ test("snapshot and group endpoints do not invent times or double-count members",
   }
 });
 
+test("snapshot repairs a stale uncertain timer from verified remote state", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const db = database();
+  const env = {
+    DB: db,
+    APP_ORIGIN: origin,
+    YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
+    ASSETS: { fetch: () => new Response("page") },
+  };
+  try {
+    const login = await call(env, "/login", "POST", {
+      email: "uncertain@example.test",
+      password: "correct",
+    });
+    assert.equal(login.status, 200);
+    const account = db.sqlite.prepare("SELECT id FROM accounts").get().id;
+    db.sqlite.prepare(
+      "UPDATE timers SET state='uncertain',subject='수학',started_at=NULL,origin='web',pending_id=NULL WHERE account_id=?",
+    ).run(account);
+    const idle = await call(env, "/snapshot", "GET", undefined, login.cookie);
+    assert.equal(idle.status, 200);
+    assert.equal(idle.data.timer.state, "idle");
+    assert.equal(idle.data.timer.subject, null);
+
+    const app = stub.users.get("jwt-uncertain@example.test");
+    app.active = true;
+    app.subject = "수학";
+    app.startedAt = Date.now() - 2_000;
+    db.sqlite.prepare(
+      "UPDATE timers SET state='uncertain',subject='수학',started_at=NULL,origin='web',pending_id=NULL WHERE account_id=?",
+    ).run(account);
+    const running = await call(env, "/snapshot", "GET", undefined, login.cookie);
+    assert.equal(running.status, 200);
+    assert.equal(running.data.timer.state, "running");
+    assert.equal(running.data.timer.subject, "수학");
+    assert.equal(running.data.timer.startedAt, app.startedAt);
+  } finally {
+    db.sqlite.close();
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("login, account isolation, timer transitions, app adoption, and response loss", async () => {
   const stub = upstream();
   const realFetch = globalThis.fetch;
@@ -1062,21 +1106,10 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     assert.equal(lost.status, 503);
     assert.equal(lost.data.code, "UNCERTAIN");
     assert.equal(app.active, true);
-    assert.equal(
-      (await call(env, "/snapshot", "GET", undefined, a.cookie)).data.timer
-        .state,
-      "uncertain",
-    );
-    const activeRecovery = await call(
-      env,
-      "/timer/resolve",
-      "POST",
-      { confirmedStopped: true },
-      a.cookie,
-      a.csrf,
-    );
-    assert.equal(activeRecovery.status, 409);
-    assert.equal(activeRecovery.data.code, "APP_ACTIVE");
+    const repairedLostStart = await call(env, "/snapshot", "GET", undefined, a.cookie);
+    assert.equal(repairedLostStart.data.timer.state, "running");
+    assert.equal(repairedLostStart.data.timer.subject, "수학");
+    assert.equal(repairedLostStart.data.timer.startedAt, app.startedAt);
     assert.equal(
       (
         await call(
@@ -1095,23 +1128,15 @@ test("login, account isolation, timer transitions, app adoption, and response lo
       409,
     );
     app.active = false;
-    const resolved = await call(
-      env,
-      "/timer/resolve",
-      "POST",
-      { confirmedStopped: true },
-      a.cookie,
-      a.csrf,
-    );
-    assert.equal(resolved.status, 200);
-    assert.equal(resolved.data.timer.state, "idle");
+    const reconciledIdle = await call(env, "/snapshot", "GET", undefined, a.cookie);
+    assert.equal(reconciledIdle.data.timer.state, "idle");
     stub.hideNextStartTime();
     const unverifiedStart = await call(
       env,
       "/timer/start",
       "POST",
       {
-        revision: resolved.data.timer.revision,
+        revision: reconciledIdle.data.timer.revision,
         operationId: randomUUID(),
         subject: "수학",
       },
@@ -1159,24 +1184,8 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     assert.equal(lostStop.status, 503);
     assert.equal(lostStop.data.code, "UNCERTAIN");
     assert.equal(app.active, false);
-    assert.equal(
-      (await call(env, "/snapshot", "GET", undefined, a.cookie)).data.timer
-        .state,
-      "uncertain",
-    );
-    assert.equal(
-      (
-        await call(
-          env,
-          "/timer/resolve",
-          "POST",
-          { confirmedStopped: true },
-          a.cookie,
-          a.csrf,
-        )
-      ).status,
-      200,
-    );
+    const repairedLostStop = await call(env, "/snapshot", "GET", undefined, a.cookie);
+    assert.equal(repairedLostStop.data.timer.state, "idle");
     assert.equal(
       (await call(env, "/logout", "POST", {}, a.cookie, a.csrf)).status,
       200,
