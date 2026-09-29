@@ -1,6 +1,6 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
 :root {
-  font-family: "Pretendard Variable", sans-serif;
+  font-family: "Pretendard Variable", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
   color: #182820;
   background: #f3f6f1;
   font-synthesis: none;
@@ -2679,4 +2679,139 @@ input[type="search"] {
 }
 @media (max-width: 480px) {
   .page-controls { justify-content: flex-end; }
+}
+
+
+/* Issue #2 reliability/UI follow-up */
+.sidebar-footer {
+  margin-top: auto;
+  display: grid;
+  gap: 8px;
+  position: relative;
+}
+.sidebar-footer .sidebar-logout {
+  width: 100%;
+  margin-top: 0;
+}
+.sidebar-settings { width: 100%; }
+.sidebar-settings > summary {
+  width: 100%;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  color: #e8f5eb;
+  min-height: 46px;
+}
+.sidebar-settings > summary:hover {
+  background: #2b4d3d;
+  color: #fff;
+}
+.sidebar-settings .settings-popover {
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: calc(100% + 10px);
+}
+.settings-menu > summary::after { content: "+"; }
+.settings-menu[open] > summary::after { content: "-"; }
+.mobile-settings-menu { display: none; }
+
+.timer-card.is-normal-mode,
+.timer-card.is-pomodoro-mode {
+  border-top-width: 3px;
+}
+.timer-card.is-normal-mode { border-top-color: #527663; }
+.timer-card.is-pomodoro-mode { border-top-color: #6f9d4e; }
+.timer-mode button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.timer-mode-description {
+  margin: 8px 0 0;
+  min-height: 20px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.member-indicator.resting {
+  background: #70877a;
+  box-shadow: 0 0 0 4px #e6ece8;
+}
+.member-indicator.unknown {
+  background: #b8781f;
+  box-shadow: 0 0 0 4px #f8ead3;
+}
+.member-state-label {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.member-state-label.studying {
+  background: #dff3e4;
+  color: #17633b;
+}
+.member-state-label.resting {
+  background: #e9eeeb;
+  color: #43594d;
+}
+.member-state-label.unknown {
+  background: #f8ead3;
+  color: #7b4b0b;
+}
+
+:root[data-theme="dark"] .text-button,
+:root[data-theme="dark"] .timer-help summary,
+:root[data-theme="dark"] .pomodoro-settings summary,
+:root[data-theme="dark"] .plan-template summary {
+  color: #cff7ad;
+}
+:root[data-theme="dark"] .group-list button.selected,
+:root[data-theme="dark"] .member-filters button.selected,
+:root[data-theme="dark"] .timer-mode button[aria-pressed="true"],
+:root[data-theme="dark"] .plan-list .plan-focus[aria-pressed="true"],
+:root[data-theme="dark"] .trend-view-controls button[aria-pressed="true"] {
+  background: #3b6846;
+  border-color: #9bd488;
+  color: #f3ffe6;
+}
+:root[data-theme="dark"] .timer-card.is-normal-mode { border-top-color: #7fb69a; }
+:root[data-theme="dark"] .timer-card.is-pomodoro-mode { border-top-color: #a9dc72; }
+:root[data-theme="dark"] .status-dot.live,
+:root[data-theme="dark"] .member-indicator.live {
+  background: #66dc85;
+  box-shadow: 0 0 0 4px #244b31;
+}
+:root[data-theme="dark"] .member-indicator.resting {
+  background: #9db2a5;
+  box-shadow: 0 0 0 4px #2c4035;
+}
+:root[data-theme="dark"] .member-indicator.unknown {
+  background: #f0b65e;
+  box-shadow: 0 0 0 4px #4a3824;
+}
+:root[data-theme="dark"] .member-state-label.studying {
+  background: #28543a;
+  color: #c9f3d1;
+}
+:root[data-theme="dark"] .member-state-label.resting {
+  background: #34483d;
+  color: #d6e3da;
+}
+:root[data-theme="dark"] .member-state-label.unknown {
+  background: #563f24;
+  color: #ffd99c;
+}
+:root[data-theme="dark"] .sidebar-settings > summary {
+  background: transparent;
+  color: #fff;
+  border-color: transparent;
+}
+
+@media (max-width: 650px) {
+  .mobile-settings-menu { display: block; }
+  .page-controls { display: flex; }
 }
