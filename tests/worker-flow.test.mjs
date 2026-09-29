@@ -13,6 +13,7 @@ function database() {
     [
       "../worker/migrations/0001_initial.sql",
       "../worker/migrations/0002_group_access_cache.sql",
+      "../worker/migrations/0003_day_cache.sql",
     ].map((path) => readFileSync(new URL(path, import.meta.url), "utf8")).join("\n"),
   );
   return {
@@ -936,6 +937,7 @@ test("login, account isolation, timer transitions, app adoption, and response lo
         .status,
       400,
     );
+    const historyCallsBefore = stub.count("/logs/day");
     const historical = await call(
       env, "/history?date=2026-09-24", "GET", undefined, a.cookie,
     );
@@ -944,6 +946,34 @@ test("login, account isolation, timer transitions, app adoption, and response lo
     assert.deepEqual(historical.data.subjects, [
       { title: "수학", studyMs: 69_946 },
     ]);
+    assert.equal(stub.count("/logs/day"), historyCallsBefore + 1);
+    const cachedHistorical = await call(
+      env, "/history?date=2026-09-24", "GET", undefined, a.cookie,
+    );
+    assert.equal(cachedHistorical.status, 200);
+    assert.equal(stub.count("/logs/day"), historyCallsBefore + 1);
+    const refreshedHistorical = await call(
+      env, "/history?date=2026-09-24&refresh=1", "GET", undefined, a.cookie,
+    );
+    assert.equal(refreshedHistorical.status, 200);
+    assert.equal(stub.count("/logs/day"), historyCallsBefore + 2);
+
+    const rangeBefore = stub.count("/logs/day");
+    const range = await call(
+      env, "/history/range?end=2026-09-23&days=3", "GET", undefined, a.cookie,
+    );
+    assert.equal(range.status, 200);
+    assert.equal(range.data.days.length, 3);
+    assert.equal(range.data.cacheHits, 0);
+    assert.equal(range.data.fetched, 3);
+    assert.equal(stub.count("/logs/day"), rangeBefore + 3);
+    const cachedRange = await call(
+      env, "/history/range?end=2026-09-23&days=3", "GET", undefined, a.cookie,
+    );
+    assert.equal(cachedRange.status, 200);
+    assert.equal(cachedRange.data.cacheHits, 3);
+    assert.equal(cachedRange.data.fetched, 0);
+    assert.equal(stub.count("/logs/day"), rangeBefore + 3);
     assert.equal(
       (await call(env, "/groups/123/members", "GET", undefined, a.cookie))
         .status,
