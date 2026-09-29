@@ -1,4 +1,4 @@
-import type { Day, Snapshot, Timer, TimerState } from "../shared/types.ts";
+import type { Day, Group, Member, Snapshot, Timer, TimerState } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import {
   YptError,
@@ -41,6 +41,7 @@ type TimerRow = {
 const encoder = new TextEncoder();
 const TTL = 30 * 24 * 60 * 60 * 1000;
 const OPERATION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const GROUP_ACCESS_TTL_MS = 5 * 60 * 1000;
 const COOKIE = "ypt_session";
 const REMEMBER_COOKIE = "__Host-ypt_remember";
 const PAGES_ORIGIN = "https://ypt.mcv.kr";
@@ -164,6 +165,13 @@ async function session(request: Request, env: Env) {
     .bind(await sha(value), Date.now())
     .first<Session>();
 }
+async function cleanupExpiredSessions(env: Env) {
+  await env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?")
+    .bind(Date.now()).run();
+  await env.DB.prepare(
+    "DELETE FROM accounts WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.account_id=accounts.id)",
+  ).bind().run();
+}
 async function revokeSessionGroup(env: Env, s: Session) {
   await env.DB.prepare("DELETE FROM sessions WHERE account_id=? AND csrf=?")
     .bind(s.account_id, s.csrf).run();
@@ -193,6 +201,68 @@ async function timer(env: Env, account: string) {
     .first<TimerRow>();
   if (!row) throw new Error("MISSING_TIMER");
   return row;
+}
+async function refreshGroupAccess(env: Env, account: string, jwt: string): Promise<{
+  list: Group[];
+  countryId: number;
+}> {
+  const list = await groups(jwt);
+  const info = await reload(jwt);
+  const countryId = Number(info.coid);
+  if (!Number.isSafeInteger(countryId) || countryId < 0)
+    throw new YptError("INVALID_DATA");
+  const expiresAt = Date.now() + GROUP_ACCESS_TTL_MS;
+  const statements = [
+    env.DB.prepare("DELETE FROM group_access_cache WHERE account_id=?").bind(account),
+    ...list.map((group) => env.DB.prepare(
+      "INSERT INTO group_access_cache(account_id,group_id,country_id,expires_at) VALUES(?,?,?,?)",
+    ).bind(account, group.id, countryId, expiresAt)),
+  ];
+  await env.DB.batch(statements);
+  return { list, countryId };
+}
+async function cachedGroupCountryId(env: Env, account: string, jwt: string, groupId: number) {
+  const cached = await env.DB.prepare(
+    "SELECT country_id FROM group_access_cache WHERE account_id=? AND group_id=? AND expires_at>?",
+  ).bind(account, groupId, Date.now()).first<{ country_id: number }>();
+  if (cached && Number.isSafeInteger(cached.country_id) && cached.country_id >= 0)
+    return cached.country_id;
+  const refreshed = await refreshGroupAccess(env, account, jwt);
+  return refreshed.list.some((group) => group.id === groupId)
+    ? refreshed.countryId : null;
+}
+async function groupOverview(env: Env, account: string, jwt: string): Promise<{
+  groups: Group[];
+  counts: Record<string, number>;
+  selected: { groupId: number; members: Member[]; checkedAt: number } | null;
+}> {
+  const { list, countryId } = await refreshGroupAccess(env, account, jwt);
+  const counts: Record<string, number> = {};
+  let selected: { groupId: number; members: Member[]; checkedAt: number } | null = null;
+  for (let index = 0; index < list.length; index += 2) {
+    const batch = list.slice(index, index + 2);
+    const results = await Promise.allSettled(batch.map(async (group) => ({
+      group,
+      members: await members(jwt, group.id, countryId),
+      checkedAt: Date.now(),
+    })));
+    results.forEach((result) => {
+      if (result.status !== "fulfilled") return;
+      counts[String(result.value.group.id)] = result.value.members.length;
+      if (result.value.group.id === list[0]?.id)
+        selected = {
+          groupId: result.value.group.id,
+          members: result.value.members,
+          checkedAt: result.value.checkedAt,
+        };
+    });
+    const authError = results.find((result) =>
+      result.status === "rejected" &&
+      result.reason instanceof YptError &&
+      result.reason.code === "AUTH_EXPIRED");
+    if (authError?.status === "rejected") throw authError.reason;
+  }
+  return { groups: list, counts, selected };
 }
 function publicTimer(row: TimerRow): Timer {
   return {
@@ -284,38 +354,32 @@ function mutationAllowed(request: Request, env: Env, s?: Session | null) {
     (!s || request.headers.get("X-CSRF-Token") === s.csrf)
   );
 }
-async function limit(env: Env, email: string, request: Request) {
-  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-  const ipKey = await accountId(env, `ip:${ip}`);
+async function hitLoginLimit(env: Env, key: string, now: number, expiry: number) {
+  await env.DB.prepare(
+    "INSERT INTO login_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires_at<? THEN 1 ELSE count+1 END, expires_at=CASE WHEN expires_at<? THEN excluded.expires_at ELSE expires_at END",
+  ).bind(key, expiry, now, now).run();
+  const row = await env.DB.prepare("SELECT count FROM login_limits WHERE key=?")
+    .bind(key).first<{ count: number }>();
+  return !!row && row.count <= 10;
+}
+async function limitIp(env: Env, request: Request) {
   const now = Date.now();
   const expiry = now + 15 * 60_000;
   await env.DB.prepare("DELETE FROM login_limits WHERE expires_at<=?")
-    .bind(now)
-    .run();
-  await env.DB.prepare(
-    "INSERT INTO login_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires_at<? THEN 1 ELSE count+1 END, expires_at=CASE WHEN expires_at<? THEN excluded.expires_at ELSE expires_at END",
-  )
-    .bind(`ip:${ipKey}`, expiry, now, now)
-    .run();
-  const ipRow = await env.DB.prepare(
-    "SELECT count FROM login_limits WHERE key=?",
-  )
-    .bind(`ip:${ipKey}`)
-    .first<{ count: number }>();
-  if (!ipRow || ipRow.count > 10) return false;
-
-  const emailKey = await accountId(env, email);
-  await env.DB.prepare(
-    "INSERT INTO login_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires_at<? THEN 1 ELSE count+1 END, expires_at=CASE WHEN expires_at<? THEN excluded.expires_at ELSE expires_at END",
-  )
-    .bind(`email:${emailKey}`, expiry, now, now)
-    .run();
-  const emailRow = await env.DB.prepare(
-    "SELECT count FROM login_limits WHERE key=?",
-  )
-    .bind(`email:${emailKey}`)
-    .first<{ count: number }>();
-  return !!emailRow && emailRow.count <= 10;
+    .bind(now).run();
+  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+  const ipKey = await accountId(env, `ip:${ip}`);
+  return hitLoginLimit(env, `ip:${ipKey}`, now, expiry);
+}
+async function limitIdentity(env: Env, prefix: "email" | "google", identity: string) {
+  const now = Date.now();
+  const expiry = now + 15 * 60_000;
+  const identityKey = await accountId(env, identity);
+  return hitLoginLimit(env, `${prefix}:${identityKey}`, now, expiry);
+}
+async function limit(env: Env, email: string, request: Request) {
+  if (!(await limitIp(env, request))) return false;
+  return limitIdentity(env, "email", email.trim().toLowerCase());
 }
 function resultError(error: unknown, headers: HeadersInit = {}) {
   if (error instanceof YptError) {
@@ -380,7 +444,7 @@ async function googleLoginRoute(request: Request, env: Env) {
   const accessToken = typeof input?.accessToken === "string" ? input.accessToken : "";
   if (!accessToken || accessToken.length > 4096)
     return fail("INPUT", 400, "Google 로그인 정보를 확인해 주세요.");
-  if (!(await limit(env, "google:login", request)))
+  if (!(await limitIp(env, request)))
     return fail("RATE_LIMIT", 429, "로그인 시도가 많습니다. 15분 후 다시 시도해 주세요.");
   let profile: unknown;
   let tokenInfo: unknown;
@@ -424,6 +488,8 @@ async function googleLoginRoute(request: Request, env: Env) {
       !email || email.length > 254 ||
       user?.email_verified !== true)
     return fail("GOOGLE_AUTH", 401, "Google 계정 정보를 확인할 수 없습니다.");
+  if (!(await limitIdentity(env, "google", googleId)))
+    return fail("RATE_LIMIT", 429, "이 Google 계정의 로그인 시도가 많습니다. 15분 후 다시 시도해 주세요.");
   let jwt: string;
   try {
     jwt = await googleSocialLogin(accessToken, googleId, email);
@@ -437,6 +503,7 @@ async function googleLoginRoute(request: Request, env: Env) {
 
 async function issueSession(request: Request, env: Env, id: string, jwt: string,
   rememberDevice: boolean) {
+  await cleanupExpiredSessions(env);
   const pages = request.headers.get("Origin") === PAGES_ORIGIN;
   const remember = pages && rememberDevice;
   const sealed = await encrypt(env, id, jwt);
@@ -814,6 +881,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return fail("CSRF", 403, "요청을 확인할 수 없습니다.");
     if (path === "/api/logout" && request.method === "POST") {
       await revokeSessionGroup(env, s);
+      await cleanupExpiredSessions(env);
       const pages = request.headers.get("Origin") === PAGES_ORIGIN;
       if (pages) await revokeRememberCookie(request, env);
       return json({ authenticated: false }, 200, {
@@ -863,6 +931,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const day: Day = await history(jwt, date);
         return json(day);
       }
+      if (path === "/api/groups/overview" && request.method === "GET")
+        return json(await groupOverview(env, s.account_id, jwt));
       if (path === "/api/groups" && request.method === "GET")
         return json({ groups: await groups(jwt) });
       if (
@@ -873,13 +943,9 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         const id = Number(path.split("/")[3]);
         if (!Number.isSafeInteger(id) || id <= 0)
           return fail("GROUP", 400, "그룹을 확인해 주세요.");
-        const list = await groups(jwt);
-        if (!list.some((g) => g.id === id))
+        const countryId = await cachedGroupCountryId(env, s.account_id, jwt, id);
+        if (countryId === null)
           return fail("GROUP", 404, "가입한 그룹이 아닙니다.");
-        const info = await reload(jwt);
-        const countryId = Number(info.coid);
-        if (!Number.isSafeInteger(countryId) || countryId < 0)
-          return fail("GROUP", 503, "그룹 정보를 확인할 수 없습니다.");
         return json({
           members: await members(jwt, id, countryId),
           checkedAt: Date.now(),
@@ -894,6 +960,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     } catch (e) {
       if (e instanceof YptError && e.code === "AUTH_EXPIRED") {
         await revokeSessionGroup(env, s);
+        await cleanupExpiredSessions(env);
         const pages = request.headers.get("Origin") === PAGES_ORIGIN;
         if (pages) await revokeRememberCookie(request, env);
         return resultError(e, {
