@@ -3,6 +3,8 @@ name: Deploy YPT Web to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -25,6 +27,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run check:worker
       - name: Build frontend
         run: npm run build
         env:
@@ -34,6 +37,7 @@ jobs:
         with:
           path: dist
   deploy:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs: build
     environment:
