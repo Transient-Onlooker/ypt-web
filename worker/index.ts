@@ -280,11 +280,64 @@ export async function reconcile(
   remote: ReturnType<typeof remoteFrom>,
 ) {
   const current = await timer(env, account);
-  if (
-    remote.status === "unverified" ||
-    ["starting", "stopping", "uncertain"].includes(current.state)
-  )
+  if (remote.status === "unverified") return current;
+
+  if (["starting", "stopping", "uncertain"].includes(current.state)) {
+    if (
+      current.state !== "uncertain" &&
+      Date.now() - current.updated_at < PENDING_RECOVERY_MS
+    )
+      return current;
+
+    const operation = current.pending_id
+      ? await env.DB.prepare(
+          "SELECT action FROM operations WHERE account_id=? AND id=?",
+        ).bind(account, current.pending_id).first<{ action: string }>()
+      : null;
+    if (
+      current.state !== "uncertain" &&
+      (!operation || !["start", "resume", "pause", "stop"].includes(operation.action))
+    )
+      return current;
+
+    if (
+      remote.status === "running" &&
+      remote.startedAt !== null &&
+      remote.subject
+    ) {
+      await env.DB.prepare(
+        "UPDATE timers SET state='running',subject=?,started_at=?,origin=?,pending_id=NULL,revision=revision+1,updated_at=? WHERE account_id=? AND revision=? AND state=?",
+      ).bind(
+        remote.subject,
+        remote.startedAt,
+        current.origin ?? "app",
+        Date.now(),
+        account,
+        current.revision,
+        current.state,
+      ).run();
+      return timer(env, account);
+    }
+
+    if (remote.status === "idle") {
+      const paused = operation?.action === "pause" || operation?.action === "resume";
+      await env.DB.prepare(
+        "UPDATE timers SET state=?,subject=?,started_at=NULL,origin=?,pending_id=NULL,revision=revision+1,updated_at=? WHERE account_id=? AND revision=? AND state=?",
+      ).bind(
+        paused ? "paused" : "idle",
+        paused ? current.subject : null,
+        paused ? current.origin : null,
+        Date.now(),
+        account,
+        current.revision,
+        current.state,
+      ).run();
+      return timer(env, account);
+    }
+
     return current;
+  }
+
   if (
     remote.status === "running" &&
     remote.startedAt !== null &&
