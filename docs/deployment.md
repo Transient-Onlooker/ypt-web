@@ -1,6 +1,6 @@
 # 배포와 도메인 연결
 
-화면은 GitHub Pages의 `https://ypt.mcv.kr`, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)의 `/api`로 제공하는 구성입니다. Pages는 GitHub Actions의 `.github/workflows/pages.yml`에서 빌드합니다. Worker의 D1 `ypt-web`에는 `worker/migrations/`의 마이그레이션을 순서대로 적용하고, Worker secret에는 `YPT_ENCRYPTION_KEY`를 설정합니다. `0002_group_access_cache.sql`은 그룹 접근 검증 결과를 짧게 재사용하기 위한 캐시 테이블을 추가합니다. `ypt.mcv.kr` CNAME은 GitHub Pages를 가리킵니다. 인증서 승인과 HTTPS 화면·자산의 200 응답을 확인하고 HTTPS 강제를 켰습니다.
+화면은 GitHub Pages의 `https://ypt.mcv.kr`, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)의 `/api`로 제공하는 구성입니다. Pages는 GitHub Actions의 `.github/workflows/pages.yml`에서 빌드합니다. Worker의 D1 `ypt-web`에는 `worker/migrations/`의 마이그레이션을 순서대로 적용하고, Worker secret에는 `YPT_ENCRYPTION_KEY`를 설정합니다. `0002_group_access_cache.sql`은 그룹 접근 검증 결과를 짧게 재사용하는 캐시를, `0003_day_cache.sql`은 과거 일별 공부 기록을 계정·날짜별로 저장하는 캐시를 추가합니다. `ypt.mcv.kr` CNAME은 GitHub Pages를 가리킵니다. 인증서 승인과 HTTPS 화면·자산의 200 응답을 확인하고 HTTPS 강제를 켰습니다.
 
 ## 현재 검증 범위
 
@@ -20,6 +20,8 @@ npm run build
 npm run check:worker
 npx wrangler d1 migrations apply DB --remote
 npx wrangler deploy
+
+# v0.23.0부터 0003_day_cache.sql이 적용되어야 /api/history/range와 기록 캐시가 동작합니다.
 ```
 
 로컬 개발은 `.dev.vars`의 `APP_ORIGIN=http://localhost:5173`과 Vite 프록시를 사용합니다. Pages 빌드는 `VITE_API_BASE_URL`에 Worker 주소를 넣습니다. Worker는 정확히 `https://ypt.mcv.kr` 출처에만 자격 증명 포함 CORS를 허용합니다. Pages 로그인은 기본적으로 계정별 불투명 세션 토큰을 탭의 `sessionStorage`에 저장합니다. **이 기기에서 로그인 유지**를 선택한 경우 별도 HttpOnly·Secure·SameSite=None·Partitioned 쿠키가 최대 30일간 새 탭의 세션을 복원합니다. 쿠키 차단 브라우저에서는 현재 탭 세션만 사용하며 화면에 안내합니다. 로그아웃 시 연결된 세션을 폐기합니다. 열품타 비밀번호·JWT는 브라우저에 저장하지 않습니다. Worker 단독 주소는 기존 HttpOnly 쿠키 세션을 유지합니다.
