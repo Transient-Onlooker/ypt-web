@@ -5,7 +5,13 @@ import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, verifiedGoalStreak } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
-import { tabFromSearch, tabUrl } from "../shared/navigation.ts";
+import {
+  historyDateFromSearch,
+  historyViewUrl,
+  tabFromSearch,
+  tabUrl,
+  trendRangeFromSearch,
+} from "../shared/navigation.ts";
 import type { Tab } from "../shared/navigation.ts";
 import { clearPersonalTools, StudyTools } from "./study-tools.tsx";
 import { freshPomodoro, nextPomodoro, parsePomodoro, pausePomodoro, pomodoroRemaining, pomodoroStatusLabel, runPomodoro, shouldAdvancePomodoro } from "../shared/pomodoro.ts";
@@ -1135,9 +1141,14 @@ function App() {
     setTab(next);
   }, []);
   useEffect(() => {
-    const restoreTab = () => setTab(tabFromSearch(window.location.search));
-    window.addEventListener("popstate", restoreTab);
-    return () => window.removeEventListener("popstate", restoreTab);
+    const restoreNavigation = () => {
+      const search = window.location.search;
+      setTab(tabFromSearch(search));
+      setDate(historyDateFromSearch(search));
+      setTrendRange(trendRangeFromSearch(search));
+    };
+    window.addEventListener("popstate", restoreNavigation);
+    return () => window.removeEventListener("popstate", restoreNavigation);
   }, []);
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -1177,12 +1188,13 @@ function App() {
   });
   const [now, setNow] = useState(Date.now());
   const [clockOffset, setClockOffset] = useState(0);
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(() => historyDateFromSearch(window.location.search));
   const [day, setDay] = useState<Day | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const [historyRefresh, setHistoryRefresh] = useState(0);
-  const [trendRange, setTrendRange] = useState<TrendRange>(7);
+  const [trendRange, setTrendRange] = useState<TrendRange>(() =>
+    trendRangeFromSearch(window.location.search));
   const [trends, setTrends] = useState<Partial<Record<TrendRange, { todayDate: string; days: TrendDay[] }>>>({});
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
@@ -1195,6 +1207,16 @@ function App() {
   const [memberQuery, setMemberQuery] = useState("");
   const [memberSort, setMemberSort] = useState<MemberSort>("time");
   const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
+  const selectHistoryDate = useCallback((nextDate: string) => {
+    setDate(nextDate);
+    const href = historyViewUrl(window.location.href, { date: nextDate });
+    window.history.replaceState(window.history.state, "", href);
+  }, []);
+  const selectTrendRange = useCallback((range: TrendRange) => {
+    setTrendRange(range);
+    const href = historyViewUrl(window.location.href, { range });
+    window.history.replaceState(window.history.state, "", href);
+  }, []);
   const reportFocusTask = useCallback((text: string) => {
     const todayDate = snapshot?.today.date;
     setFocusTask(todayDate ? { date: todayDate, text } : null);
@@ -2515,33 +2537,33 @@ function App() {
                   value={date}
                   max={snapshot?.today.date}
                   disabled={!snapshot?.capabilities.history}
-                  onChange={(event) => setDate(event.target.value)}
+                  onChange={(event) => selectHistoryDate(event.target.value)}
                 />
                 <div className="date-actions">
                   <button
                     className="secondary"
                     disabled={!date}
-                    onClick={() => setDate(shiftDate(date, -1))}
+                    onClick={() => selectHistoryDate(shiftDate(date, -1))}
                     aria-label="이전 날짜"
                   >
                     ← 이전
                   </button>
                   <button className="secondary"
                     disabled={!snapshot?.capabilities.history || date === shiftDate(snapshot.today.date, -1)}
-                    onClick={() => setDate(shiftDate(snapshot!.today.date, -1))}>
+                    onClick={() => selectHistoryDate(shiftDate(snapshot!.today.date, -1))}>
                     어제
                   </button>
                   <button
                     className="secondary"
                     disabled={!snapshot || date === snapshot.today.date}
-                    onClick={() => setDate(snapshot!.today.date)}
+                    onClick={() => selectHistoryDate(snapshot!.today.date)}
                   >
                     오늘
                   </button>
                   <button
                     className="secondary"
                     disabled={!date || !snapshot || date >= snapshot.today.date}
-                    onClick={() => setDate(shiftDate(date, 1))}
+                    onClick={() => selectHistoryDate(shiftDate(date, 1))}
                     aria-label="다음 날짜"
                   >
                     다음 →
@@ -2622,14 +2644,14 @@ function App() {
             <section className="history-card insights-card">
               {snapshot?.capabilities.history && snapshot.today ? (
                 <HistoryTrend key={`${snapshot.today.date}:${trendRange}`} today={snapshot.today}
-                  rangeDays={trendRange} goalMinutes={goalMinutes} onRangeChange={setTrendRange}
+                  rangeDays={trendRange} goalMinutes={goalMinutes} onRangeChange={selectTrendRange}
                   previous={trends[trendRange]?.todayDate === snapshot.today.date
                     ? trends[trendRange]?.days ?? null : null}
                   onLoaded={(days) => setTrends((old) => ({
                     ...old, [trendRange]: { todayDate: snapshot.today.date, days },
                   }))}
                   onSelect={(selectedDate) => {
-                    setDate(selectedDate);
+                    selectHistoryDate(selectedDate);
                     navigateTab("history");
                   }} />
               ) : (
