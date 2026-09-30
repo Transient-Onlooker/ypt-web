@@ -107,3 +107,10 @@ test("large dark surfaces use neutral theme surfaces, not the accent", () => {
   assert.match(css, /\.timer-card,[\s\S]*?\.week-row\s*\{[\s\S]*?background:\s*var\(--surface\)/);
   assert.doesNotMatch(css, /:root\[data-theme="dark"\][^{]*\.timer-card[\s\S]*?background:\s*var\(--accent\)/);
 });
+
+
+test("timer modes keep distinct top-border accents without recoloring the card surface", () => {
+  assert.match(css, /\.timer-card\.is-normal-mode\s*\{\s*border-top-color:\s*var\(--accent\);\s*\}/);
+  assert.match(css, /\.timer-card\.is-pomodoro-mode\s*\{\s*border-top-color:\s*var\(--accent-hover\);\s*\}/);
+  assert.match(css, /\.timer-card,[\s\S]*?background:\s*var\(--surface\)/);
+});

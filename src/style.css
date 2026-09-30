@@ -2290,8 +2290,8 @@ input[type="search"] {
 .timer-card.is-pomodoro-mode {
   border-top-width: 3px;
 }
-.timer-card.is-normal-mode { border-top-color: var(--border); }
-.timer-card.is-pomodoro-mode { border-top-color: var(--border); }
+.timer-card.is-normal-mode { border-top-color: var(--accent); }
+.timer-card.is-pomodoro-mode { border-top-color: var(--accent-hover); }
 .timer-mode button[aria-pressed="true"] {
   box-shadow: none;
 }
