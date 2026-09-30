@@ -25,13 +25,14 @@ export function historyDateFromSearch(search: string): string {
   return validIsoDate(date) ? date : "";
 }
 
-export function trendRangeFromSearch(search: string): 7 | 14 {
-  return new URLSearchParams(search).get("range") === "14" ? 14 : 7;
+export function trendRangeFromSearch(search: string): 7 | 14 | 30 {
+  const range = Number(new URLSearchParams(search).get("range"));
+  return range === 14 || range === 30 ? range : 7;
 }
 
 export function historyViewUrl(
   href: string,
-  state: { date?: string | null; range?: 7 | 14 | null },
+  state: { date?: string | null; range?: 7 | 14 | 30 | null },
 ): string {
   const url = new URL(href);
   if (state.date === null || state.date === "") url.searchParams.delete("date");
