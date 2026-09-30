@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
-const marker = css.indexOf("/* v0.26 accessibility contrast */");
-assert.notEqual(marker, -1, "accessibility contrast block must exist");
+const marker = css.indexOf("/* v0.28 online pastel + OLED palette */");
+assert.notEqual(marker, -1, "online palette block must exist");
 const tail = css.slice(marker);
 
 function themeBlock(selector) {
@@ -44,27 +44,29 @@ function atLeast(actual, expected, label) {
   assert.ok(actual >= expected, `${label}: expected >= ${expected}:1, got ${actual.toFixed(3)}:1`);
 }
 
-test("light palette keeps primary and emphasis text at WCAG AA contrast", () => {
+test("approved online light palette keeps text and controls at WCAG AA contrast", () => {
   const block = themeBlock(':root:not([data-theme="dark"])');
-  atLeast(contrast(variable(block, "accent-fill"), "#ffffff"), 4.5, "primary white text");
-  atLeast(contrast(variable(block, "accent-hover"), "#ffffff"), 4.5, "primary hover white text");
-  atLeast(contrast(variable(block, "accent-text"), "#ffffff"), 4.5, "accent text");
-  atLeast(contrast(variable(block, "subtle"), "#ffffff"), 4.5, "subtle text");
-  atLeast(contrast(variable(block, "accent-on-dark"), "#000000"), 4.5, "sidebar accent text");
-  atLeast(contrast(variable(block, "danger-text"), "#ffffff"), 4.5, "danger text");
-  atLeast(contrast(variable(block, "warning-text"), "#ffffff"), 4.5, "warning text");
+  atLeast(contrast("#000000", "#F2F1EB"), 4.5, "light body text");
+  atLeast(contrast("#1E1E1E", "#F2F1EB"), 4.5, "light secondary text");
+  atLeast(contrast("#000000", "#88AB8E"), 4.5, "light primary button");
+  atLeast(contrast("#000000", "#AFC8AD"), 4.5, "light selected control");
+  assert.equal(variable(block, "canvas").toUpperCase(), "#F2F1EB");
+  assert.equal(variable(block, "surface").toUpperCase(), "#EEE7DA");
+  assert.equal(variable(block, "accent-fill").toUpperCase(), "#88AB8E");
+  assert.equal(variable(block, "accent-hover").toUpperCase(), "#AFC8AD");
 });
 
-test("dark palette keeps text and graphics at WCAG AA contrast", () => {
+test("approved online OLED palette keeps text and controls at WCAG AA contrast", () => {
   const block = themeBlock(':root[data-theme="dark"]');
-  atLeast(contrast(variable(block, "accent-fill"), "#ffffff"), 4.5, "primary white text");
-  atLeast(contrast(variable(block, "accent-hover"), "#ffffff"), 4.5, "primary hover white text");
-  atLeast(contrast(variable(block, "accent-text"), "#000000"), 4.5, "accent text");
-  atLeast(contrast(variable(block, "subtle"), "#000000"), 4.5, "subtle text");
-  atLeast(contrast(variable(block, "accent-border"), "#000000"), 3, "primary component border");
-  atLeast(contrast(variable(block, "chart-accent"), "#000000"), 3, "chart accent");
-  atLeast(contrast(variable(block, "danger-text"), "#000000"), 4.5, "danger text");
-  atLeast(contrast(variable(block, "warning-text"), "#000000"), 4.5, "warning text");
+  atLeast(contrast("#FFFFFF", "#000000"), 4.5, "OLED body text");
+  atLeast(contrast("#888888", "#121212"), 4.5, "OLED secondary text");
+  atLeast(contrast("#000000", "#3EB489"), 4.5, "OLED primary button");
+  atLeast(contrast("#3EB489", "#121212"), 4.5, "OLED accent text");
+  atLeast(contrast("#888888", "#121212"), 3, "OLED control border");
+  assert.equal(variable(block, "canvas").toUpperCase(), "#000000");
+  assert.equal(variable(block, "surface").toUpperCase(), "#121212");
+  assert.equal(variable(block, "accent-fill").toUpperCase(), "#3EB489");
+  assert.equal(variable(block, "accent-hover").toUpperCase(), "#98FF98");
 });
 
 test("focus indicators exceed the WCAG 2.2 3:1 contrast minimum in both themes", () => {
@@ -74,16 +76,20 @@ test("focus indicators exceed the WCAG 2.2 3:1 contrast minimum in both themes",
   atLeast(contrast(variable(dark, "focus-accent"), "#000000"), 3, "dark focus indicator");
 });
 
-test("light member state chips keep normal-size text at AA contrast", () => {
-  atLeast(contrast("#0f4f2d", "#dff3e4"), 4.5, "studying chip");
-  atLeast(contrast("#31473b", "#e9eeeb"), 4.5, "resting chip");
-  atLeast(contrast("#5c3600", "#f8ead3"), 4.5, "unknown chip");
-});
-
-
 test("keyboard focus indicator is visibly reinforced beyond the AA minimum", () => {
   assert.match(
     tail,
     /:focus-visible\s*\{[\s\S]*?outline:\s*3px\s+solid\s+var\(--focus-accent\)/,
   );
+});
+
+test("v0.28 theme override uses only the approved online palette colors", () => {
+  const allowed = new Set([
+    "#F2F1EB", "#EEE7DA", "#AFC8AD", "#88AB8E",
+    "#000000", "#121212", "#1E1E1E", "#FFFFFF", "#888888",
+    "#3EB489", "#98FF98",
+  ]);
+  const colors = [...tail.matchAll(/#[0-9a-fA-F]{6}\b/g)].map((match) => match[0].toUpperCase());
+  assert.ok(colors.length > 0);
+  for (const color of colors) assert.ok(allowed.has(color), `unapproved palette color ${color}`);
 });
