@@ -1487,6 +1487,9 @@ function App() {
     };
   }, [loadSnapshot, sessionAttempt]);
   useEffect(() => {
+    if (!date && snapshot?.today.date) setDate(snapshot.today.date);
+  }, [date, snapshot?.today.date]);
+  useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
