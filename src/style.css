@@ -3131,6 +3131,8 @@ input[type="search"] {
   --accent-border: #2f5a45;
   --chart-accent: #2f5a45;
   --chart-outline: #000000;
+  --danger-text: #8f341f;
+  --warning-text: #6b4200;
 }
 :root[data-theme="dark"] {
   --accent-fill: #2f5a45;
@@ -3142,6 +3144,8 @@ input[type="search"] {
   --accent-border: #a8d5bd;
   --chart-accent: #70a57b;
   --chart-outline: #ffffff;
+  --danger-text: #ffb4a2;
+  --warning-text: #ffd99c;
 }
 
 /* Keep normal-size emphasis text at AAA contrast while preserving green as the accent. */
@@ -3173,6 +3177,52 @@ input[type="search"] {
   background: var(--accent-fill);
   border-color: var(--accent-border);
   color: #ffffff;
+}
+
+/* Restore semantic emphasis without dropping below AAA text contrast. */
+:root:not([data-theme="dark"]) .content .text-button,
+:root:not([data-theme="dark"]) .content .stats-eyebrow,
+:root:not([data-theme="dark"]) .content .stats-metric.primary-metric strong,
+:root:not([data-theme="dark"]) .content .comparison-values .positive strong,
+:root[data-theme="dark"] .content .text-button,
+:root[data-theme="dark"] .content .stats-eyebrow,
+:root[data-theme="dark"] .content .stats-metric.primary-metric strong,
+:root[data-theme="dark"] .content .comparison-values .positive strong {
+  color: var(--accent-text);
+}
+:root:not([data-theme="dark"]) .content .eyebrow,
+:root:not([data-theme="dark"]) .content .stats-source-note,
+:root:not([data-theme="dark"]) .content .stats-toolbar p,
+:root:not([data-theme="dark"]) .content .stats-panel-head span,
+:root:not([data-theme="dark"]) .content .stats-metric span,
+:root:not([data-theme="dark"]) .content .weekday-row > small,
+:root[data-theme="dark"] .content .eyebrow,
+:root[data-theme="dark"] .content .stats-source-note,
+:root[data-theme="dark"] .content .stats-toolbar p,
+:root[data-theme="dark"] .content .stats-panel-head span,
+:root[data-theme="dark"] .content .stats-metric span,
+:root[data-theme="dark"] .content .weekday-row > small {
+  color: var(--subtle);
+}
+:root:not([data-theme="dark"]) .content .error,
+:root:not([data-theme="dark"]) .content .error-banner,
+:root:not([data-theme="dark"]) .content .tool-notice,
+:root:not([data-theme="dark"]) .content .custom-goal small,
+:root:not([data-theme="dark"]) .content .comparison-values .negative strong,
+:root:not([data-theme="dark"]) .login-card .error,
+:root[data-theme="dark"] .content .error,
+:root[data-theme="dark"] .content .error-banner,
+:root[data-theme="dark"] .content .tool-notice,
+:root[data-theme="dark"] .content .custom-goal small,
+:root[data-theme="dark"] .content .comparison-values .negative strong,
+:root[data-theme="dark"] .login-card .error {
+  color: var(--danger-text);
+}
+:root:not([data-theme="dark"]) .content .caution,
+:root:not([data-theme="dark"]) .content .remember-warning,
+:root[data-theme="dark"] .content .caution,
+:root[data-theme="dark"] .content .remember-warning {
+  color: var(--warning-text);
 }
 
 /* State chips use text/background pairs above the 7:1 AAA threshold. */
