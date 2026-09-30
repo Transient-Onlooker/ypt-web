@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
-import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
+import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareRecentSevenDayWindows, currentVerifiedStudyStreak, medianVerifiedDailyMs, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import {
@@ -588,7 +588,11 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
   const bestDay = known.reduce<TrendDay | null>((best, row) =>
     !best || (row.totalMs ?? 0) > (best.totalMs ?? 0) ? row : best, null);
   const streak = days ? longestVerifiedStreak(days) : 0;
-  const weekComparison = rangeDays === 14 && days ? compareVerifiedWeeks(days) : null;
+  const currentStudyStreak = days ? currentVerifiedStudyStreak(days) : null;
+  const medianDailyMs = days ? medianVerifiedDailyMs(days) : null;
+  const activeDayAverageMs = studyDays > 0 ? knownTotal / studyDays : 0;
+  const restDays = Math.max(0, known.length - studyDays);
+  const recentWeekComparison = days ? compareRecentSevenDayWindows(days) : null;
   const subjectSummary = days ? summarizeTrendSubjects(days, rangeDays) : null;
   const subjectCsv = days ? formatTrendSubjectsCsv(days, rangeDays) : null;
   const subjectTotal = subjectSummary?.reduce((sum, subject) => sum + subject.totalMs, 0) ?? 0;
@@ -681,8 +685,12 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
               <div className="stats-metric-grid period-metrics">
                 <div className="stats-metric primary-metric"><span>총 공부 시간</span><strong>{duration(knownTotal)}</strong></div>
                 <div className="stats-metric"><span>일 평균</span><strong>{duration(knownTotal / Math.max(1, known.length))}</strong></div>
+                <div className="stats-metric"><span>공부한 날 평균</span><strong>{duration(activeDayAverageMs)}</strong></div>
+                <div className="stats-metric"><span>일 중앙값</span><strong>{medianDailyMs === null ? "미확인" : duration(medianDailyMs)}</strong></div>
                 <div className="stats-metric"><span>공부한 날</span><strong>{studyDays}/{known.length}일</strong></div>
-                <div className="stats-metric"><span>최장 연속</span><strong>{streak}일</strong></div>
+                <div className="stats-metric"><span>쉰 날</span><strong>{restDays}일</strong></div>
+                <div className="stats-metric"><span>현재 연속</span><strong>{currentStudyStreak === null ? "미확인" : `${currentStudyStreak}일`}</strong></div>
+                <div className="stats-metric"><span>기간 최장 연속</span><strong>{streak}일</strong></div>
                 <div className="stats-metric wide-metric">
                   <span>가장 많이 한 날</span>
                   <strong>{bestDay ? `${bestDay.date.slice(5).replace("-", ".")} · ${duration(bestDay.totalMs)}` : "기록 없음"}</strong>
@@ -697,21 +705,23 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
             </section>
           </div>
 
-          {rangeDays === 14 && (
+          {rangeDays >= 14 && (
             <section className="stats-panel stats-comparison">
-              <div className="stats-panel-head"><div><span>주간 비교</span><strong>이전 7일 ↔ 최근 7일</strong></div></div>
-              {weekComparison
+              <div className="stats-panel-head">
+                <div><span>최근 변화</span><strong>직전 7일 ↔ 최근 7일</strong></div>
+              </div>
+              {recentWeekComparison
                 ? <div className="comparison-values">
-                    <span>이전 7일 <strong>{duration(weekComparison.earlier)}</strong></span>
-                    <span>최근 7일 <strong>{duration(weekComparison.recent)}</strong></span>
-                    <span className={weekComparison.difference >= 0 ? "positive" : "negative"}>
-                      차이 <strong>{weekComparison.difference > 0
-                        ? `+${duration(weekComparison.difference)}`
-                        : weekComparison.difference < 0
-                          ? `-${duration(-weekComparison.difference)}` : "같음"}</strong>
+                    <span>직전 7일 <strong>{duration(recentWeekComparison.earlier)}</strong></span>
+                    <span>최근 7일 <strong>{duration(recentWeekComparison.recent)}</strong></span>
+                    <span className={recentWeekComparison.difference >= 0 ? "positive" : "negative"}>
+                      차이 <strong>{recentWeekComparison.difference > 0
+                        ? `+${duration(recentWeekComparison.difference)}`
+                        : recentWeekComparison.difference < 0
+                          ? `-${duration(-recentWeekComparison.difference)}` : "같음"}</strong>
                     </span>
                   </div>
-                : <p className="card-note">14일 모두 확인되면 앞뒤 7일을 비교합니다.</p>}
+                : <p className="card-note">최근 14일이 모두 확인되면 직전 7일과 최근 7일을 비교합니다.</p>}
             </section>
           )}
 
