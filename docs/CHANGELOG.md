@@ -2,6 +2,21 @@
 
 이 문서는 개발 버전의 사용자에게 보이는 변경과 검증 범위를 기록합니다. 버전 번호는 `package.json`과 일치합니다. 운영 배포 또는 GitHub Release를 뜻하지 않습니다.
 
+## v0.28.0 · 파스텔 라이트 / OLED 다크 팔레트 — 2026-09-30
+
+- 사용자 요청에 따라 임의로 새 색을 만들지 않고 **온라인에서 확인한 팔레트 값만** 테마 override에 사용합니다.
+- 라이트 모드는 Color Hunt의 `#F2F1EB / #EEE7DA / #AFC8AD / #88AB8E` 팔레트로 바꿨습니다. 페이지는 연한 크림, 카드와 내비게이션은 세이지·크림 계열로 구성하고 텍스트는 승인된 온라인 OLED 팔레트의 검정/near-black을 사용해 AA 대비를 유지합니다.
+- 다크 모드는 OLED 절전을 우선해 페이지 배경을 **순수 `#000000`**으로 고정하고, 표면은 `#121212 / #1E1E1E`, 텍스트는 `#FFFFFF / #888888`, 강조는 ColorsWall의 `#3EB489 / #98FF98` Mint 조합을 사용합니다.
+- 라이트 기본/선택/달력 단계와 다크 카드/선택/그래프/상태 표시까지 같은 승인 팔레트 안에서 다시 매핑했습니다.
+- 기본 SVG 브랜드 마크도 `#88AB8E`와 `#000000`으로 맞추고, 브라우저 theme-color는 라이트 `#F2F1EB`, 다크 `#000000`으로 동기화합니다.
+- 접근성 대비 테스트가 v0.28 최종 theme override를 직접 읽도록 바꾸고, override 내부에 승인되지 않은 6자리 HEX가 들어오면 테스트가 실패하도록 잠갔습니다.
+- Worker/D1 변경은 없습니다.
+
+온라인 출처:
+- Color Hunt pastel sage/cream: https://colorhunt.co/palette/88ab8eafc8adeee7daf2f1eb
+- ColorsWall Black + Mint: https://colorswall.com/palette/560980
+- OLED dark neutral 참고: https://designdroid.in/oled-dark-mode-color-palettes-android-2026/
+
 ## v0.27.0 · WCAG 2.2 AA 코드 점검 — 2026-09-30
 
 - 접근성 목표를 사이트 전체 AAA가 아니라 **WCAG 2.2 AA**로 명확히 정했습니다. 색상 자동 테스트도 일반 텍스트 4.5:1, 의미 있는 UI/그래픽 3:1 기준으로 맞췄습니다.
