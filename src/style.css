@@ -3057,3 +3057,64 @@ input[type="search"] {
   }
   .stats-subject-panel .trend-subject-label small { display: none; }
 }
+
+
+/* v0.24 weekday insights */
+.stats-weekday-panel {
+  display: grid;
+  gap: 4px;
+}
+.weekday-pattern {
+  display: grid;
+  gap: 9px;
+}
+.weekday-row {
+  display: grid;
+  grid-template-columns: 24px minmax(120px, 1fr) 92px 82px;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+}
+.weekday-name {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+.weekday-track {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+}
+.weekday-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-fill);
+}
+.weekday-row > strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.weekday-row > small {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .weekday-row {
+    grid-template-columns: 24px minmax(80px, 1fr) 78px;
+    gap: 8px;
+  }
+  .weekday-row > small {
+    grid-column: 2 / -1;
+    text-align: left;
+    margin-top: -4px;
+  }
+}

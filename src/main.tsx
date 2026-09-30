@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
-import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, verifiedGoalStreak } from "../shared/format.ts";
+import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import {
@@ -38,7 +38,7 @@ function BrandMark() {
 }
 type MemberSort = "time" | "name" | "status";
 type MemberFilter = "all" | "studying" | "resting" | "unknown";
-type TrendRange = 7 | 14;
+type TrendRange = 7 | 14 | 30;
 type Session = { authenticated: boolean; csrf?: string };
 type ApiError = Error & { code?: string; status?: number };
 type GoogleTokenResponse = { access_token?: string; error?: string };
@@ -592,6 +592,8 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
   const subjectSummary = days ? summarizeTrendSubjects(days, rangeDays) : null;
   const subjectCsv = days ? formatTrendSubjectsCsv(days, rangeDays) : null;
   const subjectTotal = subjectSummary?.reduce((sum, subject) => sum + subject.totalMs, 0) ?? 0;
+  const weekdaySummary = days ? summarizeWeekdays(days) : [];
+  const maxWeekdayAverage = Math.max(1, ...weekdaySummary.map((weekday) => weekday.averageMs));
   const goalDays = goalMinutes > 0 ? known.filter((row) =>
     (row.totalMs ?? 0) >= goalMinutes * 60_000).length : 0;
   const goalStreak = days && goalMinutes > 0 ? verifiedGoalStreak(days, goalMinutes) : null;
@@ -629,10 +631,11 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
             <select id="trend-range" value={rangeDays} disabled={loading}
               onChange={(event) => {
                 const value = Number(event.target.value);
-                if (value === 7 || value === 14) onRangeChange(value);
+                if (value === 7 || value === 14 || value === 30) onRangeChange(value);
               }}>
               <option value={7}>7일</option>
               <option value={14}>14일</option>
+              <option value={30}>30일</option>
             </select>
           </label>
           <button className="text-button" disabled={loading} onClick={() => void load(true)}>
@@ -740,6 +743,25 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
                     })}
                   </div>}
             <p className="card-note">과목 이름이 바뀌면 기간 내에서 별도 과목으로 집계합니다. 진행 중인 세션은 제외합니다.</p>
+          </section>
+
+          <section className="stats-panel stats-weekday-panel">
+            <div className="stats-panel-head">
+              <div><span>요일 패턴</span><strong>요일별 평균 공부시간</strong></div>
+            </div>
+            <div className="weekday-pattern">
+              {weekdaySummary.map((weekday) => (
+                <div className="weekday-row" key={weekday.weekday}>
+                  <span className="weekday-name">{weekday.label}</span>
+                  <span className="weekday-track" aria-hidden="true">
+                    <span style={{ width: `${weekday.knownDays > 0 ? weekday.averageMs / maxWeekdayAverage * 100 : 0}%` }} />
+                  </span>
+                  <strong>{weekday.knownDays > 0 ? duration(weekday.averageMs) : "미확인"}</strong>
+                  <small>{weekday.knownDays > 0 ? `${weekday.studyDays}/${weekday.knownDays}일 공부` : "확인된 날짜 없음"}</small>
+                </div>
+              ))}
+            </div>
+            <p className="card-note">선택한 기간에서 확인된 날짜만 요일별 평균에 포함합니다.</p>
           </section>
 
           <section className="stats-panel stats-chart-panel">

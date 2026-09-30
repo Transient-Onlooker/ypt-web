@@ -7,6 +7,17 @@ export type TrendDay = {
   subjects?: Subject[];
 };
 
+export type TrendRangeDays = 7 | 14 | 30;
+
+export type WeekdaySummary = {
+  weekday: number;
+  label: string;
+  knownDays: number;
+  studyDays: number;
+  totalMs: number;
+  averageMs: number;
+};
+
 export type TrendSubject = {
   title: string;
   color?: string;
@@ -15,7 +26,7 @@ export type TrendSubject = {
   recentMs: number;
 };
 
-export function summarizeTrendSubjects(days: TrendDay[], rangeDays: 7 | 14): TrendSubject[] | null {
+export function summarizeTrendSubjects(days: TrendDay[], rangeDays: TrendRangeDays): TrendSubject[] | null {
   if (days.length !== rangeDays || days.some((day) => day.totalMs === null ||
     day.subjectTimesAvailable !== true || !Array.isArray(day.subjects) ||
     day.subjects.some((subject) => subject.studyMs === null ||
@@ -105,7 +116,7 @@ export function formatTrendCsv(days: TrendDay[]) {
   return rows.map(csvRow).join("\r\n") + "\r\n";
 }
 
-export function formatTrendSubjectsCsv(days: TrendDay[], rangeDays: 7 | 14): string | null {
+export function formatTrendSubjectsCsv(days: TrendDay[], rangeDays: TrendRangeDays): string | null {
   const subjects = summarizeTrendSubjects(days, rangeDays);
   if (subjects === null) return null;
   const titles = subjects.map((subject) => subject.title);
@@ -119,6 +130,27 @@ export function formatTrendSubjectsCsv(days: TrendDay[], rangeDays: 7 | 14): str
     }),
   ];
   return rows.map(csvRow).join("\r\n") + "\r\n";
+}
+
+export function summarizeWeekdays(days: TrendDay[]): WeekdaySummary[] {
+  const labels = ["일", "월", "화", "수", "목", "금", "토"];
+  const buckets: WeekdaySummary[] = labels.map((label, weekday) => ({
+    weekday, label, knownDays: 0, studyDays: 0, totalMs: 0, averageMs: 0,
+  }));
+  for (const day of days) {
+    if (day.totalMs === null) continue;
+    const weekday = new Date(`${day.date}T00:00:00Z`).getUTCDay();
+    const bucket = buckets[weekday];
+    bucket.knownDays += 1;
+    bucket.totalMs += day.totalMs;
+    if (day.totalMs > 0) bucket.studyDays += 1;
+  }
+  buckets.forEach((bucket) => {
+    bucket.averageMs = bucket.knownDays > 0
+      ? Math.floor(bucket.totalMs / bucket.knownDays)
+      : 0;
+  });
+  return buckets;
 }
 
 export function longestVerifiedStreak(days: TrendDay[]) {
@@ -162,7 +194,7 @@ export function verifiedGoalStreak(days: TrendDay[], goalMinutes: number): numbe
   return streak;
 }
 
-export function formatTrendReview(days: TrendDay[], rangeDays: 7 | 14, goalMinutes: number): string | null {
+export function formatTrendReview(days: TrendDay[], rangeDays: TrendRangeDays, goalMinutes: number): string | null {
   if (days.length !== rangeDays) return null;
   const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
   if (sorted.some((day, index) => index > 0 &&
