@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
+import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareRecentSevenDayWindows, compareVerifiedWeeks, currentVerifiedStudyStreak, medianVerifiedDailyMs, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
 
 test("copied summary includes completed time and only verified subject times", () => {
   const result = formatDaySummary({
@@ -131,14 +131,14 @@ test("period review names missing dates and never invents a week comparison", ()
   const review = formatTrendReview(days, 14, 60);
   assert.match(review, /확인된 13\/14일/);
   assert.match(review, /미확인 날짜: 2026-09-04/);
-  assert.match(review, /앞뒤 7일 비교 미확인/);
+  assert.match(review, /최근 7일 비교 미확인/);
   assert.match(review, /과목별 기간 시간 미확인/);
   assert.doesNotMatch(review, /=위험/);
   days[3].totalMs = 3_600_000;
   days[3].subjectTimesAvailable = true;
   days[3].subjects = [{ title: "=위험\n과목", studyMs: 3_600_000 }];
   const complete = formatTrendReview(days, 14, 60);
-  assert.match(complete, /이전 7일 07:00:00 → 최근 7일 07:00:00/);
+  assert.match(complete, /직전 7일 07:00:00 → 최근 7일 07:00:00/);
   assert.match(complete, /'=위험 과목 14:00:00/);
   assert.doesNotMatch(complete, /\n과목 14/);
 });
@@ -173,7 +173,7 @@ test("30-day subject summary and review accept a full monthly window", () => {
   const review = formatTrendReview(days, 30, 0);
   assert.match(review, /최근 30일 공부 요약/);
   assert.match(review, /확인된 30\/30일/);
-  assert.doesNotMatch(review, /이전 7일/);
+  assert.match(review, /직전 7일 07:00:00 → 최근 7일 07:00:00/);
 });
 
 test("weekday summaries average only verified dates", () => {
@@ -194,4 +194,52 @@ test("weekday summaries average only verified dates", () => {
     { knownDays: tuesday?.knownDays, studyDays: tuesday?.studyDays, totalMs: tuesday?.totalMs, averageMs: tuesday?.averageMs },
     { knownDays: 1, studyDays: 1, totalMs: 7_200_000, averageMs: 7_200_000 },
   );
+});
+
+
+test("median daily time includes verified zero days but ignores unknown days", () => {
+  assert.equal(medianVerifiedDailyMs([
+    { date: "2026-09-01", totalMs: 0 },
+    { date: "2026-09-02", totalMs: 3_600_000 },
+    { date: "2026-09-03", totalMs: 7_200_000 },
+    { date: "2026-09-04", totalMs: null },
+  ]), 3_600_000);
+  assert.equal(medianVerifiedDailyMs([
+    { date: "2026-09-01", totalMs: 0 },
+    { date: "2026-09-02", totalMs: 3_600_000 },
+  ]), 1_800_000);
+  assert.equal(medianVerifiedDailyMs([{ date: "2026-09-01", totalMs: null }]), null);
+});
+
+test("current study streak counts backward from the latest verified date", () => {
+  assert.equal(currentVerifiedStudyStreak([
+    { date: "2026-09-26", totalMs: 1_000 },
+    { date: "2026-09-27", totalMs: 2_000 },
+    { date: "2026-09-28", totalMs: 0 },
+    { date: "2026-09-29", totalMs: 3_000 },
+    { date: "2026-09-30", totalMs: 4_000 },
+  ]), 2);
+  assert.equal(currentVerifiedStudyStreak([
+    { date: "2026-09-29", totalMs: 3_000 },
+    { date: "2026-09-30", totalMs: null },
+  ]), null);
+  assert.equal(currentVerifiedStudyStreak([
+    { date: "2026-09-28", totalMs: 3_000 },
+    { date: "2026-09-30", totalMs: 4_000 },
+  ]), 1);
+});
+
+test("recent seven-day comparison uses the latest 14 verified consecutive days", () => {
+  const days = Array.from({ length: 30 }, (_, index) => ({
+    date: new Date(Date.UTC(2026, 8, index + 1)).toISOString().slice(0, 10),
+    totalMs: index < 23 ? 1_000 : 2_000,
+  }));
+  assert.deepEqual(compareRecentSevenDayWindows(days), {
+    earlier: 7_000,
+    recent: 14_000,
+    difference: 7_000,
+  });
+  days[25].totalMs = null;
+  assert.equal(compareRecentSevenDayWindows(days), null);
+  assert.equal(compareRecentSevenDayWindows(days.slice(0, 13)), null);
 });

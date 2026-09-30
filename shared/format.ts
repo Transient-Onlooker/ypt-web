@@ -153,6 +153,46 @@ export function summarizeWeekdays(days: TrendDay[]): WeekdaySummary[] {
   return buckets;
 }
 
+export function medianVerifiedDailyMs(days: TrendDay[]): number | null {
+  const values = days
+    .filter((day) => day.totalMs !== null)
+    .map((day) => day.totalMs as number)
+    .sort((a, b) => a - b);
+  if (!values.length) return null;
+  const middle = Math.floor(values.length / 2);
+  return values.length % 2 === 1
+    ? values[middle]
+    : Math.floor((values[middle - 1] + values[middle]) / 2);
+}
+
+export function currentVerifiedStudyStreak(days: TrendDay[]): number | null {
+  if (!days.length) return null;
+  const sorted = [...days].sort((a, b) => b.date.localeCompare(a.date));
+  if (sorted[0].totalMs === null) return null;
+  let streak = 0;
+  let newerDate: string | null = null;
+  for (const day of sorted) {
+    if (newerDate !== null &&
+      Date.parse(`${newerDate}T00:00:00Z`) - Date.parse(`${day.date}T00:00:00Z`) !== 86_400_000) break;
+    if (day.totalMs === null || day.totalMs <= 0) break;
+    streak++;
+    newerDate = day.date;
+  }
+  return streak;
+}
+
+export function compareRecentSevenDayWindows(days: TrendDay[]) {
+  if (days.length < 14) return null;
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
+  if (sorted.length !== 14 || sorted.some((day) => day.totalMs === null)) return null;
+  if (sorted.some((day, index) => index > 0 &&
+    Date.parse(`${day.date}T00:00:00Z`) - Date.parse(`${sorted[index - 1].date}T00:00:00Z`) !== 86_400_000))
+    return null;
+  const earlier = sorted.slice(0, 7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
+  const recent = sorted.slice(7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
+  return { earlier, recent, difference: recent - earlier };
+}
+
 export function longestVerifiedStreak(days: TrendDay[]) {
   let longest = 0;
   let current = 0;
@@ -213,11 +253,11 @@ export function formatTrendReview(days: TrendDay[], rangeDays: TrendRangeDays, g
     const goalDays = known.filter((day) => (day.totalMs ?? 0) >= goalMinutes * 60_000).length;
     lines.push(`현재 하루 목표 ${goalMinutes}분 달성 ${goalDays}/${known.length}일 (과거 목표 설정은 알 수 없음)`);
   }
-  if (rangeDays === 14) {
-    const comparison = compareVerifiedWeeks(sorted);
+  if (rangeDays >= 14) {
+    const comparison = compareRecentSevenDayWindows(sorted);
     lines.push(comparison
-      ? `이전 7일 ${duration(comparison.earlier)} → 최근 7일 ${duration(comparison.recent)}`
-      : "앞뒤 7일 비교 미확인");
+      ? `직전 7일 ${duration(comparison.earlier)} → 최근 7일 ${duration(comparison.recent)}`
+      : "최근 7일 비교 미확인");
   }
   const subjects = summarizeTrendSubjects(sorted, rangeDays);
   if (subjects === null) lines.push("과목별 기간 시간 미확인");
