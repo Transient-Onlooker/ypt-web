@@ -3277,3 +3277,48 @@ input[type="search"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* v0.27 WCAG 2.2 AA hardening */
+html {
+  scroll-padding-top: 92px;
+}
+body {
+  min-width: 0;
+}
+.remember-email {
+  min-height: 32px;
+  padding-block: 4px;
+}
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])) {
+  scroll-margin-top: 92px;
+  scroll-margin-bottom: 28px;
+}
+
+@media (max-width: 650px) {
+  html {
+    scroll-padding-top: 118px;
+    scroll-padding-bottom: 104px;
+  }
+  :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])) {
+    scroll-margin-top: 118px;
+    scroll-margin-bottom: 104px;
+  }
+  .top-status {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    flex-wrap: wrap;
+    line-height: 1.35;
+  }
+  .top-status strong {
+    white-space: nowrap;
+  }
+}
+@media (max-width: 430px) {
+  .week-calendar-day small {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+  }
+}
