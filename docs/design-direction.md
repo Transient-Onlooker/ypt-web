@@ -10,23 +10,23 @@
 현재 화면은 큰 타이머 카드, 읽기 쉬운 완료 시간 요약, 과목 색 유지, 모바일 하단 3개 탭, 데스크톱 측면 탐색을 사용합니다. 조작 버튼은 가능한 한 높이 44px 이상으로 두고, 키보드 포커스 표시와 휴대폰 안전 영역을 유지합니다. Pretendard를 전 화면에서 사용합니다.
 
 
-## v0.28 색상 방향
+## v0.29 색상 방향
 
 색은 프로젝트 안에서 임의 생성하지 않고 아래 온라인 팔레트 값을 기준으로 사용합니다.
 
-- **Light / pastel** — Color Hunt: https://colorhunt.co/palette/88ab8eafc8adeee7daf2f1eb
-  - `#F2F1EB`
-  - `#EEE7DA`
-  - `#AFC8AD`
-  - `#88AB8E`
-- **Dark / OLED neutral** — https://designdroid.in/oled-dark-mode-color-palettes-android-2026/
+- **Light / pastel orange** — Color Hunt: https://colorhunt.co/palette/ff9a86ffb399ffd6a6fff0be
+  - `#FFF0BE`
+  - `#FFD6A6`
+  - `#FFB399`
+  - `#FF9A86`
+- **Dark / OLED neutral**
   - `#000000`
   - `#121212`
   - `#1E1E1E`
   - `#FFFFFF`
   - `#888888`
-- **Dark / mint accent** — ColorsWall: https://colorswall.com/palette/560980
-  - `#3EB489`
-  - `#98FF98`
+- **Dark / orange accent** — ColorsWall: https://colorswall.com/palette/560727
+  - `#FFA500`
+  - `#CC5500`
 
-라이트 테마는 부드러운 공부 플래너 느낌을 위해 pastel sage/cream을 면적이 큰 배경·카드·선택 상태에 사용합니다. 다크 테마는 OLED 픽셀을 끌 수 있도록 전체 페이지 배경을 반드시 `#000000`으로 유지하고, 콘텐츠가 있는 부분에만 `#121212`와 `#1E1E1E`을 사용합니다. 접근성 때문에 라이트의 작은 일반 텍스트에는 밝은 pastel 색 자체를 쓰지 않고 승인 팔레트의 검정/near-black을 사용합니다.
+라이트 테마는 연한 크림 배경 위에 피치·오렌지 면을 단계적으로 사용합니다. 작은 텍스트는 파스텔색 자체가 아니라 승인된 검정/near-black으로 표시해 AA 대비를 유지합니다. 다크 테마는 OLED를 위해 페이지 면적의 기본 배경을 `#000000`으로 유지하고 콘텐츠 표면만 `#121212`와 `#1E1E1E`을 사용합니다.
