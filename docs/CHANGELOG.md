@@ -2,6 +2,15 @@
 
 이 문서는 개발 버전의 사용자에게 보이는 변경과 검증 범위를 기록합니다. 버전 번호는 `package.json`과 일치합니다. 운영 배포 또는 GitHub Release를 뜻하지 않습니다.
 
+## v0.31.1 · 레거시 테마 selector 제거 — 2026-09-30
+
+- v0.31.0에서 색상 HEX는 정리했지만 예전 `:root[data-theme="dark"] ...` / `:root:not(...) ...` 컴포넌트 selector가 남아 높은 specificity로 공통 테마를 덮는 문제를 수정했습니다.
+- 상단바·타이머 카드 같은 큰 면이 다크모드에서 오렌지 accent로 칠해지던 원인이었던 레거시 테마별 규칙 137개를 제거했습니다.
+- 이제 theme-specific selector는 상단의 `:root[data-theme="dark"]` 토큰 선언 하나만 존재하고, 모든 컴포넌트는 공통 semantic rule을 사용합니다.
+- 다크의 큰 면은 `--surface / --surface-soft`를 사용하고, `--accent`는 선택·CTA·진행 상태에만 사용합니다.
+- 같은 구조가 다시 들어오면 테스트가 실패하도록 회귀 검사를 추가했습니다.
+- Worker/D1 변경은 없습니다.
+
 ## v0.31.0 · 단일 테마 시스템 리팩터링 — 2026-09-30
 
 - 색상 변경 때마다 새 override를 아래에 덧붙이던 구조를 제거하고, `src/style.css` 상단의 **단일 semantic theme token 세트**가 라이트/다크 색을 모두 소유하도록 리팩터링했습니다.

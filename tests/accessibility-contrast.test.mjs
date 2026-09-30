@@ -94,3 +94,16 @@ test("component rules use theme variables instead of literal colors", () => {
   assert.match(components, /background:\s*var\(--accent\)/);
   assert.match(components, /color:\s*var\(--text\)/);
 });
+
+
+test("legacy theme-specific component selectors are completely removed", () => {
+  const darkSelectors = [...css.matchAll(/:root\[data-theme="dark"\]/g)];
+  assert.equal(darkSelectors.length, 1, "only the canonical dark token block may use :root[data-theme=dark]");
+  assert.doesNotMatch(css, /:root:not\(\[data-theme="dark"\]\)/);
+});
+
+test("large dark surfaces use neutral theme surfaces, not the accent", () => {
+  assert.match(css, /\.topbar,[\s\S]*?\.settings-popover\s*\{[\s\S]*?background:\s*var\(--surface\)/);
+  assert.match(css, /\.timer-card,[\s\S]*?\.week-row\s*\{[\s\S]*?background:\s*var\(--surface\)/);
+  assert.doesNotMatch(css, /:root\[data-theme="dark"\][^{]*\.timer-card[\s\S]*?background:\s*var\(--accent\)/);
+});
