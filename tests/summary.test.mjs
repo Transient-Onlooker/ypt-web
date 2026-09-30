@@ -131,14 +131,14 @@ test("period review names missing dates and never invents a week comparison", ()
   const review = formatTrendReview(days, 14, 60);
   assert.match(review, /확인된 13\/14일/);
   assert.match(review, /미확인 날짜: 2026-09-04/);
-  assert.match(review, /앞뒤 7일 비교 미확인/);
+  assert.match(review, /최근 7일 비교 미확인/);
   assert.match(review, /과목별 기간 시간 미확인/);
   assert.doesNotMatch(review, /=위험/);
   days[3].totalMs = 3_600_000;
   days[3].subjectTimesAvailable = true;
   days[3].subjects = [{ title: "=위험\n과목", studyMs: 3_600_000 }];
   const complete = formatTrendReview(days, 14, 60);
-  assert.match(complete, /이전 7일 07:00:00 → 최근 7일 07:00:00/);
+  assert.match(complete, /직전 7일 07:00:00 → 최근 7일 07:00:00/);
   assert.match(complete, /'=위험 과목 14:00:00/);
   assert.doesNotMatch(complete, /\n과목 14/);
 });
@@ -173,7 +173,7 @@ test("30-day subject summary and review accept a full monthly window", () => {
   const review = formatTrendReview(days, 30, 0);
   assert.match(review, /최근 30일 공부 요약/);
   assert.match(review, /확인된 30\/30일/);
-  assert.doesNotMatch(review, /이전 7일/);
+  assert.match(review, /직전 7일 07:00:00 → 최근 7일 07:00:00/);
 });
 
 test("weekday summaries average only verified dates", () => {
