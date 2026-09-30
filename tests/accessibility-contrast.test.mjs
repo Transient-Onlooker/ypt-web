@@ -78,7 +78,7 @@ test("focus indicators exceed the WCAG 2.2 3:1 contrast minimum in both themes",
 
 test("keyboard focus indicator is visibly reinforced beyond the AA minimum", () => {
   assert.match(
-    tail,
+    css,
     /:focus-visible\s*\{[\s\S]*?outline:\s*3px\s+solid\s+var\(--focus-accent\)/,
   );
 });
