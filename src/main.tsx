@@ -396,7 +396,7 @@ function SubjectBreakdown({ day, empty }: { day: Day; empty: string }) {
             <div className="subject-track" aria-hidden="true">
               <span style={{
                 width: `${Math.min(100, subject.studyMs / maxMs * 100)}%`,
-                backgroundColor: subject.color || "#28784a",
+                backgroundColor: subject.color || "var(--accent)",
               }} />
             </div>
           )}
@@ -740,13 +740,13 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
                       const share = subjectTotal > 0 ? Math.round(subject.totalMs / subjectTotal * 100) : 0;
                       return <div className="trend-subject-row" key={subject.title}>
                         <div className="trend-subject-label">
-                          <span className="subject-color" style={{ backgroundColor: subject.color || "#FFD49F" }} aria-hidden="true" />
+                          <span className="subject-color" style={{ backgroundColor: subject.color || "var(--accent)" }} aria-hidden="true" />
                           <span>{subject.title}</span>
                           <small>{share}%</small>
                           <strong>{duration(subject.totalMs)}</strong>
                         </div>
                         <div className="trend-subject-track" aria-hidden="true">
-                          <span style={{ width: `${subjectSummary[0].totalMs > 0 ? subject.totalMs / subjectSummary[0].totalMs * 100 : 0}%`, backgroundColor: subject.color || "#FFD49F" }} />
+                          <span style={{ width: `${subjectSummary[0].totalMs > 0 ? subject.totalMs / subjectSummary[0].totalMs * 100 : 0}%`, backgroundColor: subject.color || "var(--accent)" }} />
                         </div>
                         {rangeDays === 14 && <small>이전 7일 {duration(subject.earlierMs)} → 최근 7일 {duration(subject.recentMs)}</small>}
                       </div>;

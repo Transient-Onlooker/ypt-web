@@ -2,6 +2,22 @@
 
 이 문서는 개발 버전의 사용자에게 보이는 변경과 검증 범위를 기록합니다. 버전 번호는 `package.json`과 일치합니다. 운영 배포 또는 GitHub Release를 뜻하지 않습니다.
 
+## v0.31.0 · 단일 테마 시스템 리팩터링 — 2026-09-30
+
+- 색상 변경 때마다 새 override를 아래에 덧붙이던 구조를 제거하고, `src/style.css` 상단의 **단일 semantic theme token 세트**가 라이트/다크 색을 모두 소유하도록 리팩터링했습니다.
+- v0.26~v0.30에 누적된 접근성·Sage·Mint·Orange·Soft Orange 색상 override 블록을 제거했습니다. 컴포넌트 규칙은 `var(--bg)`, `var(--surface)`, `var(--accent)`, `var(--text)`, `var(--border)` 등의 변수만 사용합니다.
+- 런타임 CSS의 직접 색상 코드는 승인 팔레트 11개로 제한했습니다. 예전 녹색/세이지/피치 fallback과 체크박스 accent, 그룹 상태색, 타이머 상태색 등은 모두 theme variable로 통합했습니다.
+- 과목 색이 없는 경우의 React inline fallback도 하드코딩 HEX 대신 `var(--accent)`를 사용합니다. 열품타에서 실제로 전달되는 `subject.color`만 동적 색으로 유지합니다.
+- 접근성/통계 레이아웃/한글 줄바꿈/reduced-motion 보완은 override 세대와 분리해 하나의 공통 구조 규칙으로 유지합니다.
+- CSS는 약 4,569줄/131KB에서 약 3,518줄/93KB로 줄었습니다.
+- 테스트가 런타임 `style.css`, `main.tsx`, `study-tools.tsx`에 승인되지 않은 6자리 HEX가 들어오면 실패하도록 변경됐습니다.
+- Worker/D1 변경은 없습니다.
+
+현재 승인 팔레트:
+- Light: `#FFF7EC / #FFEED9 / #FFE5C6 / #FFD49F`
+- Dark: `#000000 / #121212 / #1E1E1E / #FFFFFF / #888888`
+- Dark accent: `#FFA500 / #CC5500`
+
 ## v0.30.0 · 소프트 오렌지 / 통계 정렬 수정 — 2026-09-30
 
 - 라이트 테마의 붉은 피치가 강하다는 피드백에 따라 ColorsWall의 Orange scale에서 더 연한 `#FFD49F / #FFE5C6 / #FFEED9 / #FFF7EC` 조합으로 교체했습니다.

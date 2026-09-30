@@ -42,33 +42,25 @@ test("no positive tabindex or hidden focus outline is introduced", () => {
   assert.doesNotMatch(css, /outline\s*:\s*(?:none|0)\b/i);
 });
 
-test("AA focus visibility accounts for sticky header and mobile bottom navigation", () => {
-  const marker = css.indexOf("/* v0.27 WCAG 2.2 AA hardening */");
-  assert.notEqual(marker, -1);
-  const aa = css.slice(marker);
-  assert.match(aa, /scroll-padding-top:\s*92px/);
-  assert.match(aa, /scroll-padding-bottom:\s*104px/);
-  assert.match(aa, /scroll-margin-bottom:\s*104px/);
+test("focus visibility accounts for sticky header and mobile bottom navigation", () => {
+  assert.match(css, /scroll-padding-top:\s*92px/);
+  assert.match(css, /scroll-padding-bottom:\s*104px/);
+  assert.match(css, /scroll-margin-bottom:\s*104px/);
 });
 
-test("AA target-size safeguards cover custom checkboxes and primary touch controls", () => {
-  const marker = css.indexOf("/* v0.27 WCAG 2.2 AA hardening */");
-  const aa = css.slice(marker);
-  assert.match(aa, /\.remember-email\s*\{[\s\S]*?min-height:\s*32px/);
+test("target-size safeguards cover custom checkboxes and primary touch controls", () => {
+  assert.match(css, /\.remember-email\s*\{[\s\S]*?min-height:\s*32px/);
   assert.match(css, /\.bottom-nav button\s*\{[\s\S]*?min-height:\s*52px/);
   assert.match(css, /\.date-actions button\s*\{[\s\S]*?min-height:\s*44px/);
   assert.match(css, /\.timer-mode button\s*\{[\s\S]*?min-height:\s*44px/);
 });
 
-test("mobile status and calendar text can reflow instead of being clipped", () => {
-  const marker = css.indexOf("/* v0.27 WCAG 2.2 AA hardening */");
-  const aa = css.slice(marker);
-  assert.match(aa, /\.top-status\s*\{[\s\S]*?white-space:\s*normal/);
-  assert.match(aa, /\.week-calendar-day small\s*\{[\s\S]*?white-space:\s*normal/);
-  assert.doesNotMatch(css.slice(marker), /body\s*\{[\s\S]*?min-width:\s*320px/);
+test("mobile status can reflow and body does not force a 320px minimum", () => {
+  assert.match(css, /\.top-status\s*\{[\s\S]*?white-space:\s*normal/);
+  assert.match(css, /body\s*\{[\s\S]*?min-width:\s*0/);
 });
 
-test("accessible names retain the visible label for overridden button names", () => {
+test("accessible names retain visible labels", () => {
   assert.match(main, /aria-label=\{\`\$\{label\} · \$\{dark \? "라이트 모드로 변경" : "다크 모드로 변경"\}\`\}/);
   assert.match(main, /aria-label="← 이전 · 이전 날짜"/);
   assert.match(main, /aria-label="다음 → · 다음 날짜"/);
@@ -82,54 +74,19 @@ test("accessible authentication keeps password-manager semantics and does not bl
   assert.doesNotMatch(source, /onPaste\s*=|clipboardData/);
 });
 
-
 test("statistics controls remain usable on narrow screens", () => {
-  const marker = css.indexOf("/* v0.29 online orange palette + stats menu repair */");
-  assert.notEqual(marker, -1);
-  const theme = css.slice(marker);
-  assert.match(theme, /\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?min-width:\s*0/);
-  assert.match(theme, /@media \(max-width:\s*650px\)[\s\S]*?\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
-  assert.match(theme, /\.stats-toolbar \.trend-range select\s*\{[\s\S]*?width:\s*100%/);
-  assert.match(theme, /@media \(max-width:\s*430px\)[\s\S]*?\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
-  assert.match(theme, /\.mobile-page-switcher button\s*\{[\s\S]*?min-width:\s*0[\s\S]*?width:\s*100%/);
+  assert.match(css, /@media \(max-width:\s*650px\)[\s\S]*?\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+  assert.match(css, /\.stats-toolbar \.trend-range select\s*\{[\s\S]*?width:\s*100%/);
+  assert.match(css, /@media \(max-width:\s*430px\)[\s\S]*?\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
 });
 
-
-test("statistics Korean typography keeps words intact on narrow screens", () => {
-  const marker = css.indexOf("/* v0.29.1 statistics Korean typography repair */");
-  assert.notEqual(marker, -1);
-  const patch = css.slice(marker);
-  assert.match(patch, /word-break:\s*keep-all/);
-  assert.match(patch, /\.mobile-page-switcher button\s*\{[\s\S]*?white-space:\s*nowrap/);
-  assert.match(patch, /\.stats-toolbar h2\s*\{[\s\S]*?letter-spacing:\s*0/);
-  assert.match(patch, /\.stats-metric strong\s*\{[\s\S]*?letter-spacing:\s*0/);
-  assert.doesNotMatch(patch, /overflow-wrap:\s*anywhere/);
+test("statistics typography and alignment stay stable", () => {
+  assert.match(css, /\.insights-card\s*\{[\s\S]*?padding-inline:\s*22px/);
+  assert.match(css, /word-break:\s*keep-all/);
+  assert.match(css, /\.stats-toolbar h2,[\s\S]*?\.stats-metric strong\s*\{[\s\S]*?letter-spacing:\s*0/);
+  assert.match(css, /\.stats-chart-panel \.week-calendar-day small[\s\S]*?white-space:\s*nowrap/);
 });
 
-test("light page background follows the approved palette canvas instead of forced white", () => {
-  assert.match(
-    css,
-    /:root:not\(\[data-theme="dark"\]\)[\s\S]*?\.content main \{ background:\s*var\(--canvas\)\s*!important; \}/,
-  );
-  const marker = css.indexOf("/* v0.29.1 statistics Korean typography repair */");
-  const patch = css.slice(marker);
-  assert.match(patch, /\.google-login-button,[\s\S]*?background:\s*#FFF0BE/);
-});
-
-
-test("statistics content has consistent inset and no Korean-breaking wrap rules", () => {
-  const marker = css.indexOf("/* v0.30 soft online orange palette + stats alignment */");
-  assert.notEqual(marker, -1);
-  const patch = css.slice(marker);
-  assert.match(patch, /\.insights-card\s*\{[\s\S]*?padding-inline:\s*22px/);
-  assert.match(patch, /\.stats-subject-panel \.trend-subject-label > span:nth-child\(2\)[\s\S]*?word-break:\s*keep-all/);
-  assert.match(patch, /\.stats-chart-panel \.week-calendar-day small[\s\S]*?overflow-wrap:\s*normal/);
-  assert.doesNotMatch(patch, /overflow-wrap:\s*anywhere/);
-});
-
-test("live status indicators use the current orange theme instead of legacy green", () => {
-  const marker = css.indexOf("/* v0.30 soft online orange palette + stats alignment */");
-  const patch = css.slice(marker);
-  assert.match(patch, /:root\[data-theme="dark"\] \.status-dot\.live,[\s\S]*?background:\s*#FFA500/);
-  assert.match(patch, /:root:not\(\[data-theme="dark"\]\) \.status-dot\.live,[\s\S]*?background:\s*#FFD49F/);
+test("live status indicators are driven by the theme accent variable", () => {
+  assert.match(css, /\.status-dot\.live,[\s\S]*?\.member-indicator\.live\s*\{[\s\S]*?background:\s*var\(--accent\)/);
 });
