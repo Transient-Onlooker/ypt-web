@@ -3760,3 +3760,487 @@ body {
 :root[data-theme="dark"] :where(.primary, .secondary, input, select, textarea, button, summary):focus-visible {
   outline-color: #98FF98;
 }
+
+
+/* v0.29 online orange palette + stats menu repair */
+/*
+  Light / Color Hunt:
+  #FFF0BE #FFD6A6 #FFB399 #FF9A86
+
+  Dark / OLED neutral:
+  #000000 #121212 #1E1E1E #FFFFFF #888888
+
+  Dark accent / ColorsWall Black + Orange:
+  #FFA500 #CC5500
+
+  Theme override uses only these online palette colors.
+*/
+:root:not([data-theme="dark"]) {
+  --ink: #000000;
+  --muted: #1E1E1E;
+  --line: #FF9A86;
+  --canvas: #FFF0BE;
+  --forest: #000000;
+  --leaf: #FF9A86;
+  --accent-fill: #FF9A86;
+  --accent-hover: #FFB399;
+  --accent-text: #000000;
+  --focus-accent: #000000;
+  --subtle: #1E1E1E;
+  --surface: #FFD6A6;
+  --accent-on-dark: #000000;
+  --accent-border: #000000;
+  --chart-accent: #FF9A86;
+  --chart-outline: #000000;
+  --danger-text: #000000;
+  --warning-text: #000000;
+  color: #000000;
+  background: #FFF0BE;
+}
+:root:not([data-theme="dark"]) body,
+:root:not([data-theme="dark"]) .shell,
+:root:not([data-theme="dark"]) .content,
+:root:not([data-theme="dark"]) .content main {
+  background: #FFF0BE;
+}
+:root:not([data-theme="dark"]) .sidebar {
+  background: #FFB399;
+  border-color: #FF9A86;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .sidebar nav button,
+:root:not([data-theme="dark"]) .sidebar-logout,
+:root:not([data-theme="dark"]) .sidebar-nav-label {
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .sidebar nav button.active,
+:root:not([data-theme="dark"]) .sidebar nav button:hover:not(.active),
+:root:not([data-theme="dark"]) .sidebar-logout:hover {
+  background: #FF9A86;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .topbar,
+:root:not([data-theme="dark"]) .bottom-nav,
+:root:not([data-theme="dark"]) .mobile-page-switcher,
+:root:not([data-theme="dark"]) .settings-popover {
+  background: #FFD6A6;
+  border-color: #FF9A86;
+  color: #000000;
+  box-shadow: none;
+}
+:root:not([data-theme="dark"]) .timer-card,
+:root:not([data-theme="dark"]) .history-card,
+:root:not([data-theme="dark"]) .group-card,
+:root:not([data-theme="dark"]) .tool-card,
+:root:not([data-theme="dark"]) .login-card,
+:root:not([data-theme="dark"]) .settings-menu > summary,
+:root:not([data-theme="dark"]) .stats-panel,
+:root:not([data-theme="dark"]) .timer-help,
+:root:not([data-theme="dark"]) .pomodoro-settings,
+:root:not([data-theme="dark"]) .plan-template,
+:root:not([data-theme="dark"]) .plan-vs-record,
+:root:not([data-theme="dark"]) .trend-subjects,
+:root:not([data-theme="dark"]) .week-comparison,
+:root:not([data-theme="dark"]) .history-facts > div,
+:root:not([data-theme="dark"]) .week-insights span,
+:root:not([data-theme="dark"]) .week-row,
+:root:not([data-theme="dark"]) .group-list button,
+:root:not([data-theme="dark"]) .group-detail,
+:root:not([data-theme="dark"]) .member-filters button {
+  background: #FFD6A6;
+  border-color: #FF9A86;
+  color: #000000;
+  box-shadow: none;
+}
+:root:not([data-theme="dark"]) .top-status,
+:root:not([data-theme="dark"]) .active-strip,
+:root:not([data-theme="dark"]) .summary-card,
+:root:not([data-theme="dark"]) .daily-goal,
+:root:not([data-theme="dark"]) .live-session,
+:root:not([data-theme="dark"]) .stats-metric.primary-metric {
+  background: #FFB399;
+  border-color: #FF9A86;
+  color: #000000;
+  box-shadow: none;
+}
+:root:not([data-theme="dark"]) .login-page {
+  background: #FFB399;
+}
+:root:not([data-theme="dark"]) select,
+:root:not([data-theme="dark"]) input:not([type="checkbox"]),
+:root:not([data-theme="dark"]) textarea,
+:root:not([data-theme="dark"]) .secondary,
+:root:not([data-theme="dark"]) .theme-toggle,
+:root:not([data-theme="dark"]) .timer-mode button,
+:root:not([data-theme="dark"]) .trend-view-controls button,
+:root:not([data-theme="dark"]) .mobile-page-switcher button,
+:root:not([data-theme="dark"]) .settings-popover .sync-control select {
+  background: #FFF0BE;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .primary {
+  background: #FF9A86;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .primary:hover:not(:disabled),
+:root:not([data-theme="dark"]) .secondary:hover:not(:disabled),
+:root:not([data-theme="dark"]) .theme-toggle:hover:not(:disabled),
+:root:not([data-theme="dark"]) .timer-mode button:hover:not(:disabled),
+:root:not([data-theme="dark"]) .trend-view-controls button:hover:not(:disabled),
+:root:not([data-theme="dark"]) .mobile-page-switcher button:hover:not(:disabled) {
+  background: #FFB399;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .timer-mode button[aria-pressed="true"],
+:root:not([data-theme="dark"]) .trend-view-controls button[aria-pressed="true"],
+:root:not([data-theme="dark"]) .member-filters button.selected,
+:root:not([data-theme="dark"]) .group-list button.selected,
+:root:not([data-theme="dark"]) .plan-list .plan-focus[aria-pressed="true"],
+:root:not([data-theme="dark"]) .bottom-nav button.active,
+:root:not([data-theme="dark"]) .mobile-page-switcher button.active {
+  background: #FF9A86;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .stats-metric,
+:root:not([data-theme="dark"]) .comparison-values > span,
+:root:not([data-theme="dark"]) .week-calendar-day,
+:root:not([data-theme="dark"]) .daily-goal-track,
+:root:not([data-theme="dark"]) .trend-subject-track,
+:root:not([data-theme="dark"]) .plan-vs-record-track,
+:root:not([data-theme="dark"]) .member-status-track,
+:root:not([data-theme="dark"]) .subject-track,
+:root:not([data-theme="dark"]) .week-track,
+:root:not([data-theme="dark"]) .plan-progress,
+:root:not([data-theme="dark"]) .weekday-track {
+  background: #FFF0BE;
+  border-color: #000000;
+}
+:root:not([data-theme="dark"]) .text-button,
+:root:not([data-theme="dark"]) .stats-eyebrow,
+:root:not([data-theme="dark"]) .stats-metric.primary-metric strong,
+:root:not([data-theme="dark"]) .comparison-values .positive strong,
+:root:not([data-theme="dark"]) .eyebrow,
+:root:not([data-theme="dark"]) .card-note,
+:root:not([data-theme="dark"]) .stats-source-note,
+:root:not([data-theme="dark"]) .stats-toolbar p,
+:root:not([data-theme="dark"]) .stats-panel-head span,
+:root:not([data-theme="dark"]) .stats-metric span,
+:root:not([data-theme="dark"]) .weekday-row > small,
+:root:not([data-theme="dark"]) .password-manager-note,
+:root:not([data-theme="dark"]) .small-note,
+:root:not([data-theme="dark"]) .trend-range {
+  color: #1E1E1E;
+}
+:root:not([data-theme="dark"]) .caution,
+:root:not([data-theme="dark"]) .error,
+:root:not([data-theme="dark"]) .error-banner,
+:root:not([data-theme="dark"]) .remember-warning,
+:root:not([data-theme="dark"]) .login-notice,
+:root:not([data-theme="dark"]) .tool-notice {
+  background: #FFD6A6;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .member-state-label.studying,
+:root:not([data-theme="dark"]) .member-state-label.resting,
+:root:not([data-theme="dark"]) .member-state-label.unknown {
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .member-state-label.studying { background: #FF9A86; }
+:root:not([data-theme="dark"]) .member-state-label.resting { background: #FFB399; }
+:root:not([data-theme="dark"]) .member-state-label.unknown { background: #FFD6A6; }
+:root:not([data-theme="dark"]) .daily-goal-track span,
+:root:not([data-theme="dark"]) .plan-progress span,
+:root:not([data-theme="dark"]) .plan-vs-record-track span,
+:root:not([data-theme="dark"]) .member-status-track .studying,
+:root:not([data-theme="dark"]) .weekday-track > span {
+  background: #FF9A86;
+}
+:root:not([data-theme="dark"]) .member-status-track .resting { background: #FFB399; }
+:root:not([data-theme="dark"]) .member-status-track .unknown { background: #FFD6A6; }
+:root:not([data-theme="dark"]) .week-calendar-day.level-1 {
+  background: #FFF0BE;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .week-calendar-day.level-2,
+:root:not([data-theme="dark"]) .week-calendar-day.unknown {
+  background: #FFD6A6;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .week-calendar-day.level-3 {
+  background: #FFB399;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .week-calendar-day.level-4 {
+  background: #FF9A86;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) :where(.primary, .secondary, input, select, textarea, button, summary):focus-visible {
+  outline-color: #000000;
+}
+
+:root[data-theme="dark"] {
+  --ink: #FFFFFF;
+  --muted: #888888;
+  --line: #888888;
+  --canvas: #000000;
+  --forest: #FFFFFF;
+  --leaf: #FFA500;
+  --accent-fill: #FFA500;
+  --accent-hover: #CC5500;
+  --accent-text: #FFA500;
+  --focus-accent: #FFA500;
+  --subtle: #888888;
+  --surface: #121212;
+  --accent-on-dark: #FFA500;
+  --accent-border: #FFA500;
+  --chart-accent: #FFA500;
+  --chart-outline: #FFFFFF;
+  --danger-text: #FFFFFF;
+  --warning-text: #FFA500;
+  color: #FFFFFF;
+  background: #000000;
+}
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .shell,
+:root[data-theme="dark"] .content,
+:root[data-theme="dark"] .content main,
+:root[data-theme="dark"] .login-page {
+  background: #000000;
+}
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .bottom-nav {
+  background: #000000;
+  border-color: #1E1E1E;
+  color: #FFFFFF;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .timer-card,
+:root[data-theme="dark"] .history-card,
+:root[data-theme="dark"] .group-card,
+:root[data-theme="dark"] .tool-card,
+:root[data-theme="dark"] .summary-card,
+:root[data-theme="dark"] .login-card,
+:root[data-theme="dark"] .settings-popover,
+:root[data-theme="dark"] .settings-menu > summary,
+:root[data-theme="dark"] .mobile-page-switcher {
+  background: #121212;
+  border-color: #1E1E1E;
+  color: #FFFFFF;
+  box-shadow: none;
+}
+:root[data-theme="dark"] .daily-goal,
+:root[data-theme="dark"] .live-session,
+:root[data-theme="dark"] .timer-help,
+:root[data-theme="dark"] .pomodoro-settings,
+:root[data-theme="dark"] .plan-template,
+:root[data-theme="dark"] .plan-vs-record,
+:root[data-theme="dark"] .trend-subjects,
+:root[data-theme="dark"] .week-comparison,
+:root[data-theme="dark"] .stats-panel,
+:root[data-theme="dark"] .history-facts > div,
+:root[data-theme="dark"] .week-insights span,
+:root[data-theme="dark"] .week-row,
+:root[data-theme="dark"] .group-list button,
+:root[data-theme="dark"] .group-detail,
+:root[data-theme="dark"] .member-filters button,
+:root[data-theme="dark"] .top-status,
+:root[data-theme="dark"] .active-strip,
+:root[data-theme="dark"] .stats-metric,
+:root[data-theme="dark"] .comparison-values > span {
+  background: #1E1E1E;
+  border-color: #888888;
+  color: #FFFFFF;
+  box-shadow: none;
+}
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] input:not([type="checkbox"]),
+:root[data-theme="dark"] textarea,
+:root[data-theme="dark"] .secondary,
+:root[data-theme="dark"] .theme-toggle,
+:root[data-theme="dark"] .timer-mode button,
+:root[data-theme="dark"] .trend-view-controls button,
+:root[data-theme="dark"] .mobile-page-switcher button,
+:root[data-theme="dark"] .settings-popover .sync-control select {
+  background: #121212;
+  border-color: #888888;
+  color: #FFFFFF;
+}
+:root[data-theme="dark"] .primary {
+  background: #FFA500;
+  border-color: #FFA500;
+  color: #000000;
+}
+:root[data-theme="dark"] .primary:hover:not(:disabled) {
+  background: #CC5500;
+  border-color: #CC5500;
+  color: #000000;
+}
+:root[data-theme="dark"] .secondary:hover:not(:disabled),
+:root[data-theme="dark"] .theme-toggle:hover:not(:disabled),
+:root[data-theme="dark"] .timer-mode button:hover:not(:disabled),
+:root[data-theme="dark"] .trend-view-controls button:hover:not(:disabled),
+:root[data-theme="dark"] .mobile-page-switcher button:hover:not(:disabled) {
+  background: #1E1E1E;
+  border-color: #FFA500;
+  color: #FFFFFF;
+}
+:root[data-theme="dark"] .sidebar nav button,
+:root[data-theme="dark"] .sidebar-logout {
+  color: #FFFFFF;
+}
+:root[data-theme="dark"] .sidebar nav button.active,
+:root[data-theme="dark"] .sidebar nav button:hover:not(.active),
+:root[data-theme="dark"] .sidebar-logout:hover,
+:root[data-theme="dark"] .timer-mode button[aria-pressed="true"],
+:root[data-theme="dark"] .trend-view-controls button[aria-pressed="true"],
+:root[data-theme="dark"] .member-filters button.selected,
+:root[data-theme="dark"] .group-list button.selected,
+:root[data-theme="dark"] .plan-list .plan-focus[aria-pressed="true"],
+:root[data-theme="dark"] .bottom-nav button.active,
+:root[data-theme="dark"] .mobile-page-switcher button.active {
+  background: #1E1E1E;
+  border-color: #FFA500;
+  color: #FFA500;
+}
+:root[data-theme="dark"] .text-button,
+:root[data-theme="dark"] .stats-eyebrow,
+:root[data-theme="dark"] .stats-metric.primary-metric strong,
+:root[data-theme="dark"] .comparison-values .positive strong,
+:root[data-theme="dark"] .eyebrow {
+  color: #FFA500;
+}
+:root[data-theme="dark"] .card-note,
+:root[data-theme="dark"] .stats-source-note,
+:root[data-theme="dark"] .stats-toolbar p,
+:root[data-theme="dark"] .stats-panel-head span,
+:root[data-theme="dark"] .stats-metric span,
+:root[data-theme="dark"] .weekday-row > small,
+:root[data-theme="dark"] .password-manager-note,
+:root[data-theme="dark"] .small-note,
+:root[data-theme="dark"] .trend-range {
+  color: #888888;
+}
+:root[data-theme="dark"] .caution,
+:root[data-theme="dark"] .error,
+:root[data-theme="dark"] .error-banner,
+:root[data-theme="dark"] .remember-warning,
+:root[data-theme="dark"] .login-notice,
+:root[data-theme="dark"] .tool-notice {
+  background: #1E1E1E;
+  border-color: #888888;
+  color: #FFFFFF;
+}
+:root[data-theme="dark"] .member-state-label.studying {
+  background: #1E1E1E;
+  color: #FFA500;
+}
+:root[data-theme="dark"] .member-state-label.resting,
+:root[data-theme="dark"] .member-state-label.unknown {
+  background: #121212;
+  color: #888888;
+}
+:root[data-theme="dark"] .daily-goal-track,
+:root[data-theme="dark"] .trend-subject-track,
+:root[data-theme="dark"] .plan-vs-record-track,
+:root[data-theme="dark"] .member-status-track,
+:root[data-theme="dark"] .subject-track,
+:root[data-theme="dark"] .week-track,
+:root[data-theme="dark"] .plan-progress,
+:root[data-theme="dark"] .weekday-track {
+  background: #1E1E1E;
+  border-color: #888888;
+}
+:root[data-theme="dark"] .daily-goal-track span,
+:root[data-theme="dark"] .plan-progress span,
+:root[data-theme="dark"] .plan-vs-record-track span,
+:root[data-theme="dark"] .member-status-track .studying,
+:root[data-theme="dark"] .weekday-track > span {
+  background: #FFA500;
+}
+:root[data-theme="dark"] .member-status-track .resting { background: #888888; }
+:root[data-theme="dark"] .member-status-track .unknown { background: #121212; }
+:root[data-theme="dark"] .week-calendar-day,
+:root[data-theme="dark"] .week-calendar-day.level-1 {
+  background: #121212;
+  color: #FFFFFF;
+}
+:root[data-theme="dark"] .week-calendar-day.level-2,
+:root[data-theme="dark"] .week-calendar-day.unknown {
+  background: #1E1E1E;
+  color: #888888;
+}
+:root[data-theme="dark"] .week-calendar-day.level-3 {
+  background: #CC5500;
+  color: #000000;
+}
+:root[data-theme="dark"] .week-calendar-day.level-4 {
+  background: #FFA500;
+  border-color: #FFA500;
+  color: #000000;
+}
+:root[data-theme="dark"] :where(.primary, .secondary, input, select, textarea, button, summary):focus-visible {
+  outline-color: #FFA500;
+}
+
+/* Keep the statistics controls stable at narrow widths. */
+.stats-toolbar .history-trend-actions {
+  min-width: 0;
+}
+.stats-toolbar .trend-range {
+  min-width: 0;
+}
+.stats-toolbar .trend-range select {
+  min-width: 0;
+}
+.mobile-page-switcher {
+  min-width: 0;
+  overflow: hidden;
+}
+.mobile-page-switcher button {
+  min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 650px) {
+  .stats-toolbar .history-trend-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .stats-toolbar .trend-range {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+  }
+  .stats-toolbar .trend-range select {
+    width: 100%;
+  }
+  .stats-toolbar .history-trend-actions > .text-button {
+    min-height: 44px;
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+  .mobile-page-switcher button {
+    white-space: normal;
+    line-height: 1.25;
+  }
+}
+@media (max-width: 430px) {
+  .stats-toolbar .history-trend-actions {
+    grid-template-columns: 1fr;
+  }
+  .stats-toolbar .history-trend-actions > .text-button {
+    width: 100%;
+  }
+}

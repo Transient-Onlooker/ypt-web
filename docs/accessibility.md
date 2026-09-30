@@ -20,23 +20,23 @@ W3C 참고:
 - https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html
 - https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html
 
-## v0.28.0 핵심 대비
+## v0.29.0 핵심 대비
 
 아래는 현재 테마 토큰을 WCAG 상대 휘도 공식으로 계산한 값입니다.
 
 | 항목 | 색 조합 | 대비 | AA 기준 |
 | --- | --- | ---: | --- |
-| 라이트 본문 / 페이지 | #000000 / #F2F1EB | 18.56:1 | 통과 |
-| 라이트 보조 텍스트 / 페이지 | #1E1E1E / #F2F1EB | 14.73:1 | 통과 |
-| 라이트 주요 버튼 | #000000 / #88AB8E | 8.26:1 | 통과 |
-| 라이트 선택 배경 | #000000 / #AFC8AD | 11.69:1 | 통과 |
+| 라이트 본문 / 페이지 | #000000 / #FFF0BE | 18.46:1 | 통과 |
+| 라이트 보조 텍스트 / 페이지 | #1E1E1E / #FFF0BE | 14.65:1 | 통과 |
+| 라이트 주요 버튼 | #000000 / #FF9A86 | 10.22:1 | 통과 |
+| 라이트 선택 배경 | #000000 / #FFB399 | 12.16:1 | 통과 |
 | 다크 본문 / OLED 배경 | #FFFFFF / #000000 | 21.00:1 | 통과 |
 | 다크 보조 텍스트 / 카드 | #888888 / #121212 | 5.28:1 | 통과 |
-| 다크 주요 버튼 | #000000 / #3EB489 | 8.09:1 | 통과 |
-| 다크 강조 텍스트 / 카드 | #3EB489 / #121212 | 7.22:1 | 통과 |
-| 다크 밝은 강조 / 검정 | #98FF98 / #000000 | 17.09:1 | 통과 |
+| 다크 주요 버튼 | #000000 / #FFA500 | 10.63:1 | 통과 |
+| 다크 hover 버튼 | #000000 / #CC5500 | 4.87:1 | 통과 |
+| 다크 강조 텍스트 / 카드 | #FFA500 / #121212 | 9.49:1 | 통과 |
 
-v0.28 theme override는 승인한 온라인 팔레트의 6자리 HEX 외 색을 추가하면 자동 테스트가 실패합니다.
+v0.29 theme override는 승인한 온라인 팔레트의 6자리 HEX 외 색을 추가하면 자동 테스트가 실패합니다.
 
 ## 코드에서 확인한 AA 관련 구조
 
@@ -58,7 +58,7 @@ v0.28 theme override는 승인한 온라인 팔레트의 6자리 HEX 외 색을 
 
 ## 자동 검증
 
-- `tests/accessibility-contrast.test.mjs`: v0.28 온라인 팔레트 토큰, 핵심 텍스트 4.5:1, 그래픽/포커스 3:1 이상과 승인 색상 목록을 검사
+- `tests/accessibility-contrast.test.mjs`: v0.29 온라인 오렌지 팔레트 토큰, 핵심 텍스트 4.5:1, 그래픽/포커스 3:1 이상과 승인 색상 목록을 검사
 - `tests/accessibility-aa.test.mjs`: 언어, zoom 허용, skip link, form label, tabindex, click handler, focus 여백, 주요 target size, reflow CSS, label-in-name, accessible authentication의 정적 회귀 검사
 
 ## 코드만으로 확정할 수 없는 항목
