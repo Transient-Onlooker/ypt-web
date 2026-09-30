@@ -51,6 +51,8 @@ test("light palette keeps primary and emphasis text at WCAG AAA contrast", () =>
   atLeast(contrast(variable(block, "accent-text"), "#ffffff"), 7, "accent text");
   atLeast(contrast(variable(block, "subtle"), "#ffffff"), 7, "subtle text");
   atLeast(contrast(variable(block, "accent-on-dark"), "#000000"), 7, "sidebar accent text");
+  atLeast(contrast(variable(block, "danger-text"), "#ffffff"), 7, "danger text");
+  atLeast(contrast(variable(block, "warning-text"), "#ffffff"), 7, "warning text");
 });
 
 test("dark palette keeps emphasis text at WCAG AAA and graphics at AA contrast", () => {
@@ -61,6 +63,8 @@ test("dark palette keeps emphasis text at WCAG AAA and graphics at AA contrast",
   atLeast(contrast(variable(block, "subtle"), "#000000"), 7, "subtle text");
   atLeast(contrast(variable(block, "accent-border"), "#000000"), 3, "primary component border");
   atLeast(contrast(variable(block, "chart-accent"), "#000000"), 3, "chart accent");
+  atLeast(contrast(variable(block, "danger-text"), "#000000"), 7, "danger text");
+  atLeast(contrast(variable(block, "warning-text"), "#000000"), 7, "warning text");
 });
 
 test("focus indicators exceed the WCAG 2.2 3:1 contrast minimum in both themes", () => {
@@ -74,4 +78,12 @@ test("light member state chips keep normal-size text at AAA contrast", () => {
   atLeast(contrast("#0f4f2d", "#dff3e4"), 7, "studying chip");
   atLeast(contrast("#31473b", "#e9eeeb"), 7, "resting chip");
   atLeast(contrast("#5c3600", "#f8ead3"), 7, "unknown chip");
+});
+
+
+test("keyboard focus indicator uses at least a 2px perimeter-equivalent outline", () => {
+  assert.match(
+    tail,
+    /:focus-visible\s*\{[\s\S]*?outline:\s*3px\s+solid\s+var\(--focus-accent\)/,
+  );
 });
