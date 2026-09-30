@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { Day, Group, Member, Snapshot } from "../shared/types.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
-import { duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareRecentSevenDayWindows, currentVerifiedStudyStreak, medianVerifiedDailyMs, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
+import { compactDuration, duration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareRecentSevenDayWindows, currentVerifiedStudyStreak, medianVerifiedDailyMs, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
 import type { TrendDay } from "../shared/format.ts";
 import { RequestGate } from "../shared/request-gate.ts";
 import {
@@ -740,13 +740,13 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
                       const share = subjectTotal > 0 ? Math.round(subject.totalMs / subjectTotal * 100) : 0;
                       return <div className="trend-subject-row" key={subject.title}>
                         <div className="trend-subject-label">
-                          <span className="subject-color" style={{ backgroundColor: subject.color || "#8aa494" }} aria-hidden="true" />
+                          <span className="subject-color" style={{ backgroundColor: subject.color || "#FFD6BA" }} aria-hidden="true" />
                           <span>{subject.title}</span>
                           <small>{share}%</small>
                           <strong>{duration(subject.totalMs)}</strong>
                         </div>
                         <div className="trend-subject-track" aria-hidden="true">
-                          <span style={{ width: `${subjectSummary[0].totalMs > 0 ? subject.totalMs / subjectSummary[0].totalMs * 100 : 0}%`, backgroundColor: subject.color || "#5b9a72" }} />
+                          <span style={{ width: `${subjectSummary[0].totalMs > 0 ? subject.totalMs / subjectSummary[0].totalMs * 100 : 0}%`, backgroundColor: subject.color || "#FFD6BA" }} />
                         </div>
                         {rangeDays === 14 && <small>이전 7일 {duration(subject.earlierMs)} → 최근 7일 {duration(subject.recentMs)}</small>}
                       </div>;
@@ -804,7 +804,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
                     onClick={() => onSelect(row.date)}
                     aria-label={`${Number(row.date.slice(-2))}, ${row.totalMs === null ? "?" : row.totalMs === 0 ? "—" : duration(row.totalMs)}, ${row.date} 기록 보기`}>
                     <strong>{Number(row.date.slice(-2))}</strong>
-                    <small>{row.totalMs === null ? "?" : row.totalMs === 0 ? "—" : duration(row.totalMs)}</small>
+                    <small>{row.totalMs === null ? "?" : row.totalMs === 0 ? "—" : compactDuration(row.totalMs)}</small>
                   </button>;
                 })}
               </div>
