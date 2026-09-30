@@ -396,7 +396,7 @@ function SubjectBreakdown({ day, empty }: { day: Day; empty: string }) {
             <div className="subject-track" aria-hidden="true">
               <span style={{
                 width: `${Math.min(100, subject.studyMs / maxMs * 100)}%`,
-                backgroundColor: subject.color || "#28784a",
+                backgroundColor: subject.color || "var(--accent)",
               }} />
             </div>
           )}
