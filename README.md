@@ -1,8 +1,8 @@
 # YPT Web
 
-현재 코드 버전: **v0.26.0 · 접근성 대비 강화**. [변경 기록](docs/CHANGELOG.md), [직접 테스트 안내](docs/manual-test-plan.md), [기능 벤치마크](docs/benchmark-features.md), [디자인 참고와 적용 원칙](docs/design-direction.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 배포된 사이트는 [ypt.mcv.kr](https://ypt.mcv.kr)이며, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
+현재 코드 버전: **v0.27.0 · WCAG 2.2 AA 코드 점검**. [변경 기록](docs/CHANGELOG.md), [직접 테스트 안내](docs/manual-test-plan.md), [기능 벤치마크](docs/benchmark-features.md), [디자인 참고와 적용 원칙](docs/design-direction.md), [버전 관리 기준](docs/VERSIONING.md), [배포 안내](docs/deployment.md)를 참고하세요. 배포된 사이트는 [ypt.mcv.kr](https://ypt.mcv.kr)이며, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)가 제공합니다.
 
-휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 웹 클라이언트입니다. 라이트·다크 테마의 핵심 텍스트·강조색·키보드 포커스 색 대비는 WCAG 2.2 기준으로 자동 검증하며, 자세한 범위와 한계는 [접근성 점검](docs/accessibility.md)에 기록합니다. 별도 서비스 가입이나 허용 목록은 없습니다. 화면은 React·Vite로 만들고 GitHub Pages에서 제공하며, Cloudflare Worker가 열품타 API를 중계하고 D1에 웹 세션과 타이머 상태를 보관합니다.
+휴대폰과 PC에서 열품타 이메일 계정의 과목, 타이머, 공부 기록, 가입 그룹을 사용하는 웹 클라이언트입니다. 라이트·다크 테마의 핵심 텍스트·강조색·키보드 포커스는 WCAG 2.2 **AA** 기준으로 자동 검증합니다. 폼 라벨, 키보드 클릭 요소, 접근 가능한 이름, 확대/리플로우용 CSS, 모바일 타깃 크기 같은 코드 구조도 회귀 테스트하며 자세한 범위와 한계는 [접근성 점검](docs/accessibility.md)에 기록합니다. 별도 서비스 가입이나 허용 목록은 없습니다. 화면은 React·Vite로 만들고 GitHub Pages에서 제공하며, Cloudflare Worker가 열품타 API를 중계하고 D1에 웹 세션과 타이머 상태를 보관합니다.
 
 ## 사용하기
 

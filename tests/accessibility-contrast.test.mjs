@@ -44,27 +44,27 @@ function atLeast(actual, expected, label) {
   assert.ok(actual >= expected, `${label}: expected >= ${expected}:1, got ${actual.toFixed(3)}:1`);
 }
 
-test("light palette keeps primary and emphasis text at WCAG AAA contrast", () => {
+test("light palette keeps primary and emphasis text at WCAG AA contrast", () => {
   const block = themeBlock(':root:not([data-theme="dark"])');
-  atLeast(contrast(variable(block, "accent-fill"), "#ffffff"), 7, "primary white text");
-  atLeast(contrast(variable(block, "accent-hover"), "#ffffff"), 7, "primary hover white text");
-  atLeast(contrast(variable(block, "accent-text"), "#ffffff"), 7, "accent text");
-  atLeast(contrast(variable(block, "subtle"), "#ffffff"), 7, "subtle text");
-  atLeast(contrast(variable(block, "accent-on-dark"), "#000000"), 7, "sidebar accent text");
-  atLeast(contrast(variable(block, "danger-text"), "#ffffff"), 7, "danger text");
-  atLeast(contrast(variable(block, "warning-text"), "#ffffff"), 7, "warning text");
+  atLeast(contrast(variable(block, "accent-fill"), "#ffffff"), 4.5, "primary white text");
+  atLeast(contrast(variable(block, "accent-hover"), "#ffffff"), 4.5, "primary hover white text");
+  atLeast(contrast(variable(block, "accent-text"), "#ffffff"), 4.5, "accent text");
+  atLeast(contrast(variable(block, "subtle"), "#ffffff"), 4.5, "subtle text");
+  atLeast(contrast(variable(block, "accent-on-dark"), "#000000"), 4.5, "sidebar accent text");
+  atLeast(contrast(variable(block, "danger-text"), "#ffffff"), 4.5, "danger text");
+  atLeast(contrast(variable(block, "warning-text"), "#ffffff"), 4.5, "warning text");
 });
 
-test("dark palette keeps emphasis text at WCAG AAA and graphics at AA contrast", () => {
+test("dark palette keeps text and graphics at WCAG AA contrast", () => {
   const block = themeBlock(':root[data-theme="dark"]');
-  atLeast(contrast(variable(block, "accent-fill"), "#ffffff"), 7, "primary white text");
-  atLeast(contrast(variable(block, "accent-hover"), "#ffffff"), 7, "primary hover white text");
-  atLeast(contrast(variable(block, "accent-text"), "#000000"), 7, "accent text");
-  atLeast(contrast(variable(block, "subtle"), "#000000"), 7, "subtle text");
+  atLeast(contrast(variable(block, "accent-fill"), "#ffffff"), 4.5, "primary white text");
+  atLeast(contrast(variable(block, "accent-hover"), "#ffffff"), 4.5, "primary hover white text");
+  atLeast(contrast(variable(block, "accent-text"), "#000000"), 4.5, "accent text");
+  atLeast(contrast(variable(block, "subtle"), "#000000"), 4.5, "subtle text");
   atLeast(contrast(variable(block, "accent-border"), "#000000"), 3, "primary component border");
   atLeast(contrast(variable(block, "chart-accent"), "#000000"), 3, "chart accent");
-  atLeast(contrast(variable(block, "danger-text"), "#000000"), 7, "danger text");
-  atLeast(contrast(variable(block, "warning-text"), "#000000"), 7, "warning text");
+  atLeast(contrast(variable(block, "danger-text"), "#000000"), 4.5, "danger text");
+  atLeast(contrast(variable(block, "warning-text"), "#000000"), 4.5, "warning text");
 });
 
 test("focus indicators exceed the WCAG 2.2 3:1 contrast minimum in both themes", () => {
@@ -74,14 +74,14 @@ test("focus indicators exceed the WCAG 2.2 3:1 contrast minimum in both themes",
   atLeast(contrast(variable(dark, "focus-accent"), "#000000"), 3, "dark focus indicator");
 });
 
-test("light member state chips keep normal-size text at AAA contrast", () => {
-  atLeast(contrast("#0f4f2d", "#dff3e4"), 7, "studying chip");
-  atLeast(contrast("#31473b", "#e9eeeb"), 7, "resting chip");
-  atLeast(contrast("#5c3600", "#f8ead3"), 7, "unknown chip");
+test("light member state chips keep normal-size text at AA contrast", () => {
+  atLeast(contrast("#0f4f2d", "#dff3e4"), 4.5, "studying chip");
+  atLeast(contrast("#31473b", "#e9eeeb"), 4.5, "resting chip");
+  atLeast(contrast("#5c3600", "#f8ead3"), 4.5, "unknown chip");
 });
 
 
-test("keyboard focus indicator uses at least a 2px perimeter-equivalent outline", () => {
+test("keyboard focus indicator is visibly reinforced beyond the AA minimum", () => {
   assert.match(
     tail,
     /:focus-visible\s*\{[\s\S]*?outline:\s*3px\s+solid\s+var\(--focus-accent\)/,

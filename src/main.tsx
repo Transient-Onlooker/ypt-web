@@ -784,7 +784,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
             </div>
             {view === "bars" ? <div className="week-list">
               {days.map((row) => <button className="week-row" key={row.date} onClick={() => onSelect(row.date)}
-                aria-label={`${row.date} 기록 보기, ${row.totalMs === null ? "시간 확인 불가" : duration(row.totalMs)}`}>
+                aria-label={`${shortDayLabel(row.date)}, ${row.totalMs === null ? "확인 불가" : duration(row.totalMs)}, ${row.date} 기록 보기`}>
                 <span>{shortDayLabel(row.date)}</span>
                 <span className="week-track" aria-hidden="true">
                   {row.totalMs !== null && <span style={{ width: `${row.totalMs / maxMs * 100}%` }} />}
@@ -802,7 +802,7 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
                     ? "level-0" : `level-${Math.max(1, Math.ceil(row.totalMs / maxMs * 4))}`;
                   return <button type="button" className={`week-calendar-day ${level}`} key={row.date}
                     onClick={() => onSelect(row.date)}
-                    aria-label={`${row.date} 기록 보기, ${row.totalMs === null ? "시간 확인 불가" : duration(row.totalMs)}`}>
+                    aria-label={`${Number(row.date.slice(-2))}, ${row.totalMs === null ? "?" : row.totalMs === 0 ? "—" : duration(row.totalMs)}, ${row.date} 기록 보기`}>
                     <strong>{Number(row.date.slice(-2))}</strong>
                     <small>{row.totalMs === null ? "?" : row.totalMs === 0 ? "—" : duration(row.totalMs)}</small>
                   </button>;
@@ -831,9 +831,10 @@ function HistoryTrend({ today, rangeDays, goalMinutes, onRangeChange, previous, 
   );
 }
 function ThemeToggle({ dark, onToggle }: { dark: boolean; onToggle: () => void }) {
+  const label = dark ? "밝게" : "어둡게";
   return <button className="theme-toggle" type="button" onClick={onToggle}
-    aria-label={dark ? "라이트 모드로 변경" : "다크 모드로 변경"}
-    aria-pressed={dark}>{dark ? "밝게" : "어둡게"}</button>;
+    aria-label={`${label} · ${dark ? "라이트 모드로 변경" : "다크 모드로 변경"}`}
+    aria-pressed={dark}>{label}</button>;
 }
 function SettingsMenu({ open, onOpenChange, accountLabel, syncSeconds, onSyncSecondsChange, className = "" }: {
   open: boolean;
@@ -2155,6 +2156,7 @@ function App() {
             >
               <span
                 className={`status-dot ${running && !remoteUnverified && !statusStale ? "live" : ""}`}
+                aria-hidden="true"
               />
               {statusStale ? `${status} · 갱신 지연` : status}
               {(timer?.subject || snapshot?.remoteSubject) && (
@@ -2417,12 +2419,12 @@ function App() {
                       <div className="pomodoro-length-control">
                         <label htmlFor="pomodoro-focus-minutes">집중</label>
                         <div className="pomodoro-stepper">
-                          <button className="secondary" type="button" aria-label="집중 시간 1분 줄이기"
+                          <button className="secondary" type="button" aria-label="− · 집중 시간 1분 줄이기"
                             disabled={Number(pomodoroDraft.focus) <= 1}
                             onClick={() => adjustPomodoroDraft("focus", -1)}>−</button>
                           <input id="pomodoro-focus-minutes" type="number" inputMode="numeric" min="1" max="180" value={pomodoroDraft.focus}
                             onChange={(event) => setPomodoroDraft((old) => ({ ...old, focus: event.target.value }))} />
-                          <button className="secondary" type="button" aria-label="집중 시간 1분 늘리기"
+                          <button className="secondary" type="button" aria-label="+ · 집중 시간 1분 늘리기"
                             disabled={Number(pomodoroDraft.focus) >= 180}
                             onClick={() => adjustPomodoroDraft("focus", 1)}>+</button>
                         </div>
@@ -2431,12 +2433,12 @@ function App() {
                       <div className="pomodoro-length-control">
                         <label htmlFor="pomodoro-break-minutes">휴식</label>
                         <div className="pomodoro-stepper">
-                          <button className="secondary" type="button" aria-label="휴식 시간 1분 줄이기"
+                          <button className="secondary" type="button" aria-label="− · 휴식 시간 1분 줄이기"
                             disabled={Number(pomodoroDraft.short) <= 1}
                             onClick={() => adjustPomodoroDraft("short", -1)}>−</button>
                           <input id="pomodoro-break-minutes" type="number" inputMode="numeric" min="1" max="60" value={pomodoroDraft.short}
                             onChange={(event) => setPomodoroDraft((old) => ({ ...old, short: event.target.value }))} />
-                          <button className="secondary" type="button" aria-label="휴식 시간 1분 늘리기"
+                          <button className="secondary" type="button" aria-label="+ · 휴식 시간 1분 늘리기"
                             disabled={Number(pomodoroDraft.short) >= 60}
                             onClick={() => adjustPomodoroDraft("short", 1)}>+</button>
                         </div>
@@ -2579,7 +2581,7 @@ function App() {
                     className="secondary"
                     disabled={!date}
                     onClick={() => selectHistoryDate(shiftDate(date, -1))}
-                    aria-label="이전 날짜"
+                    aria-label="← 이전 · 이전 날짜"
                   >
                     ← 이전
                   </button>
@@ -2599,7 +2601,7 @@ function App() {
                     className="secondary"
                     disabled={!date || !snapshot || date >= snapshot.today.date}
                     onClick={() => selectHistoryDate(shiftDate(date, 1))}
-                    aria-label="다음 날짜"
+                    aria-label="다음 → · 다음 날짜"
                   >
                     다음 →
                   </button>
