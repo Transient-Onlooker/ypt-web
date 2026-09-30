@@ -42,7 +42,8 @@ test("history view state survives reload and rejects invalid dates", () => {
   assert.equal(historyDateFromSearch("?date=not-a-date"), "");
   assert.equal(trendRangeFromSearch("?range=7"), 7);
   assert.equal(trendRangeFromSearch("?range=14"), 14);
-  assert.equal(trendRangeFromSearch("?range=30"), 7);
+  assert.equal(trendRangeFromSearch("?range=30"), 30);
+  assert.equal(trendRangeFromSearch("?range=90"), 7);
 });
 
 test("history view URL can update one field without dropping the other", () => {
@@ -51,7 +52,7 @@ test("history view URL can update one field without dropping the other", () => {
   assert.equal(changedDate.searchParams.get("date"), "2026-09-28");
   assert.equal(changedDate.searchParams.get("range"), "14");
 
-  const changedRange = new URL(historyViewUrl(changedDate.href, { range: 7 }));
+  const changedRange = new URL(historyViewUrl(changedDate.href, { range: 30 }));
   assert.equal(changedRange.searchParams.get("date"), "2026-09-28");
-  assert.equal(changedRange.searchParams.get("range"), "7");
+  assert.equal(changedRange.searchParams.get("range"), "30");
 });
