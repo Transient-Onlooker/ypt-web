@@ -2497,7 +2497,7 @@ input[type="search"] {
 :root:not([data-theme="dark"]) #root,
 :root:not([data-theme="dark"]) .shell,
 :root:not([data-theme="dark"]) .content,
-:root:not([data-theme="dark"]) .content main { background: #fff !important; }
+:root:not([data-theme="dark"]) .content main { background: var(--canvas) !important; }
 :root[data-theme="dark"],
 :root[data-theme="dark"] body,
 :root[data-theme="dark"] #root,
@@ -4247,6 +4247,13 @@ body {
 
 
 /* v0.29.1 statistics Korean typography repair */
+:root:not([data-theme="dark"]) .google-login-button,
+:root:not([data-theme="dark"]) .settings-popover .sync-control {
+  background: #FFF0BE;
+  border-color: #000000;
+  color: #000000;
+}
+
 .stats-toolbar h2,
 .stats-toolbar p,
 .stats-panel-head span,
