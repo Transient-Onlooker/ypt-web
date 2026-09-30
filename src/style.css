@@ -4493,6 +4493,28 @@ body {
   box-shadow: 0 0 0 4px #FFE5C6;
 }
 
+:root[data-theme="dark"] {
+  --ink: #FFFFFF;
+  --muted: #888888;
+  --line: #888888;
+  --canvas: #000000;
+  --forest: #FFFFFF;
+  --leaf: #FFA500;
+  --accent-fill: #FFA500;
+  --accent-hover: #CC5500;
+  --accent-text: #FFA500;
+  --focus-accent: #FFA500;
+  --subtle: #888888;
+  --surface: #121212;
+  --accent-on-dark: #FFA500;
+  --accent-border: #FFA500;
+  --chart-accent: #FFA500;
+  --chart-outline: #FFFFFF;
+  --danger-text: #FFFFFF;
+  --warning-text: #FFA500;
+  color: #FFFFFF;
+  background: #000000;
+}
 :root[data-theme="dark"] .status-dot.live,
 :root[data-theme="dark"] .member-indicator.live {
   background: #FFA500;
