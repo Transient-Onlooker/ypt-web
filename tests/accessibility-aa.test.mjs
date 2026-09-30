@@ -93,3 +93,25 @@ test("statistics controls remain usable on narrow screens", () => {
   assert.match(theme, /@media \(max-width:\s*430px\)[\s\S]*?\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
   assert.match(theme, /\.mobile-page-switcher button\s*\{[\s\S]*?min-width:\s*0[\s\S]*?width:\s*100%/);
 });
+
+
+test("statistics Korean typography keeps words intact on narrow screens", () => {
+  const marker = css.indexOf("/* v0.29.1 statistics Korean typography repair */");
+  assert.notEqual(marker, -1);
+  const patch = css.slice(marker);
+  assert.match(patch, /word-break:\s*keep-all/);
+  assert.match(patch, /\.mobile-page-switcher button\s*\{[\s\S]*?white-space:\s*nowrap/);
+  assert.match(patch, /\.stats-toolbar h2\s*\{[\s\S]*?letter-spacing:\s*0/);
+  assert.match(patch, /\.stats-metric strong\s*\{[\s\S]*?letter-spacing:\s*0/);
+  assert.doesNotMatch(patch, /overflow-wrap:\s*anywhere/);
+});
+
+test("light page background follows the approved palette canvas instead of forced white", () => {
+  assert.match(
+    css,
+    /:root:not\(\[data-theme="dark"\]\)[\s\S]*?\.content main \{ background:\s*var\(--canvas\)\s*!important; \}/,
+  );
+  const marker = css.indexOf("/* v0.29.1 statistics Korean typography repair */");
+  const patch = css.slice(marker);
+  assert.match(patch, /\.google-login-button,[\s\S]*?background:\s*#FFF0BE/);
+});
