@@ -56,6 +56,14 @@ export function duration(ms: number | null | undefined) {
   return `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
+export function compactDuration(ms: number | null | undefined) {
+  if (ms == null) return "?";
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  const hours = Math.floor(minutes / 60);
+  const restMinutes = minutes % 60;
+  return `${hours}:${String(restMinutes).padStart(2, "0")}`;
+}
+
 function summaryLabel(value: string) {
   const flattened = value.replace(/\s+/g, " ").trim();
   return /^[=+\-@]/.test(flattened) ? `'${flattened}` : flattened;

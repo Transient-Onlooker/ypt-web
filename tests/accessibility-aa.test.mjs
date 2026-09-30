@@ -115,3 +115,21 @@ test("light page background follows the approved palette canvas instead of force
   const patch = css.slice(marker);
   assert.match(patch, /\.google-login-button,[\s\S]*?background:\s*#FFF0BE/);
 });
+
+
+test("statistics content has consistent inset and no Korean-breaking wrap rules", () => {
+  const marker = css.indexOf("/* v0.30 soft online orange palette + stats alignment */");
+  assert.notEqual(marker, -1);
+  const patch = css.slice(marker);
+  assert.match(patch, /\.insights-card\s*\{[\s\S]*?padding-inline:\s*22px/);
+  assert.match(patch, /\.stats-subject-panel \.trend-subject-label > span:nth-child\(2\)[\s\S]*?word-break:\s*keep-all/);
+  assert.match(patch, /\.stats-chart-panel \.week-calendar-day small[\s\S]*?overflow-wrap:\s*normal/);
+  assert.doesNotMatch(patch, /overflow-wrap:\s*anywhere/);
+});
+
+test("live status indicators use the current orange theme instead of legacy green", () => {
+  const marker = css.indexOf("/* v0.30 soft online orange palette + stats alignment */");
+  const patch = css.slice(marker);
+  assert.match(patch, /:root\[data-theme="dark"\] \.status-dot\.live,[\s\S]*?background:\s*#FFA500/);
+  assert.match(patch, /:root:not\(\[data-theme="dark"\]\) \.status-dot\.live,[\s\S]*?background:\s*#FFD49F/);
+});

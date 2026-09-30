@@ -2,6 +2,21 @@
 
 이 문서는 개발 버전의 사용자에게 보이는 변경과 검증 범위를 기록합니다. 버전 번호는 `package.json`과 일치합니다. 운영 배포 또는 GitHub Release를 뜻하지 않습니다.
 
+## v0.30.0 · 소프트 오렌지 / 통계 정렬 수정 — 2026-09-30
+
+- 라이트 테마의 붉은 피치가 강하다는 피드백에 따라 ColorsWall의 Orange scale에서 더 연한 `#FFD49F / #FFE5C6 / #FFEED9 / #FFF7EC` 조합으로 교체했습니다.
+- 다크 모드의 OLED `#000000` 배경은 유지하고, 오렌지 accent `#FFA500 / #CC5500`도 그대로 사용합니다.
+- 다크 타이머 상단의 실시간 상태 점이 예전 녹색 `#39be74`를 그대로 쓰던 누락을 수정해 현재 오렌지 accent를 사용하도록 했습니다.
+- 통계 컨테이너가 `padding: 0`으로 예외 처리되어 전체 내용이 왼쪽에 붙어 보이던 문제를 수정하고 좌우 inset을 복원했습니다.
+- 통계 과목명과 달력 시간에서 남아 있던 `overflow-wrap: anywhere` 영향을 제거했습니다.
+- 7열 달력의 시간은 `HH:MM:SS` 대신 폭이 짧은 `H:MM` 형식으로 표시해 좁은 셀에서도 깨지지 않게 했습니다.
+- 소프트 오렌지 팔레트, 통계 inset, live status 색, compact duration 회귀 테스트를 추가했습니다.
+- Worker/D1 변경은 없습니다.
+
+온라인 출처:
+- ColorsWall Orange scale: https://colorswall.com/palette/353647
+- ColorsWall Black + Orange: https://colorswall.com/palette/560727
+
 ## v0.29.1 · 통계 한글 표시 / 라이트 배경 수정 — 2026-09-30
 
 - 모바일 통계 메뉴에 들어갔던 `overflow-wrap: anywhere`가 한글을 음절 단위로 부자연스럽게 쪼갤 수 있어 제거했습니다.

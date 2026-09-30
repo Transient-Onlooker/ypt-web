@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareRecentSevenDayWindows, compareVerifiedWeeks, currentVerifiedStudyStreak, medianVerifiedDailyMs, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
+import { compactDuration, formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareRecentSevenDayWindows, compareVerifiedWeeks, currentVerifiedStudyStreak, medianVerifiedDailyMs, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
 
 test("copied summary includes completed time and only verified subject times", () => {
   const result = formatDaySummary({
@@ -242,4 +242,13 @@ test("recent seven-day comparison uses the latest 14 verified consecutive days",
   days[25].totalMs = null;
   assert.equal(compareRecentSevenDayWindows(days), null);
   assert.equal(compareRecentSevenDayWindows(days.slice(0, 13)), null);
+});
+
+
+test("compact duration fits narrow statistics cells", () => {
+  assert.equal(compactDuration(null), "?");
+  assert.equal(compactDuration(0), "0:00");
+  assert.equal(compactDuration(3_599_999), "0:59");
+  assert.equal(compactDuration(3_600_000), "1:00");
+  assert.equal(compactDuration(45_900_000), "12:45");
 });
