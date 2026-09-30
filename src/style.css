@@ -115,7 +115,8 @@ select:focus-visible {
   position: sticky;
   top: 0;
   z-index: 12;
-  height: 75px;
+  min-height: 75px;
+  height: auto;
   padding: 0 clamp(24px, 5vw, 72px);
   display: flex;
   align-items: center;
