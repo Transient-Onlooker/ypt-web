@@ -153,6 +153,46 @@ export function summarizeWeekdays(days: TrendDay[]): WeekdaySummary[] {
   return buckets;
 }
 
+export function medianVerifiedDailyMs(days: TrendDay[]): number | null {
+  const values = days
+    .filter((day) => day.totalMs !== null)
+    .map((day) => day.totalMs as number)
+    .sort((a, b) => a - b);
+  if (!values.length) return null;
+  const middle = Math.floor(values.length / 2);
+  return values.length % 2 === 1
+    ? values[middle]
+    : Math.floor((values[middle - 1] + values[middle]) / 2);
+}
+
+export function currentVerifiedStudyStreak(days: TrendDay[]): number | null {
+  if (!days.length) return null;
+  const sorted = [...days].sort((a, b) => b.date.localeCompare(a.date));
+  if (sorted[0].totalMs === null) return null;
+  let streak = 0;
+  let newerDate: string | null = null;
+  for (const day of sorted) {
+    if (newerDate !== null &&
+      Date.parse(`${newerDate}T00:00:00Z`) - Date.parse(`${day.date}T00:00:00Z`) !== 86_400_000) break;
+    if (day.totalMs === null || day.totalMs <= 0) break;
+    streak++;
+    newerDate = day.date;
+  }
+  return streak;
+}
+
+export function compareRecentSevenDayWindows(days: TrendDay[]) {
+  if (days.length < 14) return null;
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
+  if (sorted.length !== 14 || sorted.some((day) => day.totalMs === null)) return null;
+  if (sorted.some((day, index) => index > 0 &&
+    Date.parse(`${day.date}T00:00:00Z`) - Date.parse(`${sorted[index - 1].date}T00:00:00Z`) !== 86_400_000))
+    return null;
+  const earlier = sorted.slice(0, 7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
+  const recent = sorted.slice(7).reduce((sum, day) => sum + (day.totalMs ?? 0), 0);
+  return { earlier, recent, difference: recent - earlier };
+}
+
 export function longestVerifiedStreak(days: TrendDay[]) {
   let longest = 0;
   let current = 0;
