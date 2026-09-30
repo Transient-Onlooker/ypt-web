@@ -4317,3 +4317,230 @@ body {
     font-size: clamp(18px, 7vw, 24px);
   }
 }
+
+
+/* v0.30 soft online orange palette + stats alignment */
+/*
+  Light / ColorsWall Orange scale:
+  #FFD49F #FFE5C6 #FFEED9 #FFF7EC
+
+  Dark / OLED neutral:
+  #000000 #121212 #1E1E1E #FFFFFF #888888
+
+  Dark accent / ColorsWall Black + Orange:
+  #FFA500 #CC5500
+*/
+:root:not([data-theme="dark"]) {
+  --ink: #000000;
+  --muted: #1E1E1E;
+  --line: #FFD49F;
+  --canvas: #FFF7EC;
+  --forest: #000000;
+  --leaf: #FFD49F;
+  --accent-fill: #FFD49F;
+  --accent-hover: #FFE5C6;
+  --accent-text: #000000;
+  --focus-accent: #000000;
+  --subtle: #1E1E1E;
+  --surface: #FFEED9;
+  --accent-on-dark: #000000;
+  --accent-border: #000000;
+  --chart-accent: #FFD49F;
+  --chart-outline: #000000;
+  --danger-text: #000000;
+  --warning-text: #000000;
+  color: #000000;
+  background: #FFF7EC;
+}
+:root:not([data-theme="dark"]) body,
+:root:not([data-theme="dark"]) #root,
+:root:not([data-theme="dark"]) .shell,
+:root:not([data-theme="dark"]) .content,
+:root:not([data-theme="dark"]) .content main {
+  background: #FFF7EC !important;
+}
+:root:not([data-theme="dark"]) .sidebar {
+  background: #FFE5C6;
+  border-color: #FFD49F;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .topbar,
+:root:not([data-theme="dark"]) .bottom-nav,
+:root:not([data-theme="dark"]) .mobile-page-switcher,
+:root:not([data-theme="dark"]) .settings-popover,
+:root:not([data-theme="dark"]) .timer-card,
+:root:not([data-theme="dark"]) .history-card,
+:root:not([data-theme="dark"]) .group-card,
+:root:not([data-theme="dark"]) .tool-card,
+:root:not([data-theme="dark"]) .login-card,
+:root:not([data-theme="dark"]) .settings-menu > summary,
+:root:not([data-theme="dark"]) .stats-panel,
+:root:not([data-theme="dark"]) .timer-help,
+:root:not([data-theme="dark"]) .pomodoro-settings,
+:root:not([data-theme="dark"]) .plan-template,
+:root:not([data-theme="dark"]) .plan-vs-record,
+:root:not([data-theme="dark"]) .trend-subjects,
+:root:not([data-theme="dark"]) .week-comparison,
+:root:not([data-theme="dark"]) .history-facts > div,
+:root:not([data-theme="dark"]) .week-insights span,
+:root:not([data-theme="dark"]) .week-row,
+:root:not([data-theme="dark"]) .group-list button,
+:root:not([data-theme="dark"]) .group-detail,
+:root:not([data-theme="dark"]) .member-filters button {
+  background: #FFEED9;
+  border-color: #FFD49F;
+  color: #000000;
+  box-shadow: none;
+}
+:root:not([data-theme="dark"]) .top-status,
+:root:not([data-theme="dark"]) .active-strip,
+:root:not([data-theme="dark"]) .summary-card,
+:root:not([data-theme="dark"]) .daily-goal,
+:root:not([data-theme="dark"]) .live-session,
+:root:not([data-theme="dark"]) .stats-metric.primary-metric {
+  background: #FFE5C6;
+  border-color: #FFD49F;
+  color: #000000;
+  box-shadow: none;
+}
+:root:not([data-theme="dark"]) select,
+:root:not([data-theme="dark"]) input:not([type="checkbox"]),
+:root:not([data-theme="dark"]) textarea,
+:root:not([data-theme="dark"]) .secondary,
+:root:not([data-theme="dark"]) .theme-toggle,
+:root:not([data-theme="dark"]) .timer-mode button,
+:root:not([data-theme="dark"]) .trend-view-controls button,
+:root:not([data-theme="dark"]) .mobile-page-switcher button,
+:root:not([data-theme="dark"]) .settings-popover .sync-control,
+:root:not([data-theme="dark"]) .settings-popover .sync-control select,
+:root:not([data-theme="dark"]) .google-login-button {
+  background: #FFF7EC;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .primary,
+:root:not([data-theme="dark"]) .sidebar nav button.active,
+:root:not([data-theme="dark"]) .sidebar nav button:hover:not(.active),
+:root:not([data-theme="dark"]) .sidebar-logout:hover,
+:root:not([data-theme="dark"]) .timer-mode button[aria-pressed="true"],
+:root:not([data-theme="dark"]) .trend-view-controls button[aria-pressed="true"],
+:root:not([data-theme="dark"]) .member-filters button.selected,
+:root:not([data-theme="dark"]) .group-list button.selected,
+:root:not([data-theme="dark"]) .plan-list .plan-focus[aria-pressed="true"],
+:root:not([data-theme="dark"]) .bottom-nav button.active,
+:root:not([data-theme="dark"]) .mobile-page-switcher button.active {
+  background: #FFD49F;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .primary:hover:not(:disabled),
+:root:not([data-theme="dark"]) .secondary:hover:not(:disabled),
+:root:not([data-theme="dark"]) .theme-toggle:hover:not(:disabled),
+:root:not([data-theme="dark"]) .timer-mode button:hover:not(:disabled),
+:root:not([data-theme="dark"]) .trend-view-controls button:hover:not(:disabled),
+:root:not([data-theme="dark"]) .mobile-page-switcher button:hover:not(:disabled) {
+  background: #FFE5C6;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .stats-metric,
+:root:not([data-theme="dark"]) .comparison-values > span,
+:root:not([data-theme="dark"]) .week-calendar-day,
+:root:not([data-theme="dark"]) .daily-goal-track,
+:root:not([data-theme="dark"]) .trend-subject-track,
+:root:not([data-theme="dark"]) .plan-vs-record-track,
+:root:not([data-theme="dark"]) .member-status-track,
+:root:not([data-theme="dark"]) .subject-track,
+:root:not([data-theme="dark"]) .week-track,
+:root:not([data-theme="dark"]) .plan-progress,
+:root:not([data-theme="dark"]) .weekday-track {
+  background: #FFF7EC;
+  border-color: #FFD49F;
+}
+:root:not([data-theme="dark"]) .week-calendar-day.level-1 {
+  background: #FFF7EC;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .week-calendar-day.level-2,
+:root:not([data-theme="dark"]) .week-calendar-day.unknown {
+  background: #FFEED9;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .week-calendar-day.level-3 {
+  background: #FFE5C6;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .week-calendar-day.level-4 {
+  background: #FFD49F;
+  border-color: #000000;
+  color: #000000;
+}
+:root:not([data-theme="dark"]) .member-state-label.studying { background: #FFD49F; color: #000000; }
+:root:not([data-theme="dark"]) .member-state-label.resting { background: #FFE5C6; color: #000000; }
+:root:not([data-theme="dark"]) .member-state-label.unknown { background: #FFEED9; color: #000000; }
+:root:not([data-theme="dark"]) .daily-goal-track span,
+:root:not([data-theme="dark"]) .plan-progress span,
+:root:not([data-theme="dark"]) .plan-vs-record-track span,
+:root:not([data-theme="dark"]) .member-status-track .studying,
+:root:not([data-theme="dark"]) .weekday-track > span {
+  background: #FFD49F;
+}
+:root:not([data-theme="dark"]) .member-status-track .resting { background: #FFE5C6; }
+:root:not([data-theme="dark"]) .member-status-track .unknown { background: #FFEED9; }
+:root:not([data-theme="dark"]) .status-dot.live,
+:root:not([data-theme="dark"]) .member-indicator.live {
+  background: #FFD49F;
+  box-shadow: 0 0 0 4px #FFE5C6;
+}
+
+:root[data-theme="dark"] .status-dot.live,
+:root[data-theme="dark"] .member-indicator.live {
+  background: #FFA500;
+  box-shadow: 0 0 0 4px #1E1E1E;
+}
+
+/* Statistics content should align with the surrounding page instead of hugging its left edge. */
+:root:not([data-theme="dark"]) .insights-card,
+:root[data-theme="dark"] .insights-card {
+  padding-inline: 22px;
+  padding-bottom: 22px;
+}
+.stats-toolbar,
+.stats-summary-grid,
+.stats-comparison,
+.stats-subject-panel,
+.stats-weekday-panel,
+.stats-chart-panel,
+.stats-actions,
+.stats-source-note,
+.stats-loading {
+  min-width: 0;
+}
+.stats-subject-panel .trend-subject-label > span:nth-child(2) {
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.stats-chart-panel .week-calendar-day small {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  font-variant-numeric: tabular-nums;
+}
+.stats-chart-panel .week-row > span:first-child,
+.stats-chart-panel .week-row > strong {
+  white-space: nowrap;
+  word-break: normal;
+}
+.stats-metric,
+.stats-panel-head,
+.stats-toolbar {
+  text-align: left;
+}
+
+@media (max-width: 650px) {
+  :root:not([data-theme="dark"]) .insights-card,
+  :root[data-theme="dark"] .insights-card {
+    padding-inline: 12px;
+    padding-bottom: 12px;
+  }
+}
