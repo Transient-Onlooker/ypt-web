@@ -1,80 +1,80 @@
 # 접근성 점검
 
-YPT Web의 접근성 점검 범위와 자동 검증 항목을 기록합니다.
+YPT Web은 **WCAG 2.2 Level AA**를 구현 목표로 둡니다. 이 문서는 코드에서 자동으로 확인하는 항목과 실제 브라우저에서 따로 확인해야 하는 항목을 구분합니다.
 
-## 적용 기준
+## 기준
 
-색 대비는 WCAG 2.2를 기준으로 봅니다.
+- 일반 텍스트 대비: 4.5:1 이상
+- 큰 텍스트 대비: 3:1 이상
+- 의미 있는 UI 경계·그래픽: 3:1 이상
+- Target Size (Minimum, 2.5.8): 원칙적으로 24×24 CSS px 이상 또는 규정된 간격 예외 충족
+- Focus Not Obscured (Minimum, 2.4.11): 키보드 포커스가 작성자 UI에 완전히 가려지지 않아야 함
+- Reflow (1.4.10): 320 CSS px 폭에 해당하는 확대 환경에서 필요한 2차원 콘텐츠를 제외하고 양방향 스크롤 없이 사용 가능해야 함
 
-- 일반 텍스트: AA 4.5:1, AAA 7:1
-- 큰 텍스트: AA 3:1, AAA 4.5:1
-- 의미 있는 UI 경계·그래픽: AA 3:1
-- WCAG 2.2 Focus Appearance(AAA): 포커스 표시가 최소 2 CSS px 둘레에 해당하는 면적을 가지며, focused/unfocused 상태 사이 3:1 이상의 변화 대비가 필요
-
-참고:
+W3C 참고:
 - https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html
 - https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html
-- https://www.w3.org/WAI/WCAG22/Understanding/focus-appearance.html
+- https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
+- https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html
+- https://www.w3.org/WAI/WCAG22/Understanding/reflow.html
+- https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html
+- https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html
 
-## v0.26.0 점검 결과
+## v0.27.0 핵심 대비
 
-아래 값은 CSS 원본 색을 WCAG 상대 휘도 공식으로 계산한 값입니다.
+아래는 현재 테마 토큰을 WCAG 상대 휘도 공식으로 계산한 값입니다.
 
-| 항목 | 색 조합 | 대비 | 목표 |
+| 항목 | 색 조합 | 대비 | AA 기준 |
 | --- | --- | ---: | --- |
-| 라이트 주요 녹색 / 흰색 | #2f5a45 / #ffffff | 7.87:1 | AAA 텍스트 |
-| 라이트 hover 녹색 / 흰색 | #284c3a / #ffffff | 9.61:1 | AAA 텍스트 |
-| 라이트 보조 텍스트 / 흰색 | #555555 / #ffffff | 7.46:1 | AAA 텍스트 |
-| 검은 사이드바 강조 / 검정 | #a8d5bd / #000000 | 12.92:1 | AAA 텍스트 |
-| 다크 주요 녹색 / 흰색 | #2f5a45 / #ffffff | 7.87:1 | AAA 텍스트 |
-| 다크 hover 녹색 / 흰색 | #365c4b / #ffffff | 7.53:1 | AAA 텍스트 |
-| 다크 강조 텍스트 / 검정 | #a8d5bd / #000000 | 12.92:1 | AAA 텍스트 |
-| 다크 보조 텍스트 / 검정 | #a3a3a3 / #000000 | 8.33:1 | AAA 텍스트 |
-| 다크 그래프 강조 / 검정 | #70a57b / #000000 | 7.36:1 | AA 비텍스트 이상 |
-| 라이트 오류 텍스트 / 흰색 | #8f341f / #ffffff | 7.84:1 | AAA 텍스트 |
-| 다크 오류 텍스트 / 검정 | #ffb4a2 / #000000 | 12.30:1 | AAA 텍스트 |
-| 라이트 주의 텍스트 / 흰색 | #6b4200 / #ffffff | 8.73:1 | AAA 텍스트 |
-| 다크 주의 텍스트 / 검정 | #ffd99c / #000000 | 15.66:1 | AAA 텍스트 |
+| 라이트 주요 녹색 / 흰색 | #3f6856 / #ffffff | 6.31:1 | 통과 |
+| 라이트 hover 녹색 / 흰색 | #345747 / #ffffff | 8.08:1 | 통과 |
+| 라이트 보조 텍스트 / 흰색 | #666666 / #ffffff | 5.74:1 | 통과 |
+| 검은 사이드바 강조 / 검정 | #8caf9c / #000000 | 8.73:1 | 통과 |
+| 다크 주요 녹색 / 흰색 | #3f6856 / #ffffff | 6.31:1 | 통과 |
+| 다크 hover 녹색 / 흰색 | #4b7662 / #ffffff | 5.16:1 | 통과 |
+| 다크 강조 텍스트 / 검정 | #8caf9c / #000000 | 8.73:1 | 통과 |
+| 다크 보조 텍스트 / 검정 | #a3a3a3 / #000000 | 8.33:1 | 통과 |
+| 다크 그래프 강조 / 검정 | #70a57b / #000000 | 7.36:1 | 3:1 이상 |
+| 라이트 오류 텍스트 / 흰색 | #b64b4b / #ffffff | 5.13:1 | 통과 |
+| 라이트 주의 텍스트 / 흰색 | #7b4b0b / #ffffff | 7.36:1 | 통과 |
+| 다크 오류 텍스트 / 검정 | #ffbaa3 / #000000 | 12.80:1 | 통과 |
+| 다크 주의 텍스트 / 검정 | #f0b65e / #000000 | 11.56:1 | 통과 |
 
-라이트 그룹 상태 칩도 각각 8.31:1, 8.54:1, 8.93:1로 일반 텍스트 AAA 목표를 넘깁니다.
+사용자 과목 색처럼 외부에서 들어오는 색은 텍스트 색으로 사용하지 않고, 막대에는 고대비 경계를 함께 둡니다.
 
-### 이전 팔레트에서 확인된 문제
+## 코드에서 확인한 AA 관련 구조
 
-- `#3f6856` 위 흰색 텍스트는 약 6.31:1이어서 AA는 충족하지만 일반 텍스트 AAA 7:1에는 미달했습니다.
-- 같은 `#3f6856`을 검은 사이드바의 텍스트로 사용하면 약 3.33:1로 일반 텍스트 AA 4.5:1에도 미달했습니다.
-- 라이트 보조색 `#666666`은 흰색 대비 약 5.74:1로 AA는 통과하지만 AAA에는 미달했습니다.
-
-v0.26.0에서 주요 채움색, 텍스트용 강조색, 어두운 배경 전용 강조색을 분리해 이 문제를 제거했습니다.
-
-## 포커스와 움직임
-
-키보드 포커스가 가능한 링크, 버튼, 입력, select, textarea, summary, tabindex 요소에 3px 고대비 outline을 적용합니다. 라이트 포커스 색은 흰색과 7.87:1, 다크 포커스 색은 검정과 12.92:1입니다.
-
-`prefers-reduced-motion: reduce`에서는 transition과 animation을 사실상 제거합니다.
+- 문서 언어가 `ko`로 선언되어 있습니다.
+- viewport에서 `user-scalable=no` 또는 `maximum-scale=1`로 확대를 막지 않습니다.
+- 본문 바로가기가 있고 대상 `main`이 존재합니다.
+- 클릭 동작은 button/a/input/summary 같은 네이티브 대화형 요소에 둡니다.
+- 양수 `tabindex`를 사용하지 않습니다.
+- literal id를 가진 input/select/textarea는 label 또는 ARIA 이름과 연결합니다.
+- 로그인 이메일/비밀번호는 `username`, `current-password` autocomplete를 사용하며 붙여넣기를 막지 않습니다.
+- 동적 오류와 주요 비동기 결과는 `role="alert"` 또는 `role="status"`를 사용합니다.
+- 선택 상태에는 `aria-pressed` 또는 `aria-current`를 사용합니다.
+- 초당 변하는 타이머 숫자는 `aria-live="off"`로 두어 스크린리더를 매초 방해하지 않습니다.
+- 밝기 전환·날짜 이동·증감 버튼처럼 `aria-label`을 덮어쓰는 컨트롤은 보이는 라벨을 접근 가능한 이름에도 포함합니다.
+- 모바일 하단 고정 메뉴와 상단 sticky bar를 고려한 scroll padding/margin을 둡니다.
+- 저수준 포인터 타깃은 24px 이상을 목표로 하고, 주요 버튼은 대부분 40~54px 높이입니다. 체크박스는 클릭 가능한 label 영역을 32px 이상으로 확보합니다.
+- 320px 폭을 막는 body 최소 폭을 두지 않고, 모바일 상태 문구/달력 텍스트는 잘림 대신 줄바꿈을 허용합니다.
+- `prefers-reduced-motion: reduce`를 지원합니다.
 
 ## 자동 검증
 
-`tests/accessibility-contrast.test.mjs`가 핵심 테마 토큰을 CSS에서 직접 읽어 다음을 검사합니다.
+- `tests/accessibility-contrast.test.mjs`: 핵심 텍스트 4.5:1, 그래픽/포커스 3:1 이상 검사
+- `tests/accessibility-aa.test.mjs`: 언어, zoom 허용, skip link, form label, tabindex, click handler, focus 여백, 주요 target size, reflow CSS, label-in-name, accessible authentication의 정적 회귀 검사
 
-- 라이트/다크 주요 텍스트 강조색 7:1 이상
-- 오류/주의 텍스트 7:1 이상
-- 다크 테마 중요 UI 경계와 그래프 색 3:1 이상
-- 포커스 색 3:1 이상
-- 포커스 outline 3px
-- 그룹 상태 칩의 텍스트/배경 7:1 이상
+## 코드만으로 확정할 수 없는 항목
 
-## 아직 “사이트 전체 AAA”라고 부르지 않는 이유
+아래는 **실제 렌더링/보조기술 테스트가 필요**합니다.
 
-색 대비가 AAA여도 사이트 전체 WCAG AAA 적합성이 자동으로 성립하지 않습니다. 전체 적합성 판단에는 다음 항목까지 실제 화면과 보조기술에서 검증해야 합니다.
+- 320 CSS px 또는 400% 확대에서 실제 가로 스크롤/겹침이 없는지
+- 키보드 Tab/Shift+Tab 순서가 시각적 순서와 자연스럽게 일치하는지
+- sticky 상단바, 하단 메뉴, 열린 설정 팝오버가 실제 포커스를 완전히 가리지 않는지
+- VoiceOver/NVDA 등에서 버튼 이름, 현재 탭, 펼침 상태, 오류·상태 변경이 의도대로 읽히는지
+- 실제 계산된 CSS 기준으로 모든 pointer target이 24×24 또는 spacing 예외를 만족하는지
+- 사용자 브라우저의 텍스트 간격 오버라이드에서 잘림/겹침이 없는지
+- 색각 이상 환경에서 그래프와 상태가 색만으로 구분되지 않는지
 
-- 키보드만으로 모든 기능 조작 가능 여부와 논리적 포커스 순서
-- 포커스가 sticky header/popover 등에 가려지지 않는지
-- 모든 컨트롤의 접근 가능한 이름·역할·값
-- 200%/400% 확대 및 reflow
-- 모바일 터치 타깃 크기와 간격
-- 오류 식별 및 입력 도움말
-- 화면 읽기 프로그램에서의 상태 변경 안내
-- 색 외의 형태·텍스트로 상태를 구분하는지
-- 사용자 제공 과목 색처럼 동적 색을 사용하는 그래픽의 실제 화면 대비
-
-따라서 현재 표현은 **“핵심 색상 팔레트와 포커스 표시가 WCAG 2.2 AA를 넘고, 주요 텍스트 조합은 AAA 대비를 목표로 자동 검증됨”**이 정확합니다.
+따라서 코드 기준 표현은 **“WCAG 2.2 AA를 목표로 정적 가드와 UI 안전장치를 적용한 상태”**입니다. 수동 항목까지 통과하기 전에는 “AA 인증/완전 적합”이라고 표현하지 않습니다.
