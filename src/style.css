@@ -3190,6 +3190,10 @@ input[type="search"] {
 :root[data-theme="dark"] .content .comparison-values .positive strong {
   color: var(--accent-text);
 }
+:root:not([data-theme="dark"]) .content .stats-metric.primary-metric,
+:root[data-theme="dark"] .content .stats-metric.primary-metric {
+  border-color: var(--accent-text);
+}
 :root:not([data-theme="dark"]) .content .eyebrow,
 :root:not([data-theme="dark"]) .content .stats-source-note,
 :root:not([data-theme="dark"]) .content .stats-toolbar p,
