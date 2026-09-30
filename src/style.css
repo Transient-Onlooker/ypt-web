@@ -3118,3 +3118,162 @@ input[type="search"] {
     margin-top: -4px;
   }
 }
+
+
+/* v0.26 accessibility contrast */
+:root:not([data-theme="dark"]) {
+  --accent-fill: #2f5a45;
+  --accent-hover: #284c3a;
+  --accent-text: #2f5a45;
+  --focus-accent: #2f5a45;
+  --subtle: #555555;
+  --accent-on-dark: #a8d5bd;
+  --accent-border: #2f5a45;
+  --chart-accent: #2f5a45;
+  --chart-outline: #000000;
+  --danger-text: #8f341f;
+  --warning-text: #6b4200;
+}
+:root[data-theme="dark"] {
+  --accent-fill: #2f5a45;
+  --accent-hover: #365c4b;
+  --accent-text: #a8d5bd;
+  --focus-accent: #a8d5bd;
+  --subtle: #a3a3a3;
+  --accent-on-dark: #a8d5bd;
+  --accent-border: #a8d5bd;
+  --chart-accent: #70a57b;
+  --chart-outline: #ffffff;
+  --danger-text: #ffb4a2;
+  --warning-text: #ffd99c;
+}
+
+/* Keep normal-size emphasis text at AAA contrast while preserving green as the accent. */
+:root:not([data-theme="dark"]) .primary,
+:root[data-theme="dark"] .primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-border);
+  color: #ffffff;
+}
+:root:not([data-theme="dark"]) .primary:hover:not(:disabled),
+:root[data-theme="dark"] .primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-border);
+}
+:root:not([data-theme="dark"]) .sidebar nav button.active,
+:root:not([data-theme="dark"]) .sidebar nav button:hover:not(.active),
+:root:not([data-theme="dark"]) .sidebar-logout:hover,
+:root[data-theme="dark"] .sidebar nav button.active,
+:root[data-theme="dark"] .sidebar nav button:hover:not(.active),
+:root[data-theme="dark"] .sidebar-logout:hover {
+  color: var(--accent-on-dark);
+  border-color: var(--accent-on-dark);
+}
+:root[data-theme="dark"] .group-list button.selected,
+:root[data-theme="dark"] .member-filters button.selected,
+:root[data-theme="dark"] .timer-mode button[aria-pressed="true"],
+:root[data-theme="dark"] .plan-list .plan-focus[aria-pressed="true"],
+:root[data-theme="dark"] .trend-view-controls button[aria-pressed="true"] {
+  background: var(--accent-fill);
+  border-color: var(--accent-border);
+  color: #ffffff;
+}
+
+/* Restore semantic emphasis without dropping below AAA text contrast. */
+:root:not([data-theme="dark"]) .content .text-button,
+:root:not([data-theme="dark"]) .content .stats-eyebrow,
+:root:not([data-theme="dark"]) .content .stats-metric.primary-metric strong,
+:root:not([data-theme="dark"]) .content .comparison-values .positive strong,
+:root[data-theme="dark"] .content .text-button,
+:root[data-theme="dark"] .content .stats-eyebrow,
+:root[data-theme="dark"] .content .stats-metric.primary-metric strong,
+:root[data-theme="dark"] .content .comparison-values .positive strong {
+  color: var(--accent-text);
+}
+:root:not([data-theme="dark"]) .content .stats-metric.primary-metric,
+:root[data-theme="dark"] .content .stats-metric.primary-metric {
+  border-color: var(--accent-text);
+}
+:root:not([data-theme="dark"]) .content .eyebrow,
+:root:not([data-theme="dark"]) .content .stats-source-note,
+:root:not([data-theme="dark"]) .content .stats-toolbar p,
+:root:not([data-theme="dark"]) .content .stats-panel-head span,
+:root:not([data-theme="dark"]) .content .stats-metric span,
+:root:not([data-theme="dark"]) .content .weekday-row > small,
+:root[data-theme="dark"] .content .eyebrow,
+:root[data-theme="dark"] .content .stats-source-note,
+:root[data-theme="dark"] .content .stats-toolbar p,
+:root[data-theme="dark"] .content .stats-panel-head span,
+:root[data-theme="dark"] .content .stats-metric span,
+:root[data-theme="dark"] .content .weekday-row > small {
+  color: var(--subtle);
+}
+:root:not([data-theme="dark"]) .content .error,
+:root:not([data-theme="dark"]) .content .error-banner,
+:root:not([data-theme="dark"]) .content .tool-notice,
+:root:not([data-theme="dark"]) .content .custom-goal small,
+:root:not([data-theme="dark"]) .content .comparison-values .negative strong,
+:root:not([data-theme="dark"]) .login-card .error,
+:root[data-theme="dark"] .content .error,
+:root[data-theme="dark"] .content .error-banner,
+:root[data-theme="dark"] .content .tool-notice,
+:root[data-theme="dark"] .content .custom-goal small,
+:root[data-theme="dark"] .content .comparison-values .negative strong,
+:root[data-theme="dark"] .login-card .error {
+  color: var(--danger-text);
+}
+:root:not([data-theme="dark"]) .content .caution,
+:root:not([data-theme="dark"]) .content .remember-warning,
+:root[data-theme="dark"] .content .caution,
+:root[data-theme="dark"] .content .remember-warning {
+  color: var(--warning-text);
+}
+
+/* State chips use text/background pairs above the 7:1 AAA threshold. */
+:root:not([data-theme="dark"]) .member-state-label.studying {
+  background: #dff3e4;
+  color: #0f4f2d;
+}
+:root:not([data-theme="dark"]) .member-state-label.resting {
+  background: #e9eeeb;
+  color: #31473b;
+}
+:root:not([data-theme="dark"]) .member-state-label.unknown {
+  background: #f8ead3;
+  color: #5c3600;
+}
+
+/* Data bars remain perceivable even when an upstream subject color is very pale. */
+:root:not([data-theme="dark"]) .daily-goal-track span,
+:root:not([data-theme="dark"]) .plan-progress span,
+:root:not([data-theme="dark"]) .plan-vs-record-track span,
+:root:not([data-theme="dark"]) .member-status-track .studying,
+:root:not([data-theme="dark"]) .weekday-track > span,
+:root[data-theme="dark"] .daily-goal-track span,
+:root[data-theme="dark"] .plan-progress span,
+:root[data-theme="dark"] .plan-vs-record-track span,
+:root[data-theme="dark"] .member-status-track .studying,
+:root[data-theme="dark"] .weekday-track > span {
+  background: var(--chart-accent);
+}
+.subject-track > span,
+.trend-subject-track > span {
+  box-shadow: inset 0 0 0 1px var(--chart-outline);
+}
+
+/* A 3px high-contrast indicator exceeds WCAG 2.2 Focus Appearance size/contrast minima. */
+:where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid var(--focus-accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
