@@ -168,7 +168,7 @@ export function StudyTools({ date, today, subjects, onFocusTaskChange }: {
         <h3>과목 계획과 완료 기록</h3>
         {plannedSubjects.map((subject) => <div className="plan-vs-record-row" key={subject.title}>
           <div className="plan-vs-record-label">
-            <span className="subject-color" style={{ backgroundColor: subject.color || "#8aa494" }} aria-hidden="true" />
+            <span className="subject-color" style={{ backgroundColor: subject.color || "var(--accent)" }} aria-hidden="true" />
             <strong>{subject.title}</strong>
           </div>
           <p>계획 {subject.plannedMs / 60_000}분 · 완료 기록 {subject.recordedMs === null ? "미확인" : duration(subject.recordedMs)}</p>
