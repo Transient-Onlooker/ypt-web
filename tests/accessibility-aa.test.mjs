@@ -81,3 +81,15 @@ test("accessible authentication keeps password-manager semantics and does not bl
   assert.match(main, /autoComplete="current-password"/);
   assert.doesNotMatch(source, /onPaste\s*=|clipboardData/);
 });
+
+
+test("statistics controls remain usable on narrow screens", () => {
+  const marker = css.indexOf("/* v0.29 online orange palette + stats menu repair */");
+  assert.notEqual(marker, -1);
+  const theme = css.slice(marker);
+  assert.match(theme, /\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?min-width:\s*0/);
+  assert.match(theme, /@media \(max-width:\s*650px\)[\s\S]*?\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/);
+  assert.match(theme, /\.stats-toolbar \.trend-range select\s*\{[\s\S]*?width:\s*100%/);
+  assert.match(theme, /@media \(max-width:\s*430px\)[\s\S]*?\.stats-toolbar \.history-trend-actions\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.match(theme, /\.mobile-page-switcher button\s*\{[\s\S]*?min-width:\s*0[\s\S]*?width:\s*100%/);
+});
