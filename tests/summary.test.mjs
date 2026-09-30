@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, verifiedGoalStreak } from "../shared/format.ts";
+import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
 
 test("copied summary includes completed time and only verified subject times", () => {
   const result = formatDaySummary({
@@ -154,4 +154,44 @@ test("current goal streak stops at a short, unknown, or missing day", () => {
   assert.equal(verifiedGoalStreak(days, 90), 0);
   assert.equal(verifiedGoalStreak([{ ...days[3], totalMs: null }], 60), null);
   assert.equal(verifiedGoalStreak([days[0], days[2]], 60), 1);
+});
+
+
+test("30-day subject summary and review accept a full monthly window", () => {
+  const days = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(Date.UTC(2026, 8, 1 + index)).toISOString().slice(0, 10);
+    return {
+      date,
+      totalMs: 3_600_000,
+      subjectTimesAvailable: true,
+      subjects: [{ title: "국어", studyMs: 3_600_000 }],
+    };
+  });
+  const subjects = summarizeTrendSubjects(days, 30);
+  assert.equal(subjects?.[0].totalMs, 108_000_000);
+  assert.match(formatTrendSubjectsCsv(days, 30), /"국어"/);
+  const review = formatTrendReview(days, 30, 0);
+  assert.match(review, /최근 30일 공부 요약/);
+  assert.match(review, /확인된 30\/30일/);
+  assert.doesNotMatch(review, /이전 7일/);
+});
+
+test("weekday summaries average only verified dates", () => {
+  const days = [
+    { date: "2026-09-21", totalMs: 3_600_000 },
+    { date: "2026-09-22", totalMs: 7_200_000 },
+    { date: "2026-09-28", totalMs: 1_800_000 },
+    { date: "2026-09-29", totalMs: null },
+  ];
+  const rows = summarizeWeekdays(days);
+  const monday = rows.find((row) => row.label === "월");
+  const tuesday = rows.find((row) => row.label === "화");
+  assert.deepEqual(
+    { knownDays: monday?.knownDays, studyDays: monday?.studyDays, totalMs: monday?.totalMs, averageMs: monday?.averageMs },
+    { knownDays: 2, studyDays: 2, totalMs: 5_400_000, averageMs: 2_700_000 },
+  );
+  assert.deepEqual(
+    { knownDays: tuesday?.knownDays, studyDays: tuesday?.studyDays, totalMs: tuesday?.totalMs, averageMs: tuesday?.averageMs },
+    { knownDays: 1, studyDays: 1, totalMs: 7_200_000, averageMs: 7_200_000 },
+  );
 });
