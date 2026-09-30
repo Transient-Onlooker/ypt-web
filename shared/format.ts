@@ -253,11 +253,11 @@ export function formatTrendReview(days: TrendDay[], rangeDays: TrendRangeDays, g
     const goalDays = known.filter((day) => (day.totalMs ?? 0) >= goalMinutes * 60_000).length;
     lines.push(`현재 하루 목표 ${goalMinutes}분 달성 ${goalDays}/${known.length}일 (과거 목표 설정은 알 수 없음)`);
   }
-  if (rangeDays === 14) {
-    const comparison = compareVerifiedWeeks(sorted);
+  if (rangeDays >= 14) {
+    const comparison = compareRecentSevenDayWindows(sorted);
     lines.push(comparison
-      ? `이전 7일 ${duration(comparison.earlier)} → 최근 7일 ${duration(comparison.recent)}`
-      : "앞뒤 7일 비교 미확인");
+      ? `직전 7일 ${duration(comparison.earlier)} → 최근 7일 ${duration(comparison.recent)}`
+      : "최근 7일 비교 미확인");
   }
   const subjects = summarizeTrendSubjects(sorted, rangeDays);
   if (subjects === null) lines.push("과목별 기간 시간 미확인");
