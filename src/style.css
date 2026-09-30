@@ -28,7 +28,6 @@
   --forest: var(--text);
   --leaf: var(--accent);
   --accent-fill: var(--accent);
-  --accent-hover: var(--accent-hover);
   --accent-text: var(--text);
   --focus-accent: var(--focus);
   --subtle: var(--text-muted);

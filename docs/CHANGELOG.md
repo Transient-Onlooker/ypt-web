@@ -2,6 +2,13 @@
 
 이 문서는 개발 버전의 사용자에게 보이는 변경과 검증 범위를 기록합니다. 버전 번호는 `package.json`과 일치합니다. 운영 배포 또는 GitHub Release를 뜻하지 않습니다.
 
+## v0.31.3 · 라이트 테마 accent-hover 토큰 순환 참조 수정 — 2026-10-01
+
+- 라이트 테마의 canonical token block에서 `--accent-hover`를 실제 HEX 값으로 선언한 뒤 compatibility alias 영역에서 `--accent-hover: var(--accent-hover)`로 다시 덮어쓰던 자기참조를 제거했습니다.
+- 이 순환 참조는 라이트 모드에서 `var(--accent-hover)`를 쓰는 뽀모도로 상단 강조선과 hover/background 선언을 computed-value 단계에서 무효화할 수 있었습니다.
+- semantic custom property가 자기 자신을 직접 참조하면 테스트가 실패하도록 회귀 검사를 추가했습니다.
+- Worker/D1 변경은 없습니다.
+
 ## v0.31.2 · 타이머 모드 상단 강조 복원 — 2026-09-30
 
 - 일반 타이머와 뽀모도로를 전환할 때 타이머 카드 상단 3px 강조선 색이 바뀌는 시각적 구분을 복원했습니다.

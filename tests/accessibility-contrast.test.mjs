@@ -102,6 +102,10 @@ test("legacy theme-specific component selectors are completely removed", () => {
   assert.doesNotMatch(css, /:root:not\(\[data-theme="dark"\]\)/);
 });
 
+test("semantic theme custom properties never reference themselves", () => {
+  assert.doesNotMatch(css, /(--[a-z0-9-]+)\s*:\s*var\(\1(?:\s*,[^)]*)?\)\s*;/i);
+});
+
 test("large dark surfaces use neutral theme surfaces, not the accent", () => {
   assert.match(css, /\.topbar,[\s\S]*?\.settings-popover\s*\{[\s\S]*?background:\s*var\(--surface\)/);
   assert.match(css, /\.timer-card,[\s\S]*?\.week-row\s*\{[\s\S]*?background:\s*var\(--surface\)/);
