@@ -3122,33 +3122,33 @@ input[type="search"] {
 
 /* v0.26 accessibility contrast */
 :root:not([data-theme="dark"]) {
-  --accent-fill: #2f5a45;
-  --accent-hover: #284c3a;
-  --accent-text: #2f5a45;
-  --focus-accent: #2f5a45;
-  --subtle: #555555;
-  --accent-on-dark: #a8d5bd;
-  --accent-border: #2f5a45;
-  --chart-accent: #2f5a45;
+  --accent-fill: #3f6856;
+  --accent-hover: #345747;
+  --accent-text: #3f6856;
+  --focus-accent: #3f6856;
+  --subtle: #666666;
+  --accent-on-dark: #8caf9c;
+  --accent-border: #3f6856;
+  --chart-accent: #3f6856;
   --chart-outline: #000000;
-  --danger-text: #8f341f;
-  --warning-text: #6b4200;
+  --danger-text: #b64b4b;
+  --warning-text: #7b4b0b;
 }
 :root[data-theme="dark"] {
-  --accent-fill: #2f5a45;
-  --accent-hover: #365c4b;
-  --accent-text: #a8d5bd;
-  --focus-accent: #a8d5bd;
+  --accent-fill: #3f6856;
+  --accent-hover: #4b7662;
+  --accent-text: #8caf9c;
+  --focus-accent: #8caf9c;
   --subtle: #a3a3a3;
-  --accent-on-dark: #a8d5bd;
-  --accent-border: #a8d5bd;
+  --accent-on-dark: #8caf9c;
+  --accent-border: #8caf9c;
   --chart-accent: #70a57b;
   --chart-outline: #ffffff;
-  --danger-text: #ffb4a2;
-  --warning-text: #ffd99c;
+  --danger-text: #ffbaa3;
+  --warning-text: #f0b65e;
 }
 
-/* Keep normal-size emphasis text at AAA contrast while preserving green as the accent. */
+/* Keep normal-size emphasis text above WCAG AA contrast while preserving green as the accent. */
 :root:not([data-theme="dark"]) .primary,
 :root[data-theme="dark"] .primary {
   background: var(--accent-fill);
@@ -3229,7 +3229,7 @@ input[type="search"] {
   color: var(--warning-text);
 }
 
-/* State chips use text/background pairs above the 7:1 AAA threshold. */
+/* State chips keep strong text/background contrast and do not rely on color alone. */
 :root:not([data-theme="dark"]) .member-state-label.studying {
   background: #dff3e4;
   color: #0f4f2d;
