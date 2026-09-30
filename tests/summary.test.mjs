@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareVerifiedWeeks, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
+import { formatDaySummary, formatDayCsv, formatTrendCsv, formatTrendSubjectsCsv, formatTrendReview, longestVerifiedStreak, compareRecentSevenDayWindows, compareVerifiedWeeks, currentVerifiedStudyStreak, medianVerifiedDailyMs, summarizeTrendSubjects, summarizeWeekdays, verifiedGoalStreak } from "../shared/format.ts";
 
 test("copied summary includes completed time and only verified subject times", () => {
   const result = formatDaySummary({
@@ -194,4 +194,52 @@ test("weekday summaries average only verified dates", () => {
     { knownDays: tuesday?.knownDays, studyDays: tuesday?.studyDays, totalMs: tuesday?.totalMs, averageMs: tuesday?.averageMs },
     { knownDays: 1, studyDays: 1, totalMs: 7_200_000, averageMs: 7_200_000 },
   );
+});
+
+
+test("median daily time includes verified zero days but ignores unknown days", () => {
+  assert.equal(medianVerifiedDailyMs([
+    { date: "2026-09-01", totalMs: 0 },
+    { date: "2026-09-02", totalMs: 3_600_000 },
+    { date: "2026-09-03", totalMs: 7_200_000 },
+    { date: "2026-09-04", totalMs: null },
+  ]), 3_600_000);
+  assert.equal(medianVerifiedDailyMs([
+    { date: "2026-09-01", totalMs: 0 },
+    { date: "2026-09-02", totalMs: 3_600_000 },
+  ]), 1_800_000);
+  assert.equal(medianVerifiedDailyMs([{ date: "2026-09-01", totalMs: null }]), null);
+});
+
+test("current study streak counts backward from the latest verified date", () => {
+  assert.equal(currentVerifiedStudyStreak([
+    { date: "2026-09-26", totalMs: 1_000 },
+    { date: "2026-09-27", totalMs: 2_000 },
+    { date: "2026-09-28", totalMs: 0 },
+    { date: "2026-09-29", totalMs: 3_000 },
+    { date: "2026-09-30", totalMs: 4_000 },
+  ]), 2);
+  assert.equal(currentVerifiedStudyStreak([
+    { date: "2026-09-29", totalMs: 3_000 },
+    { date: "2026-09-30", totalMs: null },
+  ]), null);
+  assert.equal(currentVerifiedStudyStreak([
+    { date: "2026-09-28", totalMs: 3_000 },
+    { date: "2026-09-30", totalMs: 4_000 },
+  ]), 1);
+});
+
+test("recent seven-day comparison uses the latest 14 verified consecutive days", () => {
+  const days = Array.from({ length: 30 }, (_, index) => ({
+    date: new Date(Date.UTC(2026, 8, index + 1)).toISOString().slice(0, 10),
+    totalMs: index < 23 ? 1_000 : 2_000,
+  }));
+  assert.deepEqual(compareRecentSevenDayWindows(days), {
+    earlier: 7_000,
+    recent: 14_000,
+    difference: 7_000,
+  });
+  days[25].totalMs = null;
+  assert.equal(compareRecentSevenDayWindows(days), null);
+  assert.equal(compareRecentSevenDayWindows(days.slice(0, 13)), null);
 });
