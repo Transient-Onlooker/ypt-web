@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const css = readFileSync(new URL("../src/style.css", import.meta.url), "utf8");
-const marker = css.indexOf("/* v0.28 online pastel + OLED palette */");
+const marker = css.indexOf("/* v0.29 online orange palette + stats menu repair */");
 assert.notEqual(marker, -1, "online palette block must exist");
 const tail = css.slice(marker);
 
@@ -44,29 +44,29 @@ function atLeast(actual, expected, label) {
   assert.ok(actual >= expected, `${label}: expected >= ${expected}:1, got ${actual.toFixed(3)}:1`);
 }
 
-test("approved online light palette keeps text and controls at WCAG AA contrast", () => {
+test("approved online orange light palette keeps text and controls at WCAG AA contrast", () => {
   const block = themeBlock(':root:not([data-theme="dark"])');
-  atLeast(contrast("#000000", "#F2F1EB"), 4.5, "light body text");
-  atLeast(contrast("#1E1E1E", "#F2F1EB"), 4.5, "light secondary text");
-  atLeast(contrast("#000000", "#88AB8E"), 4.5, "light primary button");
-  atLeast(contrast("#000000", "#AFC8AD"), 4.5, "light selected control");
-  assert.equal(variable(block, "canvas").toUpperCase(), "#F2F1EB");
-  assert.equal(variable(block, "surface").toUpperCase(), "#EEE7DA");
-  assert.equal(variable(block, "accent-fill").toUpperCase(), "#88AB8E");
-  assert.equal(variable(block, "accent-hover").toUpperCase(), "#AFC8AD");
+  atLeast(contrast("#000000", "#FFF0BE"), 4.5, "light body text");
+  atLeast(contrast("#1E1E1E", "#FFF0BE"), 4.5, "light secondary text");
+  atLeast(contrast("#000000", "#FF9A86"), 4.5, "light primary button");
+  atLeast(contrast("#000000", "#FFB399"), 4.5, "light selected control");
+  assert.equal(variable(block, "canvas").toUpperCase(), "#FFF0BE");
+  assert.equal(variable(block, "surface").toUpperCase(), "#FFD6A6");
+  assert.equal(variable(block, "accent-fill").toUpperCase(), "#FF9A86");
+  assert.equal(variable(block, "accent-hover").toUpperCase(), "#FFB399");
 });
 
-test("approved online OLED palette keeps text and controls at WCAG AA contrast", () => {
+test("approved online OLED orange palette keeps text and controls at WCAG AA contrast", () => {
   const block = themeBlock(':root[data-theme="dark"]');
   atLeast(contrast("#FFFFFF", "#000000"), 4.5, "OLED body text");
   atLeast(contrast("#888888", "#121212"), 4.5, "OLED secondary text");
-  atLeast(contrast("#000000", "#3EB489"), 4.5, "OLED primary button");
-  atLeast(contrast("#3EB489", "#121212"), 4.5, "OLED accent text");
+  atLeast(contrast("#000000", "#FFA500"), 4.5, "OLED primary button");
+  atLeast(contrast("#FFA500", "#121212"), 4.5, "OLED accent text");
   atLeast(contrast("#888888", "#121212"), 3, "OLED control border");
   assert.equal(variable(block, "canvas").toUpperCase(), "#000000");
   assert.equal(variable(block, "surface").toUpperCase(), "#121212");
-  assert.equal(variable(block, "accent-fill").toUpperCase(), "#3EB489");
-  assert.equal(variable(block, "accent-hover").toUpperCase(), "#98FF98");
+  assert.equal(variable(block, "accent-fill").toUpperCase(), "#FFA500");
+  assert.equal(variable(block, "accent-hover").toUpperCase(), "#CC5500");
 });
 
 test("focus indicators exceed the WCAG 2.2 3:1 contrast minimum in both themes", () => {
@@ -83,11 +83,11 @@ test("keyboard focus indicator is visibly reinforced beyond the AA minimum", () 
   );
 });
 
-test("v0.28 theme override uses only the approved online palette colors", () => {
+test("v0.29 theme override uses only the approved online palette colors", () => {
   const allowed = new Set([
-    "#F2F1EB", "#EEE7DA", "#AFC8AD", "#88AB8E",
+    "#FFF0BE", "#FFD6A6", "#FFB399", "#FF9A86",
     "#000000", "#121212", "#1E1E1E", "#FFFFFF", "#888888",
-    "#3EB489", "#98FF98",
+    "#FFA500", "#CC5500",
   ]);
   const colors = [...tail.matchAll(/#[0-9a-fA-F]{6}\b/g)].map((match) => match[0].toUpperCase());
   assert.ok(colors.length > 0);
