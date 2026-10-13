@@ -20,7 +20,7 @@ W3C 참고:
 - https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html
 - https://www.w3.org/WAI/WCAG22/Understanding/accessible-authentication-minimum.html
 
-## v0.31.0 핵심 대비
+## v0.31.3 기준 핵심 대비
 
 아래는 현재 테마 토큰을 WCAG 상대 휘도 공식으로 계산한 값입니다.
 
@@ -36,7 +36,7 @@ W3C 참고:
 | 다크 hover 버튼 | #000000 / #CC5500 | 4.87:1 | 통과 |
 | 다크 강조 텍스트 / 카드 | #FFA500 / #121212 | 9.49:1 | 통과 |
 
-런타임 테마는 단일 semantic token 세트에서만 색을 정의합니다. `style.css`, `main.tsx`, `study-tools.tsx`에 승인 팔레트 밖 6자리 HEX가 들어오면 자동 테스트가 실패합니다.
+런타임 테마는 단일 semantic token 세트에서만 색을 정의합니다. 라이트 `--accent-hover`의 순환 참조는 v0.31.3에서 제거했습니다. `style.css`, `main.tsx`, `study-tools.tsx`에 승인 팔레트 밖 6자리 HEX가 들어오면 자동 테스트가 실패합니다.
 
 ## 코드에서 확인한 AA 관련 구조
 
@@ -58,7 +58,7 @@ W3C 참고:
 
 ## 자동 검증
 
-- `tests/accessibility-contrast.test.mjs`: v0.31 단일 테마 토큰, 핵심 텍스트 4.5:1, 그래픽/포커스 3:1 이상과 승인 색상 목록을 검사
+- `tests/accessibility-contrast.test.mjs`: 단일 테마 토큰, 핵심 텍스트 4.5:1, 그래픽/포커스 3:1 이상, 승인 색상 목록, 레거시 selector와 custom property 직접 자기참조 재발 방지를 검사
 - `tests/accessibility-aa.test.mjs`: 언어, zoom 허용, skip link, form label, tabindex, click handler, focus 여백, 주요 target size, reflow CSS, label-in-name, accessible authentication의 정적 회귀 검사
 
 ## 코드만으로 확정할 수 없는 항목

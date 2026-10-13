@@ -1,13 +1,13 @@
 # 공부·집중 앱 기능 벤치마크
 
-2026-09-26에 각 제품의 공식 기능 안내를 확인했습니다. 기능 패턴만 참고했고 코드·디자인 자산을 복사하지 않았습니다. 열품타 API에서 확인되지 않은 데이터를 만들어내지 않는 범위에서 적용합니다.
+외부 제품의 공식 기능 안내는 2026-09-26 조사 기록이며, **YPT Web 적용 현황 설명은 2026-10-13 v0.31.3 코드 기준**입니다. 외부 제품 기능이 현재도 동일한지 다시 조사한 것은 아닙니다. 기능 패턴만 참고했고 코드·디자인 자산을 복사하지 않았습니다. 열품타 API에서 확인되지 않은 데이터를 만들어내지 않는 범위에서 적용합니다.
 
 | 제품과 공식 자료 | 참고한 기능 | YPT Web 적용 |
 | --- | --- | --- |
 | [Pomofocus](https://pomofocus.io/) | 오늘의 작업 목록, 작업별 예상 집중 시간, 집중·휴식 구간, 길이 조정 | v0.15.0에서 오늘의 계획과 독립 카운트다운 적용, v0.16.0에서 전날 미완료 계획 이어가기. 예상 시간과 열품타 실측 시간은 구분 |
-| [TickTick](https://www.ticktick.com/features), [집중 기능 안내](https://help.ticktick.com/articles/7055782010496745472), [집중 분포 안내](https://help.ticktick.com/articles/7055780404896202752) | 할 일 완료율, 포모도로·스톱워치, 집중 통계와 날짜 분포 | 완료율은 v0.15.0에, 7·14일 달력 분포는 v0.17.0에 적용. 스톱워치는 기존 열품타 타이머를 사용 |
+| [TickTick](https://www.ticktick.com/features), [집중 기능 안내](https://help.ticktick.com/articles/7055782010496745472), [집중 분포 안내](https://help.ticktick.com/articles/7055780404896202752) | 할 일 완료율, 포모도로·스톱워치, 집중 통계와 날짜 분포 | 완료율은 v0.15.0에, 7·14일 달력 분포는 v0.17.0에 적용, 30일은 v0.24.0에 확대. 스톱워치는 기존 열품타 타이머를 사용 |
 | [Forest](https://forestapp.cc/) | 연속 공부일, 집중 패턴, 태그, 일일 목표 | 검증된 날짜 기록으로 연속 공부일·목표 진행을 기존 버전에서 제공. 임의 태그와 앱 미션은 YPT 기록에 쓰지 않음 |
-| [Toggl Track](https://toggl.com/features/time-reporting) | 기간별 보고·필터, 내보내기, 목표 대비 시간 | 7·14일 기록·CSV·하루 목표에 적용. v0.16.0에서 과목별 기간 합계·CSV·현재 목표 달성일 추가. 미확인 날짜를 0시간으로 합산하지 않음 |
+| [Toggl Track](https://toggl.com/features/time-reporting) | 기간별 보고·필터, 내보내기, 목표 대비 시간 | 현재 7·14·30일 기록·CSV·하루 목표에 적용. v0.16.0에서 과목별 기간 합계·CSV·현재 목표 달성일 추가. 미확인 날짜를 0시간으로 합산하지 않음 |
 | [Freedom](https://freedom.to/features) | 앱·사이트 차단, 기기 간 동기화, 집중 예약 | 현재 웹 페이지에는 다른 휴대폰 앱을 차단할 권한이 없음. 차단 기능을 흉내 내거나 열품타 타이머를 자동 조작하지 않음 |
 | [Clockify 보고서](https://clockify.me/features/reports) | 주간 보고, 계획 시간과 실제 기록의 구분, 내보내기 | v0.17.0에서 기존 조회 기간의 완료 기록 회고를 복사. v0.18.0에서 연결한 과목별 예상 시간과 검증된 완료 기록을 별도 값으로 비교 |
 | [Todoist 생산성](https://www.todoist.com/help/todoist/features/use-the-productivity-view-in-todoist-6S63uAa9), [프로젝트 템플릿](https://www.todoist.com/help/articles/208821185-Project-templates), [여러 할 일 입력](https://www.todoist.com/help/todoist/features/add-or-manage-multiple-tasks-in-todoist-PcPoskdUp) | 목표 연속 달성, 작업 목록 재사용, 여러 작업 일괄 입력 | v0.17.0에서 현재 하루 목표의 확인된 연속 달성, 이 탭의 반복 계획, 여러 줄 빠른 입력 적용. 작업 데이터는 열품타와 동기화하지 않음 |
