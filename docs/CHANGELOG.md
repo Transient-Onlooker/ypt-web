@@ -2,6 +2,12 @@
 
 이 문서는 개발 버전의 사용자에게 보이는 변경과 검증 범위를 기록합니다. 버전 번호는 `package.json`과 일치합니다. 운영 배포 또는 GitHub Release를 뜻하지 않습니다.
 
+## 문서 동기화 (버전 변경 없음) · 2026-10-13
+
+- v0.31.3 코드와 README, 디자인, 접근성, 직접 QA, 기능 후보, 벤치마크, 배포 및 API 검증 문서의 현재 상태 설명을 동기화했습니다. 과거 버전/실험의 기록과 최신 운영 확인 여부를 구분합니다.
+- 공개 저장소의 추적 파일 및 `main` 변경 이력을 대상으로 한 패턴 기반 보안 검토 범위와 한계를 [`security-review.md`](security-review.md)에 기록했습니다.
+- **프런트·Worker·D1·의존성·라이선스 파일 변경 없음.** 따라서 `package.json`/lockfile 버전은 v0.31.3을 유지합니다.
+
 ## v0.31.3 · 라이트 테마 accent-hover 토큰 순환 참조 수정 — 2026-10-01
 
 - 라이트 테마의 canonical token block에서 `--accent-hover`를 실제 HEX 값으로 선언한 뒤 compatibility alias 영역에서 `--accent-hover: var(--accent-hover)`로 다시 덮어쓰던 자기참조를 제거했습니다.
