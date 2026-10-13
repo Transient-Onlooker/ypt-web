@@ -2,12 +2,24 @@
 
 화면은 GitHub Pages의 `https://ypt.mcv.kr`, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)의 `/api`로 제공하는 구성입니다. Pages는 GitHub Actions의 `.github/workflows/pages.yml`에서 빌드합니다. Worker의 D1 `ypt-web`에는 `worker/migrations/`의 마이그레이션을 순서대로 적용하고, Worker secret에는 `YPT_ENCRYPTION_KEY`를 설정합니다. `0002_group_access_cache.sql`은 그룹 접근 검증 결과를 짧게 재사용하는 캐시를, `0003_day_cache.sql`은 과거 일별 공부 기록을 계정·날짜별로 저장하는 캐시를 추가합니다. `ypt.mcv.kr` CNAME은 GitHub Pages를 가리킵니다. 인증서 승인과 HTTPS 화면·자산의 200 응답을 확인하고 HTTPS 강제를 켰습니다.
 
+## 버전·배포 상태 확인 (2026-10-13 문서 점검)
+
+- 코드 기준 버전: `package.json`의 **v0.31.3**. `main` 기준 SHA: `af4bb60ccaca82e8e1a0703c79854c87da05b934` (문서 동기화 작업 전).
+- 마지막으로 확인한 `main` GitHub Actions [run #36788884723](https://github.com/Transient-Onlooker/ypt-web/actions/runs/36788884723)은 `npm ci`, `npm test`, 프런트 빌드, Worker **dry-run**, Pages **실제 배포**가 성공했습니다. 이는 해당 시점의 Pages 배포 결과입니다.
+- GitHub Pages workflow는 **Worker를 실제 배포하지 않습니다.** Worker 코드·D1 migration을 변경할 때는 인증된 환경에서 remote migration/Worker deploy를 따로 수행해야 합니다. `npm run check:worker` 성공을 운영 Worker 최신화의 증거로 사용하지 않습니다.
+- 2026-10-13 문서 점검에서는 Cloudflare 계정의 현재 Worker 배포 SHA, D1 원격 migration 적용 상태, 실제 로그인 브라우저 QA를 새로 확인하지 않았습니다.
+
 ## 현재 검증 범위
 
 - Worker의 `GET /api/session`은 비로그인 상태를 반환합니다. `ypt.mcv.kr` 출처의 CORS 사전 요청은 204, 다른 출처의 로그인 요청은 403입니다.
 - 통합 테스트에서 Pages 출처의 사용자별 로그인·계정 분리·타이머 제어·로그아웃을 모의 열품타 응답으로 검증했습니다.
 - Pull request에서는 `npm test`, `npm run check:worker`, `npm run build`를 실행하고 Pages 배포는 하지 않습니다. `main` push와 수동 실행에서만 Pages를 배포합니다.
 - Pages 배포 워크플로 성공, DNS CNAME 변경, HTTPS 인증서 승인, Pages 화면·JS 자산 200 응답, HTTPS 강제 설정을 확인했습니다. 사용자가 실제 계정으로 Pages 주소의 로그인과 타이머 시작·종료 성공을 보고했습니다. 비밀번호 저장 제안과 기록·그룹 화면의 운영 주소 검증은 아직 남아 있습니다. [API 검증 기록](api-validation.md)을 참고합니다.
+
+## 공개 운영 보안 주의
+
+- 비밀 값 `YPT_ENCRYPTION_KEY`와 사용자 JWT·Google 액세스 토큰은 환경 변수/Cloudflare Secrets로 관리하며 Git/채팅/CI 로그에 기록하지 않습니다. 공개 가능 설정값인 OAuth 웹 클라이언트 ID나 D1 데이터베이스 식별자와 구분합니다.
+- 운영 Worker와 GitHub Pages의 배포 시점을 맞춰 검증하고, `npm audit --json` 및 GitHub Dependabot 보안 알림은 별도 실행·조회해야 합니다. 이 저장소의 최근 점검 범위는 [보안 점검 기록](security-review.md)을 참고합니다.
 
 ## 재배포
 
