@@ -2245,6 +2245,65 @@ input[type="search"] {
   color: var(--text-muted);
 }
 .settings-popover p { margin: 0; color: var(--text); font-size: 12px; line-height: 1.5; }
+.device-settings {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+.device-settings-heading { display: flex; align-items: center; gap: 10px; }
+.device-settings-heading > div { min-width: 0; }
+.device-settings-heading strong { font-size: 14px; }
+.settings-popover .device-settings-heading p,
+.settings-popover .device-code-hint { color: var(--text-muted); font-size: 12px; }
+.device-settings-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 20px;
+}
+.device-code-label { display: grid; gap: 6px; color: var(--text); font-size: 12px; font-weight: 700; }
+.device-code-label input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: .08em;
+  font-variant-numeric: tabular-nums;
+}
+.device-code-label input::placeholder { color: var(--text-muted); letter-spacing: 0; }
+.device-pair-button { width: 100%; min-height: 44px; }
+.device-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 4px; font-size: 12px; }
+.device-refresh-button,
+.device-list-item button {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.device-list-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.device-list-item > span { display: grid; gap: 3px; min-width: 0; font-size: 12px; }
+.device-list-item small { color: var(--text-muted); }
+.settings-popover .device-message { padding: 9px 10px; border-radius: 8px; background: var(--surface); color: var(--text); }
 @media (max-width: 480px) {
   .page-controls { justify-content: flex-end; }
 }

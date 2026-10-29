@@ -847,10 +847,12 @@ function SettingsMenu({ open, onOpenChange, accountLabel, syncSeconds, onSyncSec
   const [deviceCode, setDeviceCode] = useState("");
   const [deviceMessage, setDeviceMessage] = useState("");
   const [devices, setDevices] = useState<{id: string; createdAt: number}[]>([]);
+  const [devicesLoaded, setDevicesLoaded] = useState(false);
   const refreshDevices = async () => {
     try {
       const result = await api<{devices: {id: string; createdAt: number}[]}>("/devices");
       setDevices(result.devices);
+      setDevicesLoaded(true);
     } catch (error) { setDeviceMessage(error instanceof Error ? error.message : "기기 조회 실패"); }
   };
   const pairDevice = async () => {
@@ -892,19 +894,27 @@ function SettingsMenu({ open, onOpenChange, accountLabel, syncSeconds, onSyncSec
       </label>
       <p>타이머와 선택한 그룹 현황의 서버 확인 간격입니다. 그룹 목록은 최소 60초 간격으로 확인합니다.</p>
       <hr />
-      <section aria-label="ESP32 기기 연결">
-        <strong>ESP32 기기 연결</strong>
-        <label>기기 연결 코드
+      <section className="device-settings" aria-label="ESP32 기기 연결">
+        <div className="device-settings-heading">
+          <span className="device-settings-icon" aria-hidden="true">▦</span>
+          <div><strong>ESP32 기기</strong><p>공부 타이머를 계정에 연결해요</p></div>
+        </div>
+        <label className="device-code-label">기기 연결 코드
           <input inputMode="numeric" maxLength={8} value={deviceCode} autoComplete="off"
-            onChange={(event) => setDeviceCode(event.target.value.replace(/\D/g, ""))} />
+            placeholder="8자리 숫자" onChange={(event) => setDeviceCode(event.target.value.replace(/\D/g, ""))} />
         </label>
-        <button type="button" onClick={() => void pairDevice()}>연결</button>
-        <button type="button" onClick={() => void refreshDevices()}>연결된 기기 조회</button>
-        {devices.map((device) => <div key={device.id}>
-          <span>기기 {device.id.slice(0, 8)} · {new Date(device.createdAt).toLocaleDateString()}</span>
+        <p className="device-code-hint">기기 설정 화면에서 발급한 코드를 입력해 주세요.</p>
+        <button className="primary device-pair-button" type="button" onClick={() => void pairDevice()}>기기 연결하기</button>
+        <div className="device-list-heading">
+          <strong>연결된 기기</strong>
+          <button className="device-refresh-button" type="button" onClick={() => void refreshDevices()}>조회</button>
+        </div>
+        {devicesLoaded && devices.length === 0 && <p className="device-code-hint">연결된 기기가 없어요.</p>}
+        {devices.map((device) => <div className="device-list-item" key={device.id}>
+          <span><strong>기기 {device.id.slice(0, 8)}</strong><small>연결일 {new Date(device.createdAt).toLocaleDateString()}</small></span>
           <button type="button" onClick={() => void revokeDevice(device.id)}>연결 해제</button>
         </div>)}
-        {deviceMessage && <p role="status">{deviceMessage}</p>}
+        {deviceMessage && <p className="device-message" role="status">{deviceMessage}</p>}
       </section>
     </div>
   </details>;
