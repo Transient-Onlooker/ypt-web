@@ -896,15 +896,19 @@ function SettingsMenu({ open, onOpenChange, accountLabel, syncSeconds, onSyncSec
       <hr />
       <section className="device-settings" aria-label="ESP32 기기 연결">
         <div className="device-settings-heading">
-          <span className="device-settings-icon" aria-hidden="true">▦</span>
-          <div><strong>ESP32 기기</strong><p>공부 타이머를 계정에 연결해요</p></div>
+          <span className="device-settings-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="6" y="5" width="12" height="14" rx="2" /><path d="M9 9h6M9 12h6M9 15h3M3 9h3M3 15h3M18 9h3M18 15h3" />
+            </svg>
+          </span>
+          <div><strong>ESP32 기기</strong><p>내 타이머를 계정에 연결</p></div>
         </div>
         <label className="device-code-label">기기 연결 코드
           <input inputMode="numeric" maxLength={8} value={deviceCode} autoComplete="off"
             placeholder="8자리 숫자" onChange={(event) => setDeviceCode(event.target.value.replace(/\D/g, ""))} />
         </label>
-        <p className="device-code-hint">기기 설정 화면에서 발급한 코드를 입력해 주세요.</p>
-        <button className="primary device-pair-button" type="button" onClick={() => void pairDevice()}>기기 연결하기</button>
+        <p className="device-code-hint">기기 설정 화면에서 발급한 8자리 코드를 입력하세요.</p>
+        <button className="primary device-pair-button" type="button" onClick={() => void pairDevice()}>연결하기</button>
         <div className="device-list-heading">
           <strong>연결된 기기</strong>
           <button className="device-refresh-button" type="button" onClick={() => void refreshDevices()}>조회</button>
