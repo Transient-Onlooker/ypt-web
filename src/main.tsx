@@ -844,6 +844,28 @@ function SettingsMenu({ open, onOpenChange, accountLabel, syncSeconds, onSyncSec
   onSyncSecondsChange: (seconds: number) => void;
   className?: string;
 }) {
+  const [deviceCode, setDeviceCode] = useState("");
+  const [deviceMessage, setDeviceMessage] = useState("");
+  const [devices, setDevices] = useState<{id: string; createdAt: number}[]>([]);
+  const refreshDevices = async () => {
+    try {
+      const result = await api<{devices: {id: string; createdAt: number}[]}>("/devices");
+      setDevices(result.devices);
+    } catch (error) { setDeviceMessage(error instanceof Error ? error.message : "기기 조회 실패"); }
+  };
+  const pairDevice = async () => {
+    if (!/^\d{8}$/.test(deviceCode)) { setDeviceMessage("8자리 연결 코드를 입력하세요."); return; }
+    try {
+      await api("/devices/claim", "POST", {code: deviceCode});
+      setDeviceCode(""); setDeviceMessage("기기가 연결됐습니다."); await refreshDevices();
+    } catch (error) { setDeviceMessage(error instanceof Error ? error.message : "기기 연결 실패"); }
+  };
+  const revokeDevice = async (id: string) => {
+    try {
+      await api("/devices/revoke", "POST", {id});
+      setDeviceMessage("기기 연결을 해제했습니다."); await refreshDevices();
+    } catch (error) { setDeviceMessage(error instanceof Error ? error.message : "연결 해제 실패"); }
+  };
   return <details className={`settings-menu ${className}`.trim()} open={open}
     onToggle={(event) => onOpenChange(event.currentTarget.open)}>
     <summary>설정</summary>
@@ -869,6 +891,21 @@ function SettingsMenu({ open, onOpenChange, accountLabel, syncSeconds, onSyncSec
         </select>
       </label>
       <p>타이머와 선택한 그룹 현황의 서버 확인 간격입니다. 그룹 목록은 최소 60초 간격으로 확인합니다.</p>
+      <hr />
+      <section aria-label="ESP32 기기 연결">
+        <strong>ESP32 기기 연결</strong>
+        <label>기기 연결 코드
+          <input inputMode="numeric" maxLength={8} value={deviceCode} autoComplete="off"
+            onChange={(event) => setDeviceCode(event.target.value.replace(/\D/g, ""))} />
+        </label>
+        <button type="button" onClick={() => void pairDevice()}>연결</button>
+        <button type="button" onClick={() => void refreshDevices()}>연결된 기기 조회</button>
+        {devices.map((device) => <div key={device.id}>
+          <span>기기 {device.id.slice(0, 8)} · {new Date(device.createdAt).toLocaleDateString()}</span>
+          <button type="button" onClick={() => void revokeDevice(device.id)}>연결 해제</button>
+        </div>)}
+        {deviceMessage && <p role="status">{deviceMessage}</p>}
+      </section>
     </div>
   </details>;
 }

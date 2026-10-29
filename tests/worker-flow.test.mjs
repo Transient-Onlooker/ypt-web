@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID, createHash } from "node:crypto";
 import worker from "../worker/index.ts";
 import { PENDING_RECOVERY_MS } from "../shared/constants.ts";
 
@@ -14,6 +14,7 @@ function database() {
       "../worker/migrations/0001_initial.sql",
       "../worker/migrations/0002_group_access_cache.sql",
       "../worker/migrations/0003_day_cache.sql",
+      "../worker/migrations/0004_devices.sql",
     ].map((path) => readFileSync(new URL(path, import.meta.url), "utf8")).join("\n"),
   );
   return {
@@ -24,6 +25,7 @@ function database() {
         bind(...values) {
           return {
             first: async () => statement.get(...values) ?? null,
+            all: async () => ({ results: statement.all(...values) }),
             run: async () => ({
               meta: { changes: Number(statement.run(...values).changes) },
             }),
@@ -36,6 +38,74 @@ function database() {
     },
   };
 }
+
+test("device pairing is one-time, scoped, revocable and uses shared timer state", async () => {
+  const stub = upstream();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = stub.fetch;
+  const db = database();
+  const env = {DB: db, APP_ORIGIN: origin, YPT_ENCRYPTION_KEY: randomBytes(32).toString("base64"), ASSETS: {fetch: () => new Response("page")}};
+  const token = randomBytes(32).toString("hex");
+  const deviceCall = async (path, method = "GET", data, withOrigin = false) => {
+    const response = await worker.fetch(new Request(`${origin}/api${path}`, {
+      method,
+      headers: {Authorization: `Device ${token}`, ...(data ? {"Content-Type":"application/json"} : {}), ...(withOrigin ? {Origin: origin} : {})},
+      ...(data ? {body: JSON.stringify(data)} : {}),
+    }), env);
+    return {status: response.status, data: await response.json()};
+  };
+  try {
+    const login = await call(env, "/login", "POST", {email:"device@example.test", password:"correct"});
+    assert.equal(login.status, 200);
+    const noPossession = await worker.fetch(new Request(`${origin}/api/device/pair/begin`, {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({code:"87654321", tokenHash:createHash("sha256").update(token).digest("hex")}),
+    }), env);
+    assert.equal(noPossession.status, 400);
+    const begin = await worker.fetch(new Request(`${origin}/api/device/pair/begin`, {
+      method:"POST", headers:{"Content-Type":"application/json", Authorization:`Device ${token}`}, body:JSON.stringify({code:"12345678"}),
+    }), env);
+    assert.equal(begin.status, 200);
+    assert.equal((await deviceCall("/device/session")).status, 401);
+    db.sqlite.prepare("UPDATE device_pairs SET expires_at=? WHERE code_hash=?")
+      .run(Date.now() - 1, createHash("sha256").update("12345678").digest("hex"));
+    assert.equal((await call(env, "/devices/claim", "POST", {code:"12345678"}, login.cookie, login.data.csrf)).status, 404);
+    db.sqlite.prepare("UPDATE device_pairs SET expires_at=? WHERE code_hash=?")
+      .run(Date.now() + 60_000, createHash("sha256").update("12345678").digest("hex"));
+    assert.equal((await call(env, "/devices/claim", "POST", {code:"12345678"}, login.cookie, login.data.csrf)).status, 200);
+    assert.equal((await call(env, "/devices/claim", "POST", {code:"12345678"}, login.cookie, login.data.csrf)).status, 404);
+    assert.equal((await deviceCall("/device/session")).status, 200);
+    assert.equal((await deviceCall("/device/session", "GET", undefined, true)).status, 401);
+    assert.equal((await deviceCall("/snapshot", "GET", undefined, true)).status, 401);
+    assert.equal((await deviceCall("/groups")).status, 403);
+    const snapshot = await deviceCall("/snapshot");
+    assert.equal(snapshot.status, 200);
+    const operationId = randomUUID();
+    const input = {operationId, revision:snapshot.data.timer.revision, subject:"수학"};
+    assert.equal((await deviceCall("/timer/start", "POST", input)).status, 200);
+    assert.equal((await deviceCall("/timer/start", "POST", input)).status, 409);
+    const running = await call(env, "/snapshot", "GET", undefined, login.cookie);
+    assert.equal(running.data.timer.state, "running");
+    assert.equal((await deviceCall("/timer/pause", "POST", {operationId:randomUUID(), revision:running.data.timer.revision})).status, 403);
+    const paused = await call(env, "/timer/pause", "POST", {operationId:randomUUID(), revision:running.data.timer.revision}, login.cookie, login.data.csrf);
+    assert.equal(paused.status, 200);
+    const pausedSnapshot = await deviceCall("/snapshot");
+    assert.equal(pausedSnapshot.data.timer.state, "paused");
+    const resume = await deviceCall("/timer/resume", "POST", {operationId:randomUUID(), revision:pausedSnapshot.data.timer.revision});
+    assert.equal(resume.status, 200);
+    const resumed = await deviceCall("/snapshot");
+    assert.equal(resumed.data.timer.state, "running");
+    assert.equal((await deviceCall("/timer/stop", "POST", {operationId:randomUUID(), revision:resumed.data.timer.revision})).status, 200);
+    const other = await call(env, "/login", "POST", {email:"other@example.test", password:"correct"});
+    const otherDevices = await call(env, "/devices", "GET", undefined, other.cookie);
+    assert.equal(otherDevices.data.devices.length, 0);
+    assert.equal((await call(env, "/devices/revoke", "POST", {id:createHash("sha256").update(token).digest("hex")}, other.cookie, other.data.csrf)).status, 200);
+    assert.equal((await deviceCall("/device/session")).status, 200);
+    const listed = await call(env, "/devices", "GET", undefined, login.cookie);
+    assert.equal(listed.data.devices.length, 1);
+    assert.equal((await call(env, "/devices/revoke", "POST", {id:listed.data.devices[0].id}, login.cookie, login.data.csrf)).status, 200);
+    assert.equal((await deviceCall("/device/session")).status, 401);
+  } finally { db.sqlite.close(); globalThis.fetch = realFetch; }
+});
 function upstream() {
   const users = new Map();
   const requestCounts = new Map();

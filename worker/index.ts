@@ -166,11 +166,24 @@ async function session(request: Request, env: Env) {
     .bind(await sha(value), Date.now())
     .first<Session>();
 }
+async function deviceSession(request: Request, env: Env): Promise<Session | null> {
+  const authorization = request.headers.get("Authorization") ?? "";
+  if (request.headers.has("Origin") || !/^Device [0-9a-f]{64}$/.test(authorization)) return null;
+  const tokenHash = await sha(authorization.slice(7));
+  const device = await env.DB.prepare(
+    "SELECT token_hash, account_id FROM devices WHERE token_hash=?",
+  ).bind(tokenHash).first<{token_hash: string; account_id: string}>();
+  if (!device) return null;
+  const now = Date.now();
+  await env.DB.prepare("UPDATE devices SET last_seen_at=? WHERE token_hash=? AND last_seen_at<?")
+    .bind(now, tokenHash, now - 60_000).run();
+  return {...device, csrf: "", expires_at: Number.MAX_SAFE_INTEGER};
+}
 async function cleanupExpiredSessions(env: Env) {
   await env.DB.prepare("DELETE FROM sessions WHERE expires_at<=?")
     .bind(Date.now()).run();
   await env.DB.prepare(
-    "DELETE FROM accounts WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.account_id=accounts.id)",
+    "DELETE FROM accounts WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.account_id=accounts.id) AND NOT EXISTS (SELECT 1 FROM devices WHERE devices.account_id=accounts.id)",
   ).bind().run();
 }
 async function revokeSessionGroup(env: Env, s: Session) {
@@ -999,6 +1012,29 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     const path = url.pathname;
+    if (path === "/api/device/pair/begin" && request.method === "POST") {
+      if (request.headers.has("Origin") || !(await limitIp(env, request)))
+        return fail("PAIR_LIMIT", 429, "잠시 뒤 다시 시도해 주세요.");
+      const input = await body(request);
+      const authorization = request.headers.get("Authorization") ?? "";
+      if (!input || typeof input.code !== "string" || !/^[0-9]{8}$/.test(input.code) ||
+          !/^Device [0-9a-f]{64}$/.test(authorization))
+        return fail("INPUT", 400, "연결 요청을 확인해 주세요.");
+      const tokenHash = await sha(authorization.slice(7));
+      if (await env.DB.prepare("SELECT token_hash FROM devices WHERE token_hash=?").bind(tokenHash).first())
+        return fail("PAIR_CONFLICT", 409, "이미 연결된 기기입니다.");
+      const now = Date.now();
+      await env.DB.prepare("DELETE FROM device_pairs WHERE expires_at<=?").bind(now).run();
+      try {
+        await env.DB.prepare("INSERT INTO device_pairs(code_hash,token_hash,expires_at) VALUES(?,?,?)")
+          .bind(await sha(input.code), tokenHash, now + 5 * 60_000).run();
+      } catch { return fail("PAIR_CONFLICT", 409, "새 연결 코드로 다시 시도해 주세요."); }
+      return json({expiresInSeconds: 300});
+    }
+    if (path === "/api/device/session" && request.method === "GET") {
+      const device = await deviceSession(request, env);
+      return device ? json({authenticated: true}) : fail("UNAUTHORIZED", 401, "연결되지 않은 기기입니다.");
+    }
     if (path === "/api/login" && request.method === "POST") {
       try {
         return await loginRoute(request, env);
@@ -1016,8 +1052,16 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       }
     }
     let s: Session | null;
+    let device: Session | null = null;
     try {
-      s = await session(request, env);
+      if ((request.headers.get("Authorization") ?? "").startsWith("Device ")) {
+        device = await deviceSession(request, env);
+        if (!device) return fail("UNAUTHORIZED", 401, "연결되지 않은 기기입니다.");
+        if (!((path === "/api/snapshot" && request.method === "GET") ||
+              (/^\/api\/timer\/(start|stop|resume)$/.test(path) && request.method === "POST")))
+          return fail("FORBIDDEN", 403, "기기에서 사용할 수 없는 요청입니다.");
+        s = device;
+      } else s = await session(request, env);
     } catch {
       return fail("SERVER_ERROR", 500, "세션을 확인하지 못했습니다.");
     }
@@ -1030,7 +1074,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
           ? { "Set-Cookie": rememberCookie("", 0) } : {},
       );
     if (!s) return fail("UNAUTHORIZED", 401, "다시 로그인해 주세요.");
-    if (request.method !== "GET" && !mutationAllowed(request, env, s))
+    if (!device && request.method !== "GET" && !mutationAllowed(request, env, s))
       return fail("CSRF", 403, "요청을 확인할 수 없습니다.");
     if (path === "/api/logout" && request.method === "POST") {
       await revokeSessionGroup(env, s);
@@ -1041,6 +1085,34 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         "Set-Cookie": pages ? rememberCookie("", 0) :
           `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`,
       });
+    }
+    if (path === "/api/devices/claim" && request.method === "POST") {
+      if (!(await limitIp(env, request))) return fail("PAIR_LIMIT", 429, "잠시 뒤 다시 시도해 주세요.");
+      const input = await body(request);
+      if (!input || typeof input.code !== "string" || !/^[0-9]{8}$/.test(input.code))
+        return fail("INPUT", 400, "연결 코드를 확인해 주세요.");
+      const now = Date.now();
+      const codeHash = await sha(input.code);
+      // INSERT and consumption are tied by a unique token hash. Repeated claims cannot reassign it.
+      const claimed = await env.DB.prepare(
+        "INSERT OR IGNORE INTO devices(token_hash,account_id,created_at,last_seen_at) SELECT token_hash,?,?,? FROM device_pairs WHERE code_hash=? AND expires_at>?",
+      ).bind(s.account_id, now, now, codeHash, now).run();
+      if (!claimed.meta.changes) return fail("PAIR_INVALID", 404, "코드가 만료됐거나 이미 사용됐습니다.");
+      await env.DB.prepare("DELETE FROM device_pairs WHERE code_hash=?").bind(codeHash).run();
+      return json({paired: true});
+    }
+    if (path === "/api/devices" && request.method === "GET") {
+      const result = await env.DB.prepare("SELECT token_hash,created_at,last_seen_at FROM devices WHERE account_id=? ORDER BY created_at DESC")
+        .bind(s.account_id).all<{token_hash:string;created_at:number;last_seen_at:number}>();
+      return json({devices: result.results.map(d => ({id:d.token_hash, createdAt:d.created_at, lastSeenAt:d.last_seen_at}))});
+    }
+    if (path === "/api/devices/revoke" && request.method === "POST") {
+      const input = await body(request);
+      if (!input || typeof input.id !== "string" || !/^[0-9a-f]{64}$/.test(input.id))
+        return fail("INPUT", 400, "기기를 확인해 주세요.");
+      await env.DB.prepare("DELETE FROM devices WHERE account_id=? AND token_hash=?").bind(s.account_id, input.id).run();
+      await cleanupExpiredSessions(env);
+      return json({revoked:true});
     }
     try {
       const jwt = await credential(env, s.account_id);
@@ -1128,7 +1200,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       return fail("NOT_FOUND", 404, "요청을 찾을 수 없습니다.");
     } catch (e) {
       if (e instanceof YptError && e.code === "AUTH_EXPIRED") {
-        await revokeSessionGroup(env, s);
+        if (device) await env.DB.prepare("DELETE FROM devices WHERE token_hash=?").bind(device.token_hash).run();
+        else await revokeSessionGroup(env, s);
         await cleanupExpiredSessions(env);
         const pages = request.headers.get("Origin") === PAGES_ORIGIN;
         if (pages) await revokeRememberCookie(request, env);
