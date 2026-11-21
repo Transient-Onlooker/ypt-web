@@ -1,6 +1,6 @@
 # 배포와 도메인 연결
 
-화면은 GitHub Pages의 `https://ypt.mcv.kr`, API는 [Cloudflare Worker](https://ypt-web.junuh145858.workers.dev)의 `/api`로 제공하는 구성입니다. Pages는 GitHub Actions의 `.github/workflows/pages.yml`에서 빌드합니다. Worker의 D1 `ypt-web`에는 `worker/migrations/`의 마이그레이션을 순서대로 적용하고, Worker secret에는 `YPT_ENCRYPTION_KEY`를 설정합니다. `0002_group_access_cache.sql`은 그룹 접근 검증 결과를 짧게 재사용하는 캐시를, `0003_day_cache.sql`은 과거 일별 공부 기록을 계정·날짜별로 저장하는 캐시를 추가합니다. `ypt.mcv.kr` CNAME은 GitHub Pages를 가리킵니다. 인증서 승인과 HTTPS 화면·자산의 200 응답을 확인하고 HTTPS 강제를 켰습니다.
+화면은 GitHub Pages의 `https://ypt.mcv.kr`, API는 Cloudflare Worker의 `/api`로 제공하는 구성입니다. Pages는 GitHub Actions의 `.github/workflows/pages.yml`에서 빌드합니다. Worker의 D1 `ypt-web`에는 `worker/migrations/`의 마이그레이션을 순서대로 적용하고, Worker secret에는 `YPT_ENCRYPTION_KEY`를 설정합니다. `0002_group_access_cache.sql`은 그룹 접근 검증 결과를 짧게 재사용하는 캐시를, `0003_day_cache.sql`은 과거 일별 공부 기록을 계정·날짜별로 저장하는 캐시를 추가합니다. `ypt.mcv.kr` CNAME은 GitHub Pages를 가리킵니다. 인증서 승인과 HTTPS 화면·자산의 200 응답을 확인하고 HTTPS 강제를 켰습니다.
 
 ## 버전·배포 상태 확인 (2026-10-13 문서 점검)
 
